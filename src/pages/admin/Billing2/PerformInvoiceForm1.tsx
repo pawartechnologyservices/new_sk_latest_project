@@ -1,3 +1,6 @@
+
+
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Download, FileText } from "lucide-react";
-import { Invoice, InvoiceItem, clients, serviceTypes, formatCurrency } from "../AdminBilling";
+import { Invoice, InvoiceItem } from "../AdminBilling";
 import jsPDF from "jspdf";
+import { formatCurrency, formatDate, convertToIndianWords, calculateDueDate } from "../../../utils/formatters";
 
 interface PerformInvoiceItem {
   description: string;
@@ -21,8 +25,11 @@ interface PerformInvoiceItem {
 interface PerformInvoiceFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvoiceCreate: (invoice: Invoice) => void;
+  onInvoiceCreate: (invoice: Invoice) => Promise<boolean>;
   performInvoicesCount: number;
+   userId?: string;  // Add this
+  userRole?: string; // Add this
+
 }
 
 export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
@@ -68,14 +75,11 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     destination: "",
     deliveryTerms: "",
     
-    // Client details (for backward compatibility)
-    client: "",
+    // Client details
     clientEmail: "",
     serviceType: "",
-    dueDate: "",
-    invoiceDate: new Date().toISOString().split('T')[0],
     
-    // Additional fields
+    // Bank details
     accountHolder: "S K ENTEPRISES",
     bankName: "BANK OF MAHARASHTRA",
     accountNumber: "CA 60168661338",
@@ -85,88 +89,9 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     termsConditions: "E. & O.E"
   });
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const day = date.getDate();
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const year = date.getFullYear().toString().slice(-2);
-    return `${day}-${month}-${year}`;
-  };
+  const [loading, setLoading] = useState(false);
 
-  // Number to words converter
-  const convertToIndianWords = (num: number) => {
-    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    
-    function convert_hundreds(num: number) {
-      let result = '';
-      if (num >= 100) {
-        result += ones[Math.floor(num / 100)] + ' Hundred ';
-        num %= 100;
-      }
-      if (num >= 20) {
-        result += tens[Math.floor(num / 10)] + ' ';
-        num %= 10;
-      }
-      if (num >= 10) {
-        result += teens[num - 10] + ' ';
-        return result;
-      }
-      if (num > 0) {
-        result += ones[num] + ' ';
-      }
-      return result;
-    }
-    
-    function convert_number(num: number) {
-      if (num === 0) return 'Zero';
-      
-      let result = '';
-      const crore = Math.floor(num / 10000000);
-      if (crore > 0) {
-        result += convert_hundreds(crore) + 'Crore ';
-        num %= 10000000;
-      }
-      
-      const lakh = Math.floor(num / 100000);
-      if (lakh > 0) {
-        result += convert_hundreds(lakh) + 'Lakh ';
-        num %= 100000;
-      }
-      
-      const thousand = Math.floor(num / 1000);
-      if (thousand > 0) {
-        result += convert_hundreds(thousand) + 'Thousand ';
-        num %= 1000;
-      }
-      
-      const hundred = Math.floor(num / 100);
-      if (hundred > 0) {
-        result += convert_hundreds(hundred) + 'Hundred ';
-        num %= 100;
-      }
-      
-      if (num > 0) {
-        result += convert_hundreds(num);
-      }
-      
-      return result.trim();
-    }
-    
-    const rupees = Math.floor(num);
-    const paise = Math.round((num - rupees) * 100);
-    
-    let result = convert_number(rupees) + ' Rupees';
-    if (paise > 0) {
-      result += ' and ' + convert_number(paise) + ' Paise';
-    }
-    result += ' Only';
-    
-    return `INR ${result.toUpperCase()}`;
-  };
-
-  // Generate Sales Order PDF - UPDATED VERSION with separate UNIT column
+  // Generate Sales Order PDF
   const generateSalesOrderPDF = (invoiceData: any) => {
     try {
       const doc = new jsPDF({
@@ -202,7 +127,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       };
 
       // ==================== HEADER SECTION ====================
-      // Sales Order Title
       addText("SALES ORDER", pageWidth / 2, yPos, { 
         size: 16, 
         style: 'bold', 
@@ -210,7 +134,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       });
       yPos += 8;
       
-      // Company Name
       addText(formData.companyName || "S K Enterprises", pageWidth / 2, yPos, { 
         size: 12, 
         style: 'bold', 
@@ -218,7 +141,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       });
       yPos += 6;
       
-      // Company Address
       const companyAddress = formData.companyAddress || "Office No 505, 5th Floor, Global Square\nDeccan College Road, Yerwada, Pune";
       const companyAddressLines = companyAddress.split('\n');
       companyAddressLines.forEach((line: string) => {
@@ -231,14 +153,12 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       
       yPos += 2;
       
-      // GSTIN
       addText(`GSTIN/UIN: ${formData.companyGSTIN || "27ALKPK7734N1ZE"}`, pageWidth / 2, yPos, { 
         size: 9, 
         align: 'center' 
       });
       yPos += 4;
       
-      // State and Code
       addText(`State Name : ${formData.companyState || "Maharashtra"}, Code : ${formData.companyStateCode || "27"}`, 
         pageWidth / 2, yPos, { 
           size: 9, 
@@ -246,7 +166,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
         });
       yPos += 4;
       
-      // Email
       addText(`E-Mail : ${formData.companyEmail || "s.k.enterprises7583@gmail.com"}`, 
         pageWidth / 2, yPos, { 
           size: 9, 
@@ -255,14 +174,12 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       yPos += 10;
 
       // ==================== CONSIGNEE SECTION ====================
-      // Section Title
       addText("Consignee (Ship to)", leftMargin, yPos, { 
         size: 10, 
         style: 'bold' 
       });
       yPos += 5;
       
-      // Consignee Name
       const consigneeName = formData.consigneeName || formData.buyerName || "";
       addText(consigneeName, leftMargin, yPos, { 
         size: 10, 
@@ -270,7 +187,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       });
       yPos += 4;
       
-      // Consignee Address
       if (formData.consigneeAddress) {
         const consigneeAddressLines = formData.consigneeAddress.split('\n');
         consigneeAddressLines.forEach((line: string) => {
@@ -279,7 +195,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
         });
       }
       
-      // Consignee GSTIN
       if (formData.consigneeGSTIN) {
         addText(`GSTIN/UIN : ${formData.consigneeGSTIN}`, leftMargin, yPos, { size: 9 });
         yPos += 4;
@@ -294,14 +209,12 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       yPos += 8;
 
       // ==================== BUYER SECTION ====================
-      // Section Title
       addText("Buyer (Bill to)", leftMargin, yPos, { 
         size: 10, 
         style: 'bold' 
       });
       yPos += 5;
       
-      // Buyer Name
       const buyerName = formData.buyerName || "";
       addText(buyerName, leftMargin, yPos, { 
         size: 10, 
@@ -309,7 +222,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       });
       yPos += 4;
       
-      // Buyer Address
       if (formData.buyerAddress) {
         const buyerAddressLines = formData.buyerAddress.split('\n');
         buyerAddressLines.forEach((line: string) => {
@@ -318,7 +230,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
         });
       }
       
-      // Buyer GSTIN
       if (formData.buyerGSTIN) {
         addText(`GSTIN/UIN : ${formData.buyerGSTIN}`, leftMargin, yPos, { size: 9 });
         yPos += 4;
@@ -332,13 +243,11 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
 
       yPos += 8;
 
-      // ==================== ORDER DETAILS TABLE ====================
-      // Create a 2-column layout for order details
+      // ==================== ORDER DETAILS ====================
       const orderDetailsY = yPos;
       const col1X = leftMargin;
       const col2X = leftMargin + contentWidth * 0.6;
       
-      // Column 1 - Left side
       addText("Voucher No.", col1X, orderDetailsY, { size: 9 });
       addText(formData.voucherNo || "", col1X + 35, orderDetailsY, { 
         size: 9, 
@@ -354,7 +263,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       addText("Dated", col1X, orderDetailsY + 18, { size: 9 });
       addText(formatDate(formData.orderDate) || "", col1X + 35, orderDetailsY + 18, { size: 9 });
       
-      // Column 2 - Right side
       addText("Mode/Terms of Payment", col2X, orderDetailsY, { size: 9 });
       addText(formData.paymentTerms || "", col2X + 45, orderDetailsY, { size: 9 });
       
@@ -369,26 +277,23 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
 
       yPos = orderDetailsY + 24;
 
-      // ==================== ITEMS TABLE HEADER ====================
-      // Table Headers - Fixed aligned positions with UNIT column
+      // ==================== ITEMS TABLE ====================
       const columnPositions = {
         slNo: leftMargin + 5,
         description: leftMargin + 15,
         quantity: leftMargin + 110,
-        unit: leftMargin + 130,      // NEW: Unit column position
-        rate: leftMargin + 150,      // Adjusted for unit column
-        amount: leftMargin + 175     // Adjusted for unit column
+        unit: leftMargin + 130,
+        rate: leftMargin + 150,
+        amount: leftMargin + 175
       };
 
-      // Draw header line
       drawLine(yPos);
       yPos += 8;
 
-      // Table headers - INCLUDING UNIT COLUMN
       addText("Sl No.", columnPositions.slNo, yPos, { size: 9, style: 'bold', align: 'center' });
       addText("Description of Goods", columnPositions.description, yPos, { size: 9, style: 'bold', align: 'left' });
       addText("Quantity", columnPositions.quantity, yPos, { size: 9, style: 'bold', align: 'center' });
-      addText("Unit", columnPositions.unit, yPos, { size: 9, style: 'bold', align: 'center' }); // NEW: Unit header
+      addText("Unit", columnPositions.unit, yPos, { size: 9, style: 'bold', align: 'center' });
       addText("Rate per", columnPositions.rate, yPos, { size: 9, style: 'bold', align: 'right' });
       addText("Amount", columnPositions.amount, yPos, { size: 9, style: 'bold', align: 'right' });
       
@@ -396,16 +301,13 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       drawLine(yPos);
       yPos += 6;
 
-      // ==================== ITEMS TABLE ROWS ====================
       items.forEach((item, index) => {
-        // Check for page break
         if (yPos > pageHeight - 50) {
           doc.addPage();
           yPos = 20;
           addText("Continued...", pageWidth / 2, yPos, { size: 10, align: 'center' });
           yPos += 15;
           
-          // Redraw table header on new page
           drawLine(yPos - 8);
           addText("Sl No.", columnPositions.slNo, yPos, { size: 9, style: 'bold', align: 'center' });
           addText("Description of Goods", columnPositions.description, yPos, { size: 9, style: 'bold', align: 'left' });
@@ -418,35 +320,23 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
           yPos += 6;
         }
 
-        // Serial Number - Centered
         addText(`${index + 1}`, columnPositions.slNo, yPos, { size: 9, align: 'center' });
-        
-        // Description - Left aligned
-        const description = item.description || "";
-        addText(description, columnPositions.description, yPos, { 
+        addText(item.description || "", columnPositions.description, yPos, { 
           size: 9,
           align: 'left'
         });
-        
-        // Quantity - Centered
         addText(`${item.quantity}`, columnPositions.quantity, yPos, { 
           size: 9,
           align: 'center'
         });
-        
-        // Unit - Centered (NEW COLUMN)
         addText(item.unit || "No", columnPositions.unit, yPos, { 
           size: 9,
           align: 'center'
         });
-        
-        // Rate per - Right aligned
         addText(formatCurrency(item.rate), columnPositions.rate, yPos, { 
           size: 9,
           align: 'right'
         });
-        
-        // Amount - Right aligned
         addText(formatCurrency(item.amount), columnPositions.amount, yPos, { 
           size: 9,
           align: 'right'
@@ -455,7 +345,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
         yPos += 8;
       });
 
-      // Draw line after items
       drawLine(yPos);
       yPos += 8;
 
@@ -464,14 +353,12 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       const gst = subtotal * 0.18;
       const totalAmount = subtotal + gst;
       
-      // Total label
       addText("Total", columnPositions.rate - 5, yPos, { 
         size: 10, 
         style: 'bold',
         align: 'left'
       });
       
-      // Total amount
       addText(formatCurrency(totalAmount), columnPositions.amount, yPos, { 
         size: 10, 
         style: 'bold',
@@ -506,14 +393,12 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       yPos += 8;
 
       // ==================== BANK DETAILS ====================
-      // Section title
       addText("Company's Bank Details", leftMargin, yPos, { 
         size: 10, 
         style: 'bold' 
       });
       yPos += 6;
       
-      // Bank details
       addText(`A/c Holder's Name : ${formData.accountHolder || "S K ENTEPRISES"}`, leftMargin, yPos, { size: 9 });
       yPos += 4;
       
@@ -527,11 +412,9 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       yPos += 12;
 
       // ==================== SIGNATURE SECTION ====================
-      // Draw line for signature
       const signatureY = pageHeight - 40;
       drawLine(signatureY - 10);
       
-      // Company signature
       addText("for S K Enterprises", leftMargin + contentWidth * 0.25, signatureY, { 
         size: 9, 
         align: 'center' 
@@ -562,152 +445,140 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // Create invoice items with unit information
-    const invoiceItems: (InvoiceItem & { unit?: string })[] = items.map(item => ({
-      description: item.description,
-      quantity: item.quantity,
-      rate: item.rate,
-      amount: item.amount,
-      unit: item.unit // Include unit in the invoice item
-    }));
-
-    const subtotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
-    const gst = subtotal * 0.18;
-    const totalAmount = subtotal + gst;
-
-    const formattedDate = formatDate(formData.orderDate);
-    const amountInWords = convertToIndianWords(totalAmount);
-
-    const newInvoice: Invoice & { items: (InvoiceItem & { unit?: string })[] } = {
-      id: formData.voucherNo,
-      client: formData.consigneeName || formData.buyerName || formData.client,
-      clientEmail: formData.clientEmail,
-      amount: totalAmount,
-      status: "pending",
-      date: formattedDate,
-      dueDate: formData.dueDate ? formatDate(formData.dueDate) : "",
-      items: invoiceItems,
-      tax: gst,
-      discount: 0,
-      serviceType: formData.serviceType,
-      site: formData.destination,
-      invoiceType: "perform",
-      paymentTerms: formData.paymentTerms,
-      
-      // Sales Order specific fields
-      voucherNo: formData.voucherNo,
-      buyerRef: formData.buyerRef,
-      consignee: formData.consigneeName,
-      consigneeAddress: formData.consigneeAddress,
-      consigneeGSTIN: formData.consigneeGSTIN,
-      buyer: formData.buyerName,
-      buyerAddress: formData.buyerAddress,
-      buyerGSTIN: formData.buyerGSTIN,
-      companyGSTIN: formData.companyGSTIN,
-      companyState: formData.companyState,
-      companyStateCode: formData.companyStateCode,
-      email: formData.companyEmail,
-      
-      // Bank details
-      accountHolder: formData.accountHolder,
-      bankName: formData.bankName,
-      accountNumber: formData.accountNumber,
-      branchAndIFSC: formData.branchAndIFSC,
-      
-      // Additional fields
-      notes: formData.otherReferences,
-      dispatchedThrough: formData.dispatchedThrough,
-      deliveryTerms: formData.deliveryTerms,
-      amountInWords: amountInWords,
-      
-      // For backward compatibility
-      servicePeriodFrom: "",
-      servicePeriodTo: "",
-      managementFeesPercent: 0,
-      managementFeesAmount: 0,
-      roundUp: 0,
-      sacCode: "",
-      panNumber: "",
-      gstNumber: formData.companyGSTIN,
-      serviceLocation: "",
-      esicNumber: "",
-      lwfNumber: "",
-      pfNumber: "",
-      ifscCode: "MAHB0001233",
-      branch: "KALYANI NAGAR",
-      clientAddress: formData.buyerAddress,
-      invoiceNumber: formData.voucherNo,
-      companyName: formData.companyName,
-      companyAddress: formData.companyAddress,
-    };
-    
-    // First generate PDF
-    const pdfGenerated = generateSalesOrderPDF({
-      ...newInvoice,
-      items: invoiceItems,
-      consigneeName: formData.consigneeName,
-      consigneeAddress: formData.consigneeAddress,
-      consigneeGSTIN: formData.consigneeGSTIN,
-      buyerName: formData.buyerName,
-      buyerAddress: formData.buyerAddress,
-      buyerGSTIN: formData.buyerGSTIN,
-      voucherNo: formData.voucherNo,
-      date: formattedDate
-    });
-    
-    if (pdfGenerated) {
-      // Then save invoice to system
-      onInvoiceCreate(newInvoice as Invoice);
-      onClose();
-      resetForm();
+    // Validate form
+    if (!formData.consigneeName && !formData.buyerName) {
+      alert("Please enter either Consignee Name or Buyer Name");
+      return;
     }
-  };
+    
+    if (items.length === 0 || items.some(item => !item.description || item.quantity <= 0 || item.rate <= 0)) {
+      alert("Please add valid items with description, quantity, and rate");
+      return;
+    }
+    
+    setLoading(true);
 
-  // Function to download PDF only without saving to system
-  const handleDownloadOnly = () => {
-    const invoiceItems = items.map(item => ({
-      description: item.description,
-      quantity: item.quantity,
-      unit: item.unit,
-      rate: item.rate,
-      amount: item.amount
-    }));
+    try {
+      // Calculate amounts
+      const invoiceItems: InvoiceItem[] = items.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: item.quantity * item.rate,
+        unit: item.unit
+      }));
 
-    const subtotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
-    const gst = subtotal * 0.18;
-    const totalAmount = subtotal + gst;
+      const subtotal = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
+      const gst = subtotal * 0.18;
+      const totalAmount = subtotal + gst;
+      const formattedDate = formatDate(formData.orderDate);
+      const dueDate = calculateDueDate(formData.orderDate, 30);
+      const amountInWords = convertToIndianWords(totalAmount);
 
-    const formattedDate = formatDate(formData.orderDate);
-
-    const tempInvoice = {
-      id: formData.voucherNo,
-      client: formData.consigneeName || formData.buyerName || formData.client,
-      amount: totalAmount,
-      date: formattedDate,
-      items: invoiceItems,
-      consigneeName: formData.consigneeName,
-      consigneeAddress: formData.consigneeAddress,
-      consigneeGSTIN: formData.consigneeGSTIN,
-      consigneeState: formData.consigneeState,
-      consigneeStateCode: formData.consigneeStateCode,
-      buyerName: formData.buyerName,
-      buyerAddress: formData.buyerAddress,
-      buyerGSTIN: formData.buyerGSTIN,
-      buyerState: formData.buyerState,
-      buyerStateCode: formData.buyerStateCode,
-      voucherNo: formData.voucherNo,
-      buyerRef: formData.buyerRef,
-      paymentTerms: formData.paymentTerms,
-      notes: formData.otherReferences,
-      site: formData.destination,
-      dispatchedThrough: formData.dispatchedThrough,
-      deliveryTerms: formData.deliveryTerms,
-    };
-
-    generateSalesOrderPDF(tempInvoice);
+      const newInvoice: Invoice = {
+        id: formData.voucherNo,
+        invoiceNumber: formData.voucherNo,
+        voucherNo: formData.voucherNo,
+        invoiceType: "perform",
+        status: "pending",
+        
+        // Client info
+        client: formData.consigneeName || formData.buyerName || "",
+        clientEmail: formData.clientEmail,
+        clientAddress: formData.buyerAddress,
+        
+        // Company info
+        companyName: formData.companyName,
+        companyAddress: formData.companyAddress,
+        companyGSTIN: formData.companyGSTIN,
+        companyState: formData.companyState,
+        companyStateCode: formData.companyStateCode,
+        companyEmail: formData.companyEmail,
+        
+        // Consignee info
+        consignee: formData.consigneeName,
+        consigneeAddress: formData.consigneeAddress,
+        consigneeGSTIN: formData.consigneeGSTIN,
+        consigneeState: formData.consigneeState,
+        consigneeStateCode: formData.consigneeStateCode,
+        
+        // Buyer info
+        buyer: formData.buyerName,
+        buyerAddress: formData.buyerAddress,
+        buyerGSTIN: formData.buyerGSTIN,
+        buyerState: formData.buyerState,
+        buyerStateCode: formData.buyerStateCode,
+        
+        // Order details
+        buyerRef: formData.buyerRef,
+        dispatchedThrough: formData.dispatchedThrough,
+        paymentTerms: formData.paymentTerms,
+        notes: formData.otherReferences,
+        site: formData.destination,
+        destination: formData.destination,
+        deliveryTerms: formData.deliveryTerms,
+        serviceType: formData.serviceType,
+        
+        // Items
+        items: invoiceItems,
+        
+        // Financials
+        subtotal: subtotal,
+        tax: gst,
+        discount: 0,
+        amount: totalAmount,
+        roundUp: 0,
+        
+        // Dates
+        date: formattedDate,
+        dueDate: dueDate,
+        
+        // Bank details
+        bankName: formData.bankName,
+        accountNumber: formData.accountNumber,
+        ifscCode: "MAHB0001233",
+        branch: "KALYANI NAGAR",
+        accountHolder: formData.accountHolder,
+        branchAndIFSC: formData.branchAndIFSC,
+        
+        // Additional
+        amountInWords: amountInWords,
+        termsConditions: formData.termsConditions,
+        footerNote: formData.footerNote,
+        
+        // Initialize other fields
+        managementFeesPercent: 0,
+        managementFeesAmount: 0,
+        sacCode: "",
+        panNumber: "",
+        gstNumber: formData.companyGSTIN,
+        serviceLocation: "",
+        esicNumber: "",
+        lwfNumber: "",
+        pfNumber: "",
+        servicePeriodFrom: "",
+        servicePeriodTo: ""
+      };
+      
+      // First generate PDF
+      generateSalesOrderPDF(newInvoice);
+      
+      // Then save to database
+      const success = await onInvoiceCreate(newInvoice);
+      
+      if (success) {
+        onClose();
+        resetForm();
+      }
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      alert('Failed to create invoice. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addItem = () => {
@@ -724,7 +595,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
 
   const updateItem = (index: number, field: keyof PerformInvoiceItem, value: string | number) => {
     const newItems = [...items];
-    const parsedValue = typeof value === 'string' ? (field === 'description' || field === 'unit' ? value : parseFloat(value) || 0) : value;
+    const parsedValue = typeof value === 'string' ? 
+      (field === 'description' || field === 'unit' ? value : parseFloat(value) || 0) : value;
     
     newItems[index] = {
       ...newItems[index],
@@ -777,11 +649,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       destination: "",
       deliveryTerms: "",
       
-      client: "",
       clientEmail: "",
       serviceType: "",
-      dueDate: "",
-      invoiceDate: new Date().toISOString().split('T')[0],
       
       accountHolder: "S K ENTERPRISES",
       bankName: "BANK OF MAHARASHTRA",
@@ -793,7 +662,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     });
   };
 
-  // Copy buyer details to consignee
   const handleCopyBuyerToConsignee = () => {
     setFormData(prev => ({
       ...prev,
@@ -805,7 +673,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     }));
   };
 
-  // Auto-generate voucher number
   const handleGenerateVoucherNo = () => {
     const year = new Date().getFullYear();
     const nextYear = year + 1;
@@ -834,7 +701,7 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Perform Invoice / Sales Order</DialogTitle>
+          <DialogTitle>Create Perform Invoice / Sales Orders</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Company Details */}
@@ -867,7 +734,6 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                   onChange={(e) => handleInputChange("companyAddress", e.target.value)}
                   rows={3}
                   required
-                  placeholder="Line 1&#10;Line 2&#10;Line 3"
                 />
               </div>
               <div className="space-y-2">
@@ -883,7 +749,7 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
             </div>
           </div>
 
-          {/* Consignee Details (Ship to) */}
+          {/* Consignee Details */}
           <div className="border rounded-lg p-4 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-lg">Consignee Details (Ship to)</h3>
@@ -899,20 +765,12 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="consigneeName">Consignee Name *</Label>
-                <Select 
+                <Input
+                  id="consigneeName"
                   value={formData.consigneeName}
-                  onValueChange={(value) => handleInputChange("consigneeName", value)}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select consignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map(client => (
-                      <SelectItem key={client} value={client}>{client}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => handleInputChange("consigneeName", e.target.value)}
+                  placeholder="Consignee name"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="consigneeGSTIN">Consignee GSTIN/UIN</Label>
@@ -923,13 +781,13 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="consigneeAddress">Consignee Address (use Enter for new lines)</Label>
+                <Label htmlFor="consigneeAddress">Consignee Address</Label>
                 <Textarea 
                   id="consigneeAddress" 
                   value={formData.consigneeAddress}
                   onChange={(e) => handleInputChange("consigneeAddress", e.target.value)}
-                  rows={4}
-                  placeholder="ALYSSUM DEVELOPERS PVT. LTD.&#10;OFFICE NO. 132/23, 133/1, 133/2/2/2, 133/3, 133/4, 169/1, 170/1, 171/1, 171/2, 172/1A, BEHIND SAYAJI-,&#10;HOTEL, PUNE-BANGLORE HIGHWAY, WAKAD, PUNE"
+                  rows={3}
+                  placeholder="Enter consignee address"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -955,26 +813,19 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
             </div>
           </div>
 
-          {/* Buyer Details (Bill to) */}
+          {/* Buyer Details */}
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="font-semibold text-lg">Buyer Details (Bill to)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="buyerName">Buyer Name *</Label>
-                <Select 
+                <Input
+                  id="buyerName"
                   value={formData.buyerName}
-                  onValueChange={(value) => handleInputChange("buyerName", value)}
+                  onChange={(e) => handleInputChange("buyerName", e.target.value)}
+                  placeholder="Buyer name"
                   required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select buyer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map(client => (
-                      <SelectItem key={client} value={client}>{client}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="buyerGSTIN">Buyer GSTIN/UIN</Label>
@@ -985,13 +836,13 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="buyerAddress">Buyer Address (use Enter for new lines)</Label>
+                <Label htmlFor="buyerAddress">Buyer Address</Label>
                 <Textarea 
                   id="buyerAddress" 
                   value={formData.buyerAddress}
                   onChange={(e) => handleInputChange("buyerAddress", e.target.value)}
-                  rows={4}
-                  placeholder="ALYSSUM DEVELOPERS PVT. LTD.&#10;OFFICE NO. 132/23, 133/1, 133/2/2/2, 133/3, 133/4, 169/1, 170/1, 171/1, 171/2, 172/1A, BEHIND SAYAJI-,&#10;HOTEL, PUNE-BANGLORE HIGHWAY, WAKAD, PUNE"
+                  rows={3}
+                  placeholder="Enter buyer address"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1081,6 +932,14 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                   id="destination" 
                   value={formData.destination}
                   onChange={(e) => handleInputChange("destination", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="serviceType">Service Type</Label>
+                <Input 
+                  id="serviceType" 
+                  value={formData.serviceType}
+                  onChange={(e) => handleInputChange("serviceType", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -1289,19 +1148,9 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
           </div>
 
           <div className="flex gap-2">
-            <Button type="submit" className="flex-1">
+            <Button type="submit" className="flex-1" disabled={loading}>
               <Download className="mr-2 h-4 w-4" />
-              Create & Download PDF
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleDownloadOnly}
-              className="flex-1"
-              disabled={items.length === 0 || !formData.consigneeName}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download PDF Only
+              {loading ? 'Creating...' : 'Create & Download PDF'}
             </Button>
             <Button type="button" variant="outline" onClick={resetForm} className="flex-1">
               Reset Form

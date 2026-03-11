@@ -2,6 +2,7 @@
 "use client";
 
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { DashboardSidebar } from "@/components/shared/DashboardSidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1811,14 +1812,14 @@ const NotificationList = ({
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
       >
-        <Card className="text-center py-12 border-dashed border-2 bg-gradient-to-br from-muted/50 to-background">
-          <CardContent className="space-y-4">
+        <Card className="text-center py-8 md:py-12 border-dashed border-2 bg-gradient-to-br from-muted/50 to-background">
+          <CardContent className="space-y-3 md:space-y-4">
             <div className="relative inline-block">
-              <Bell className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-50" />
+              <Bell className="h-12 w-12 md:h-16 md:w-16 mx-auto text-muted-foreground mb-3 md:mb-4 opacity-50" />
               <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 blur-xl rounded-full" />
             </div>
             <motion.h3 
-              className="text-xl font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
+              className="text-lg md:text-xl font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
               animate={{ 
                 backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
               }}
@@ -1833,7 +1834,7 @@ const NotificationList = ({
                filter === 'unread' ? "All caught up!" : 
                "No read notifications"}
             </motion.h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <p className="text-xs md:text-sm text-muted-foreground max-w-md mx-auto px-4">
               {filter === 'all' ? 
                 "You're all caught up! When you have new notifications, they'll appear here." :
                 filter === 'unread' ?
@@ -1848,7 +1849,7 @@ const NotificationList = ({
                 <Button 
                   variant="outline" 
                   onClick={() => setFilter('all')}
-                  className="mt-4"
+                  className="mt-2 md:mt-4 text-xs md:text-sm h-8 md:h-10"
                 >
                   View All Notifications
                 </Button>
@@ -1861,8 +1862,8 @@ const NotificationList = ({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
+    <div className="space-y-2 md:space-y-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs md:text-sm text-muted-foreground mb-2">
         <span className="flex items-center gap-2">
           <span className="animate-pulse">📊</span>
           Showing {notifications.length} {filter === 'all' ? '' : filter} notification{notifications.length !== 1 ? 's' : ''}
@@ -1876,7 +1877,7 @@ const NotificationList = ({
               variant="ghost" 
               size="sm" 
               onClick={handleMarkAllRead}
-              className="h-8 px-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 hover:from-green-500/20 hover:to-emerald-500/20"
+              className="h-7 md:h-8 px-2 text-xs md:text-sm bg-gradient-to-r from-green-500/10 to-emerald-500/10 hover:from-green-500/20 hover:to-emerald-500/20"
             >
               <CheckCheck className="h-3 w-3 mr-1 animate-pulse" />
               Mark all read
@@ -1939,26 +1940,28 @@ const NotificationList = ({
               {/* Animated background effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               
-              <CardContent className="p-4 relative">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <CardContent className="p-3 md:p-4 relative">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-1 md:gap-2 mb-1">
                       <motion.div
                         whileHover={{ rotate: 15 }}
                         transition={{ type: "spring", stiffness: 300 }}
+                        className="flex-shrink-0"
                       >
                         {getCommunicationIcon(notification.communicationType, notification.notificationType)}
                       </motion.div>
-                      <h4 className="font-semibold text-lg">{notification.title}</h4>
+                      <h4 className="font-semibold text-sm md:text-lg truncate">{notification.title}</h4>
                       
                       <motion.div
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
+                        className="flex-shrink-0"
                       >
                         <Badge 
                           variant={getTypeColor(notification.type)}
                           className={cn(
-                            "transition-all duration-300",
+                            "transition-all duration-300 text-[10px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5",
                             notification.type === 'urgent' && "animate-pulse bg-gradient-to-r from-red-500 to-red-600",
                             notification.type === 'warning' && "bg-gradient-to-r from-orange-500 to-amber-500",
                             notification.type === 'success' && "bg-gradient-to-r from-green-500 to-emerald-500",
@@ -1973,8 +1976,9 @@ const NotificationList = ({
                         <motion.div
                           whileHover={{ scale: 1.05 }}
                           transition={{ type: "spring", stiffness: 300 }}
+                          className="flex-shrink-0"
                         >
-                          <Badge variant="outline" className="text-xs bg-background/50 backdrop-blur-sm">
+                          <Badge variant="outline" className="text-[8px] md:text-xs bg-background/50 backdrop-blur-sm px-1.5 md:px-2 py-0 md:py-0.5">
                             {notification.notificationType
                               .replace('site_', 'Site ')
                               .replace('task_', 'Task ')
@@ -1991,7 +1995,7 @@ const NotificationList = ({
                           <TooltipTrigger asChild>
                             <motion.div 
                               className={cn(
-                                "w-3 h-3 rounded-full ring-2 ring-white dark:ring-gray-800",
+                                "w-2 h-2 md:w-3 md:h-3 rounded-full ring-1 md:ring-2 ring-white dark:ring-gray-800 flex-shrink-0",
                                 getPriorityColor(notification.priority)
                               )}
                               whileHover={{ scale: 1.3 }}
@@ -2002,7 +2006,7 @@ const NotificationList = ({
                             />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>{notification.priority.toUpperCase()} priority</p>
+                            <p className="text-xs">{notification.priority.toUpperCase()} priority</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -2012,10 +2016,11 @@ const NotificationList = ({
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ type: "spring", stiffness: 200 }}
+                          className="flex-shrink-0"
                         >
                           <Badge 
                             variant="default" 
-                            className="animate-pulse bg-gradient-to-r from-primary to-secondary"
+                            className="animate-pulse bg-gradient-to-r from-primary to-secondary text-[8px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5"
                           >
                             New
                           </Badge>
@@ -2026,98 +2031,105 @@ const NotificationList = ({
                        getLeaveRequestTypeBadge(notification.notificationType)}
                       
                       {notification.read && (
-                        <Badge variant="outline" className="text-xs">
-                          <CheckCheck className="h-3 w-3 mr-1" />
+                        <Badge variant="outline" className="text-[8px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5">
+                          <CheckCheck className="h-2 w-2 md:h-3 md:w-3 mr-0.5 md:mr-1" />
                           Read
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
+                    
+                    <p className="text-xs md:text-sm text-muted-foreground mb-2 line-clamp-2">
                       {notification.message}
                     </p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                      <span className="flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-md">
+                    
+                    <div className="flex flex-wrap items-center gap-1 md:gap-4 text-[10px] md:text-xs text-muted-foreground">
+                      <span className="flex items-center gap-0.5 md:gap-1 bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
                         {notification.notificationType?.includes('site') ? (
-                          <Building className="h-3 w-3" />
+                          <Building className="h-2 w-2 md:h-3 md:w-3" />
                         ) : notification.notificationType?.includes('task') ? (
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-2 w-2 md:h-3 md:w-3" />
                         ) : notification.notificationType?.includes('inventory') ? (
-                          <Package className="h-3 w-3" />
+                          <Package className="h-2 w-2 md:h-3 md:w-3" />
                         ) : notification.notificationType?.includes('machine') ? (
-                          <Cpu className="h-3 w-3" />
+                          <Cpu className="h-2 w-2 md:h-3 md:w-3" />
                         ) : notification.notificationType?.includes('leave') ? (
-                          <CalendarDays className="h-3 w-3" />
+                          <CalendarDays className="h-2 w-2 md:h-3 md:w-3" />
                         ) : (
-                          <Calendar className="h-3 w-3" />
+                          <Calendar className="h-2 w-2 md:h-3 md:w-3" />
                         )}
-                        {notification.followUpDate || new Date(notification.createdAt).toLocaleDateString('en-IN') || "Just now"}
+                        <span className="truncate max-w-[60px] md:max-w-none">
+                          {notification.followUpDate || new Date(notification.createdAt).toLocaleDateString('en-IN') || "Just now"}
+                        </span>
                       </span>
-                      <span className="text-primary">•</span>
-                      <span className="font-medium bg-muted/30 px-2 py-1 rounded-md">
+                      
+                      <span className="text-primary hidden md:inline">•</span>
+                      
+                      <span className="font-medium bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
                         {notification.time}
                       </span>
                       
                       {notification.clientName && (
                         <>
-                          <span className="text-primary">•</span>
-                          <span className="font-medium flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-md">
-                            <User className="h-3 w-3" />
-                            Client: {notification.clientName}
+                          <span className="text-primary hidden md:inline">•</span>
+                          <span className="font-medium flex items-center gap-0.5 md:gap-1 bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
+                            <User className="h-2 w-2 md:h-3 md:w-3" />
+                            <span className="truncate max-w-[60px] md:max-w-none">Client: {notification.clientName}</span>
                           </span>
                         </>
                       )}
                       
                       {notification.siteName && (
                         <>
-                          <span className="text-primary">•</span>
-                          <span className="font-medium flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-md">
-                            <Building className="h-3 w-3" />
-                            Site: {notification.siteName}
+                          <span className="text-primary hidden md:inline">•</span>
+                          <span className="font-medium flex items-center gap-0.5 md:gap-1 bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
+                            <Building className="h-2 w-2 md:h-3 md:w-3" />
+                            <span className="truncate max-w-[60px] md:max-w-none">Site: {notification.siteName}</span>
                           </span>
                         </>
                       )}
                       
                       {notification.itemName && (
                         <>
-                          <span className="text-primary">•</span>
-                          <span className="font-medium flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-md">
-                            <Package className="h-3 w-3" />
-                            Item: {notification.itemName}
+                          <span className="text-primary hidden md:inline">•</span>
+                          <span className="font-medium flex items-center gap-0.5 md:gap-1 bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
+                            <Package className="h-2 w-2 md:h-3 md:w-3" />
+                            <span className="truncate max-w-[60px] md:max-w-none">Item: {notification.itemName}</span>
                           </span>
                         </>
                       )}
                       
                       {notification.machineName && (
                         <>
-                          <span className="text-primary">•</span>
-                          <span className="font-medium flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-md">
-                            <Cpu className="h-3 w-3" />
-                            Machine: {notification.machineName}
+                          <span className="text-primary hidden md:inline">•</span>
+                          <span className="font-medium flex items-center gap-0.5 md:gap-1 bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
+                            <Cpu className="h-2 w-2 md:h-3 md:w-3" />
+                            <span className="truncate max-w-[60px] md:max-w-none">Machine: {notification.machineName}</span>
                           </span>
                         </>
                       )}
                       
                       {notification.employeeName && (
                         <>
-                          <span className="text-primary">•</span>
-                          <span className="font-medium flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-md">
-                            <User className="h-3 w-3" />
-                            Employee: {notification.employeeName}
+                          <span className="text-primary hidden md:inline">•</span>
+                          <span className="font-medium flex items-center gap-0.5 md:gap-1 bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
+                            <User className="h-2 w-2 md:h-3 md:w-3" />
+                            <span className="truncate max-w-[60px] md:max-w-none">Employee: {notification.employeeName}</span>
                           </span>
                         </>
                       )}
                       
                       {notification.leaveRequestType && (
                         <>
-                          <span className="text-primary">•</span>
-                          <span className="font-medium bg-muted/30 px-2 py-1 rounded-md">
+                          <span className="text-primary hidden md:inline">•</span>
+                          <span className="font-medium bg-muted/30 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
                             Type: {notification.leaveRequestType}
                           </span>
                         </>
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-center gap-2 ml-4">
+                  
+                  <div className="flex flex-col items-center gap-1 md:gap-2 ml-1 md:ml-4 flex-shrink-0">
                     {!notification.read ? (
                       <motion.div
                         whileHover={{ scale: 1.1, rotate: 5 }}
@@ -2130,10 +2142,10 @@ const NotificationList = ({
                             e.stopPropagation();
                             handleMarkAsRead(notification.id);
                           }}
-                          className="text-primary hover:bg-primary/10"
+                          className="h-6 w-6 md:h-8 md:w-8 text-primary hover:bg-primary/10"
                           title="Mark as read"
                         >
-                          <CheckCheck className="h-4 w-4" />
+                          <CheckCheck className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                       </motion.div>
                     ) : (
@@ -2148,10 +2160,10 @@ const NotificationList = ({
                             e.stopPropagation();
                             handleMarkAsUnread(notification.id);
                           }}
-                          className="text-muted-foreground hover:bg-muted"
+                          className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground hover:bg-muted"
                           title="Mark as unread"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3 w-3 md:h-4 md:w-4" />
                         </Button>
                       </motion.div>
                     )}
@@ -2166,10 +2178,10 @@ const NotificationList = ({
                           e.stopPropagation();
                           handleDelete(notification.id);
                         }}
-                        className="text-destructive hover:bg-destructive/10"
+                        className="h-6 w-6 md:h-8 md:w-8 text-destructive hover:bg-destructive/10"
                         title="Delete notification"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                       </Button>
                     </motion.div>
                   </div>
@@ -2199,6 +2211,17 @@ const Notifications = () => {
   const [showStats, setShowStats] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const autoRefreshRef = useRef<NodeJS.Timeout>();
+
+  // Add mobile sidebar state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const handleMenuClick = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
+  const handleMobileClose = () => {
+    setMobileSidebarOpen(false);
+  };
 
   const [settings, setSettings] = useState<NotificationSettings>({
     desktopNotifications: true,
@@ -2233,11 +2256,11 @@ const Notifications = () => {
   const SiteSelector = () => (
     <div className="flex items-center gap-2">
       <Select value={selectedSite} onValueChange={setSelectedSite}>
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className="w-[160px] md:w-[200px] h-8 md:h-10 text-xs md:text-sm">
           <SelectValue placeholder="Select site">
             <div className="flex items-center gap-2">
-              <Building className="h-4 w-4" />
-              <span>
+              <Building className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="truncate">
                 {selectedSite === "all" 
                   ? "All Sites" 
                   : allSites.find(s => s._id === selectedSite)?.name || "Select site"}
@@ -2248,10 +2271,10 @@ const Notifications = () => {
         <SelectContent>
           <SelectItem value="all">
             <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4" />
+              <Globe className="h-3 w-3 md:h-4 md:w-4" />
               <div>
                 <span>All Sites</span>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground hidden md:block">
                   Show data from all sites
                 </p>
               </div>
@@ -2260,10 +2283,10 @@ const Notifications = () => {
           {allSites.map(site => (
             <SelectItem key={site._id} value={site._id}>
               <div className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                <div>
-                  <span className="truncate">{site.name}</span>
-                  <p className="text-xs text-muted-foreground">
+                <Building className="h-3 w-3 md:h-4 md:w-4" />
+                <div className="min-w-0">
+                  <span className="truncate block">{site.name}</span>
+                  <p className="text-xs text-muted-foreground hidden md:block truncate">
                     {site.clientName} • {site.location}
                   </p>
                 </div>
@@ -2280,15 +2303,14 @@ const Notifications = () => {
           onClick={() => {
             setSelectedSite("all");
             setFilter("all");
-            toast({
-              title: "Filters cleared",
+            toast.success("Filters cleared", {
               description: "All filters have been cleared",
             });
           }}
-          className="gap-2"
+          className="h-8 md:h-10 gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-3"
         >
-          <FilterX className="h-4 w-4" />
-          Clear Filters
+          <FilterX className="h-3 w-3 md:h-4 md:w-4" />
+          <span className="hidden xs:inline">Clear</span>
         </Button>
       )}
     </div>
@@ -2807,48 +2829,48 @@ const Notifications = () => {
 
   const getCommunicationIcon = (type?: string, notificationType?: string) => {
     if (notificationType?.includes('site_')) {
-      if (notificationType === 'site_addition') return <Building className="h-5 w-5 mr-2 text-blue-500" />;
-      if (notificationType === 'site_status') return <RefreshCw className="h-5 w-5 mr-2 text-purple-500" />;
-      if (notificationType === 'site_deletion') return <Trash2 className="h-5 w-5 mr-2 text-red-500" />;
-      if (notificationType === 'site_update') return <Building className="h-5 w-5 mr-2 text-amber-500" />;
+      if (notificationType === 'site_addition') return <Building className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-blue-500" />;
+      if (notificationType === 'site_status') return <RefreshCw className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-purple-500" />;
+      if (notificationType === 'site_deletion') return <Trash2 className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-red-500" />;
+      if (notificationType === 'site_update') return <Building className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-amber-500" />;
     }
     
     if (notificationType?.includes('task_')) {
-      if (notificationType === 'task_creation') return <Bell className="h-5 w-5 mr-2 text-indigo-500" />;
-      if (notificationType === 'task_assignment') return <Users className="h-5 w-5 mr-2 text-teal-500" />;
-      if (notificationType === 'task_completion') return <CheckCircle className="h-5 w-5 mr-2 text-emerald-500" />;
-      if (notificationType === 'task_update') return <Clock className="h-5 w-5 mr-2 text-cyan-500" />;
-      if (notificationType === 'task_overdue') return <AlertCircle className="h-5 w-5 mr-2 text-rose-500" />;
+      if (notificationType === 'task_creation') return <Bell className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-indigo-500" />;
+      if (notificationType === 'task_assignment') return <Users className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-teal-500" />;
+      if (notificationType === 'task_completion') return <CheckCircle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-emerald-500" />;
+      if (notificationType === 'task_update') return <Clock className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-cyan-500" />;
+      if (notificationType === 'task_overdue') return <AlertCircle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-rose-500" />;
     }
     
     if (notificationType?.includes('inventory_')) {
-      if (notificationType === 'inventory_out_of_stock') return <AlertOctagon className="h-5 w-5 mr-2 text-red-500" />;
-      if (notificationType === 'inventory_critical') return <AlertCircle className="h-5 w-5 mr-2 text-orange-500" />;
-      if (notificationType === 'inventory_low_stock') return <Package className="h-5 w-5 mr-2 text-yellow-500" />;
-      return <ShoppingBag className="h-5 w-5 mr-2" />;
+      if (notificationType === 'inventory_out_of_stock') return <AlertOctagon className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-red-500" />;
+      if (notificationType === 'inventory_critical') return <AlertCircle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-orange-500" />;
+      if (notificationType === 'inventory_low_stock') return <Package className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-yellow-500" />;
+      return <ShoppingBag className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />;
     }
     
     if (notificationType?.includes('machine_')) {
-      if (notificationType === 'machine_breakdown') return <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />;
-      if (notificationType === 'machine_maintenance') return <Cpu className="h-5 w-5 mr-2 text-blue-500" />;
-      return <Cpu className="h-5 w-5 mr-2" />;
+      if (notificationType === 'machine_breakdown') return <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-red-500" />;
+      if (notificationType === 'machine_maintenance') return <Cpu className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-blue-500" />;
+      return <Cpu className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />;
     }
     
     if (notificationType?.includes('leave_')) {
-      if (notificationType === 'leave_approved') return <CheckCircle className="h-5 w-5 mr-2 text-green-500" />;
-      if (notificationType === 'leave_rejected') return <AlertCircle className="h-5 w-5 mr-2 text-red-500" />;
-      if (notificationType === 'leave_cancelled') return <XCircle className="h-5 w-5 mr-2 text-gray-500" />;
-      if (notificationType === 'leave_request') return <FileText className="h-5 w-5 mr-2 text-indigo-500" />;
-      if (notificationType === 'leave_pending') return <Clock className="h-5 w-5 mr-2 text-yellow-500" />;
-      return <CalendarDays className="h-5 w-5 mr-2" />;
+      if (notificationType === 'leave_approved') return <CheckCircle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-green-500" />;
+      if (notificationType === 'leave_rejected') return <AlertCircle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-red-500" />;
+      if (notificationType === 'leave_cancelled') return <XCircle className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-gray-500" />;
+      if (notificationType === 'leave_request') return <FileText className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-indigo-500" />;
+      if (notificationType === 'leave_pending') return <Clock className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-yellow-500" />;
+      return <CalendarDays className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2" />;
     }
     
     switch(type) {
-      case "call": return <Phone className="h-5 w-5 mr-2 text-green-500" />;
-      case "email": return <Mail className="h-5 w-5 mr-2 text-blue-500" />;
-      case "meeting": return <Calendar className="h-5 w-5 mr-2 text-purple-500" />;
-      case "demo": return <Eye className="h-5 w-5 mr-2 text-amber-500" />;
-      default: return <Bell className="h-5 w-5 mr-2 text-primary" />;
+      case "call": return <Phone className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-green-500" />;
+      case "email": return <Mail className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-blue-500" />;
+      case "meeting": return <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-purple-500" />;
+      case "demo": return <Eye className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-amber-500" />;
+      default: return <Bell className="h-4 w-4 md:h-5 md:w-5 mr-1 md:mr-2 text-primary" />;
     }
   };
 
@@ -2864,15 +2886,15 @@ const Notifications = () => {
   const getLeaveRequestTypeBadge = (notificationType?: string) => {
     switch(notificationType) {
       case 'leave_request':
-        return <Badge variant="secondary" className="text-xs bg-gradient-to-r from-indigo-500 to-purple-500">New Request</Badge>;
+        return <Badge variant="secondary" className="text-[8px] md:text-xs bg-gradient-to-r from-indigo-500 to-purple-500 px-1.5 md:px-2 py-0 md:py-0.5">New Request</Badge>;
       case 'leave_approved':
-        return <Badge variant="default" className="bg-gradient-to-r from-green-500 to-emerald-500 text-xs">Approved</Badge>;
+        return <Badge variant="default" className="bg-gradient-to-r from-green-500 to-emerald-500 text-[8px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5">Approved</Badge>;
       case 'leave_rejected':
-        return <Badge variant="destructive" className="bg-gradient-to-r from-red-500 to-rose-500 text-xs">Rejected</Badge>;
+        return <Badge variant="destructive" className="bg-gradient-to-r from-red-500 to-rose-500 text-[8px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5">Rejected</Badge>;
       case 'leave_cancelled':
-        return <Badge variant="outline" className="text-xs">Cancelled</Badge>;
+        return <Badge variant="outline" className="text-[8px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5">Cancelled</Badge>;
       case 'leave_pending':
-        return <Badge variant="secondary" className="text-xs bg-gradient-to-r from-yellow-500 to-amber-500">Pending</Badge>;
+        return <Badge variant="secondary" className="text-[8px] md:text-xs bg-gradient-to-r from-yellow-500 to-amber-500 px-1.5 md:px-2 py-0 md:py-0.5">Pending</Badge>;
       default:
         return null;
     }
@@ -2995,23 +3017,31 @@ const Notifications = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <DashboardHeader title="Notifications" />
+      <DashboardHeader title="Notifications" onMenuClick={handleMenuClick} />
+      
+      {/* Main App Sidebar - Only shown on mobile when open */}
+      {mobileSidebarOpen && (
+        <DashboardSidebar 
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={handleMobileClose}
+        />
+      )}
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="p-6 space-y-6"
+        className="p-3 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Header with Stats */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
+        {/* Header with Stats - Responsive */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-4">
             <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 blur-xl rounded-full" />
-              <div className="relative flex items-center gap-2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-xl border">
-                <Bell className="h-6 w-6 text-primary" />
-                <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  {unreadCount} Unread Notification{unreadCount !== 1 && "s"}
+              <div className="absolute -inset-2 md:-inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 blur-xl rounded-full" />
+              <div className="relative flex items-center gap-1 md:gap-2 bg-background/80 backdrop-blur-sm px-2 md:px-4 py-1 md:py-2 rounded-lg md:rounded-xl border">
+                <Bell className="h-4 w-4 md:h-6 md:w-6 text-primary" />
+                <span className="text-sm md:text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  {unreadCount} Unread
                 </span>
                 {newNotificationsCount > 0 && (
                   <motion.div
@@ -3021,51 +3051,52 @@ const Notifications = () => {
                   >
                     <Badge 
                       variant="destructive" 
-                      className="animate-pulse bg-gradient-to-r from-red-500 to-pink-500"
+                      className="animate-pulse bg-gradient-to-r from-red-500 to-pink-500 text-[10px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5"
                     >
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      {newNotificationsCount} New
+                      <Sparkles className="h-2 w-2 md:h-3 md:w-3 mr-0.5 md:mr-1" />
+                      {newNotificationsCount}
                     </Badge>
                   </motion.div>
                 )}
               </div>
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm text-muted-foreground">
               {!isOnline && (
-                <Badge variant="outline" className="text-destructive animate-pulse">
-                  <AlertCircle className="h-3 w-3 mr-1" />
+                <Badge variant="outline" className="text-destructive animate-pulse text-[10px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5">
+                  <AlertCircle className="h-2 w-2 md:h-3 md:w-3 mr-0.5 md:mr-1" />
                   Offline
                 </Badge>
               )}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md cursor-help">
-                      <Clock className="h-3 w-3" />
-                      Last checked: {lastChecked.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    <span className="flex items-center gap-0.5 md:gap-1 bg-muted/50 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md cursor-help">
+                      <Clock className="h-2 w-2 md:h-3 md:w-3" />
+                      <span className="hidden xs:inline">Last:</span> {lastChecked.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Notifications are auto-refreshing {autoRefresh ? 'every minute' : 'manually'}</p>
+                    <p className="text-xs">Notifications auto-refresh {autoRefresh ? 'every minute' : 'manually'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-1 md:gap-2">
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={handleRefresh}
-                className="gap-2"
+                className="gap-1 md:gap-2 h-7 md:h-10 text-xs md:text-sm px-2 md:px-4"
               >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
+                <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden xs:inline">Refresh</span>
               </Button>
             </motion.div>
             <motion.div
@@ -3073,12 +3104,13 @@ const Notifications = () => {
               whileTap={{ scale: 0.95 }}
             >
               <Button 
+                size="sm"
                 onClick={handleMarkAllRead} 
                 disabled={unreadCount === 0}
-                className="bg-gradient-to-r from-primary to-secondary gap-2"
+                className="bg-gradient-to-r from-primary to-secondary gap-1 md:gap-2 h-7 md:h-10 text-xs md:text-sm px-2 md:px-4"
               >
-                <CheckCheck className="mr-2 h-4 w-4" />
-                Mark All Read
+                <CheckCheck className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden xs:inline">Mark All</span>
               </Button>
             </motion.div>
           </div>
@@ -3088,41 +3120,41 @@ const Notifications = () => {
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex justify-center items-center py-12"
+            className="flex justify-center items-center py-8 md:py-12"
           >
-            <div className="text-center space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-              <div className="space-y-2">
-                <p className="font-medium">Loading notifications...</p>
-                <Progress value={75} className="w-48 mx-auto" />
-                <p className="text-sm text-muted-foreground">Checking for updates across all systems</p>
+            <div className="text-center space-y-2 md:space-y-4">
+              <Loader2 className="h-8 w-8 md:h-12 md:w-12 animate-spin text-primary mx-auto" />
+              <div className="space-y-1 md:space-y-2">
+                <p className="text-xs md:text-sm font-medium">Loading notifications...</p>
+                <Progress value={75} className="w-32 md:w-48 mx-auto h-1 md:h-2" />
+                <p className="text-[10px] md:text-xs text-muted-foreground">Checking across all systems</p>
               </div>
             </div>
           </motion.div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {/* Main Tabs Component */}
             <Tabs value={filter} onValueChange={(value) => setFilter(value as 'all' | 'unread' | 'read')} className="w-full">
-              <div className="flex justify-between items-center mb-4">
-                <TabsList className="grid grid-cols-3 w-[400px] bg-gradient-to-r from-muted/50 to-background/50 backdrop-blur-sm border">
-                  <TabsTrigger value="all" className="relative">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-3 md:mb-4">
+                <TabsList className="grid grid-cols-3 w-full sm:w-[300px] md:w-[400px] bg-gradient-to-r from-muted/50 to-background/50 backdrop-blur-sm border h-8 md:h-10">
+                  <TabsTrigger value="all" className="text-xs md:text-sm px-1 md:px-2">
                     All
-                    <Badge variant="outline" className="ml-2 px-1.5 py-0 text-xs">
+                    <Badge variant="outline" className="ml-1 md:ml-2 px-1 py-0 text-[8px] md:text-xs">
                       {notifications.length}
                     </Badge>
                   </TabsTrigger>
-                  <TabsTrigger value="unread" className="relative">
+                  <TabsTrigger value="unread" className="text-xs md:text-sm px-1 md:px-2">
                     Unread
                     <Badge 
                       variant="default" 
-                      className="ml-2 px-1.5 py-0 text-xs bg-gradient-to-r from-primary to-secondary"
+                      className="ml-1 md:ml-2 px-1 py-0 text-[8px] md:text-xs bg-gradient-to-r from-primary to-secondary"
                     >
                       {notifications.filter(n => !n.read).length}
                     </Badge>
                   </TabsTrigger>
-                  <TabsTrigger value="read" className="relative">
+                  <TabsTrigger value="read" className="text-xs md:text-sm px-1 md:px-2">
                     Read
-                    <Badge variant="outline" className="ml-2 px-1.5 py-0 text-xs">
+                    <Badge variant="outline" className="ml-1 md:ml-2 px-1 py-0 text-[8px] md:text-xs">
                       {notifications.filter(n => n.read).length}
                     </Badge>
                   </TabsTrigger>
@@ -3137,10 +3169,10 @@ const Notifications = () => {
                 <motion.div 
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="flex items-center justify-between gap-2 text-sm text-muted-foreground bg-gradient-to-r from-primary/5 to-secondary/5 p-3 rounded-md mb-4 border"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] md:text-sm text-muted-foreground bg-gradient-to-r from-primary/5 to-secondary/5 p-2 md:p-3 rounded-md mb-3 md:mb-4 border"
                 >
-                  <div className="flex items-center gap-2">
-                    <Building className="h-3 w-3" />
+                  <div className="flex items-center gap-1 md:gap-2">
+                    <Building className="h-3 w-3 md:h-4 md:w-4" />
                     <span>
                       Filtering by site: <span className="font-semibold">
                         {allSites.find(s => s._id === selectedSite)?.name}
@@ -3151,7 +3183,7 @@ const Notifications = () => {
                     variant="ghost" 
                     size="sm" 
                     onClick={() => setSelectedSite('all')}
-                    className="h-6 px-2 text-xs"
+                    className="h-6 md:h-8 px-2 text-[10px] md:text-xs"
                   >
                     Clear filter
                   </Button>
@@ -3219,67 +3251,67 @@ const Notifications = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="flex items-center justify-between text-sm text-muted-foreground pt-4 border-t"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] md:text-sm text-muted-foreground pt-3 md:pt-4 border-t"
         >
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span>High Priority</span>
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-1 md:gap-2">
+              <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-red-500 animate-pulse" />
+              <span>High</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-yellow-500" />
-              <span>Medium Priority</span>
+            <div className="flex items-center gap-1 md:gap-2">
+              <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-yellow-500" />
+              <span>Medium</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span>Low Priority</span>
+            <div className="flex items-center gap-1 md:gap-2">
+              <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-green-500" />
+              <span>Low</span>
             </div>
             {selectedSite !== 'all' && (
-              <div className="flex items-center gap-2 ml-4">
-                <Building className="h-3 w-3" />
-                <span className="font-medium">
-                  Site: {allSites.find(s => s._id === selectedSite)?.name}
+              <div className="flex items-center gap-1 md:gap-2 ml-0 sm:ml-4">
+                <Building className="h-2.5 w-2.5 md:h-3 md:w-3" />
+                <span className="font-medium text-[10px] md:text-xs">
+                  {allSites.find(s => s._id === selectedSite)?.name}
                 </span>
               </div>
             )}
           </div>
-          <div>
-            {`Showing ${filteredNotifications.length} of ${notifications.length} notifications`}
-            {selectedSite !== 'all' && ` (Filtered by site)`}
+          <div className="text-[10px] md:text-xs">
+            {`Showing ${filteredNotifications.length} of ${notifications.length}`}
+            {selectedSite !== 'all' && ` (Filtered)`}
           </div>
         </motion.div>
       </motion.div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-sm md:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Notification Details</DialogTitle>
+            <DialogTitle className="text-base md:text-lg">Notification Details</DialogTitle>
           </DialogHeader>
           {viewNotification && (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
+              className="space-y-3 md:space-y-4"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1 md:gap-2">
                 {getCommunicationIcon(viewNotification.communicationType, viewNotification.notificationType)}
-                <h3 className="text-lg font-semibold">{viewNotification.title}</h3>
-                <Badge variant={getTypeColor(viewNotification.type)}>
+                <h3 className="text-sm md:text-lg font-semibold">{viewNotification.title}</h3>
+                <Badge variant={getTypeColor(viewNotification.type)} className="text-[10px] md:text-xs">
                   {viewNotification.type}
                 </Badge>
-                <div className={`w-3 h-3 rounded-full ${getPriorityColor(viewNotification.priority)}`} />
+                <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${getPriorityColor(viewNotification.priority)}`} />
               </div>
               
               {viewNotification.notificationType?.includes('site_') ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                   {viewNotification.siteName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Site Name</h4>
-                      <p className="font-medium">{viewNotification.siteName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Site Name</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.siteName}</p>
                       <Button 
                         variant="link" 
                         size="sm" 
-                        className="p-0 h-auto text-xs"
+                        className="p-0 h-auto text-[10px] md:text-xs"
                         onClick={() => openSiteInNewTab(viewNotification.siteName)}
                       >
                         View Sites →
@@ -3288,43 +3320,43 @@ const Notifications = () => {
                   )}
                   {viewNotification.clientName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Client</h4>
-                      <p className="font-medium">{viewNotification.clientName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Client</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.clientName}</p>
                     </div>
                   )}
                   {viewNotification.location && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Location</h4>
-                      <p className="font-medium">{viewNotification.location}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Location</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.location}</p>
                     </div>
                   )}
                   {viewNotification.oldStatus && viewNotification.newStatus && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Status Change</h4>
-                      <p className="font-medium">
-                        <Badge variant="outline" className="mr-2">{viewNotification.oldStatus}</Badge>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Status Change</h4>
+                      <p className="text-xs md:text-sm font-medium">
+                        <Badge variant="outline" className="mr-1 md:mr-2 text-[8px] md:text-xs">{viewNotification.oldStatus}</Badge>
                         →
-                        <Badge variant="outline" className="ml-2">{viewNotification.newStatus}</Badge>
+                        <Badge variant="outline" className="ml-1 md:ml-2 text-[8px] md:text-xs">{viewNotification.newStatus}</Badge>
                       </p>
                     </div>
                   )}
                   {viewNotification.createdAt && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Created</h4>
-                      <p className="font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Created</h4>
+                      <p className="text-xs md:text-sm font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
               ) : viewNotification.notificationType?.includes('task_') ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                   {viewNotification.taskTitle && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Task Title</h4>
-                      <p className="font-medium">{viewNotification.taskTitle}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Task Title</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.taskTitle}</p>
                       <Button 
                         variant="link" 
                         size="sm" 
-                        className="p-0 h-auto text-xs"
+                        className="p-0 h-auto text-[10px] md:text-xs"
                         onClick={() => openTaskInNewTab(viewNotification.taskTitle)}
                       >
                         View Tasks →
@@ -3333,49 +3365,49 @@ const Notifications = () => {
                   )}
                   {viewNotification.taskAssignee && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Assignee</h4>
-                      <p className="font-medium">{viewNotification.taskAssignee}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Assignee</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.taskAssignee}</p>
                     </div>
                   )}
                   {viewNotification.siteName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Site</h4>
-                      <p className="font-medium">{viewNotification.siteName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Site</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.siteName}</p>
                     </div>
                   )}
                   {viewNotification.taskPriority && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Priority</h4>
-                      <Badge variant={getTypeColor(viewNotification.type)}>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Priority</h4>
+                      <Badge variant={getTypeColor(viewNotification.type)} className="text-[8px] md:text-xs">
                         {viewNotification.taskPriority}
                       </Badge>
                     </div>
                   )}
                   {viewNotification.taskStatus && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Status</h4>
-                      <Badge variant="outline">
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Status</h4>
+                      <Badge variant="outline" className="text-[8px] md:text-xs">
                         {viewNotification.taskStatus}
                       </Badge>
                     </div>
                   )}
                   {viewNotification.createdAt && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Created</h4>
-                      <p className="font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Created</h4>
+                      <p className="text-xs md:text-sm font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
               ) : viewNotification.notificationType?.includes('inventory_') ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                   {viewNotification.itemName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Item Name</h4>
-                      <p className="font-medium">{viewNotification.itemName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Item Name</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.itemName}</p>
                       <Button 
                         variant="link" 
                         size="sm" 
-                        className="p-0 h-auto text-xs"
+                        className="p-0 h-auto text-[10px] md:text-xs"
                         onClick={() => openInventoryInNewTab(viewNotification.itemSku)}
                       >
                         View Inventory →
@@ -3384,22 +3416,22 @@ const Notifications = () => {
                   )}
                   {viewNotification.itemSku && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">SKU</h4>
-                      <p className="font-medium">{viewNotification.itemSku}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">SKU</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.itemSku}</p>
                     </div>
                   )}
                   {viewNotification.currentQuantity !== undefined && viewNotification.reorderLevel !== undefined && (
-                    <div className="col-span-2">
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Stock Level</h4>
+                    <div className="col-span-1 sm:col-span-2">
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Stock Level</h4>
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <div className="flex justify-between text-sm mb-1">
+                          <div className="flex justify-between text-[10px] md:text-xs mb-0.5 md:mb-1">
                             <span>Current: {viewNotification.currentQuantity}</span>
                             <span>Reorder: {viewNotification.reorderLevel}</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 md:h-2">
                             <div 
-                              className={`h-2 rounded-full ${
+                              className={`h-1.5 md:h-2 rounded-full ${
                                 viewNotification.currentQuantity === 0 ? 'bg-red-500' :
                                 viewNotification.currentQuantity <= Math.floor(viewNotification.reorderLevel * 0.3) ? 'bg-orange-500' :
                                 viewNotification.currentQuantity <= viewNotification.reorderLevel ? 'bg-yellow-500' :
@@ -3416,39 +3448,39 @@ const Notifications = () => {
                   )}
                   {viewNotification.department && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Department</h4>
-                      <p className="font-medium">{viewNotification.department}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Department</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.department}</p>
                     </div>
                   )}
                   {viewNotification.supplier && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Supplier</h4>
-                      <p className="font-medium">{viewNotification.supplier}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Supplier</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.supplier}</p>
                     </div>
                   )}
                   {viewNotification.siteName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Site</h4>
-                      <p className="font-medium">{viewNotification.siteName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Site</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.siteName}</p>
                     </div>
                   )}
                   {viewNotification.createdAt && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Created</h4>
-                      <p className="font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Created</h4>
+                      <p className="text-xs md:text-sm font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
               ) : viewNotification.notificationType?.includes('machine_') ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                   {viewNotification.machineName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Machine Name</h4>
-                      <p className="font-medium">{viewNotification.machineName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Machine Name</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.machineName}</p>
                       <Button 
                         variant="link" 
                         size="sm" 
-                        className="p-0 h-auto text-xs"
+                        className="p-0 h-auto text-[10px] md:text-xs"
                         onClick={() => openMachinesInNewTab(viewNotification.machineName)}
                       >
                         View Machines →
@@ -3457,14 +3489,15 @@ const Notifications = () => {
                   )}
                   {viewNotification.machineModel && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Model</h4>
-                      <p className="font-medium">{viewNotification.machineModel}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Model</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.machineModel}</p>
                     </div>
                   )}
                   {viewNotification.machineStatus && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Status</h4>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Status</h4>
                       <Badge className={`
+                        text-[8px] md:text-xs px-1.5 md:px-2 py-0 md:py-0.5
                         ${viewNotification.machineStatus === 'operational' ? 'bg-green-100 text-green-800' : 
                           viewNotification.machineStatus === 'maintenance' ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-red-100 text-red-800'} border-0`}
@@ -3475,27 +3508,27 @@ const Notifications = () => {
                   )}
                   {viewNotification.nextMaintenanceDate && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Next Maintenance</h4>
-                      <p className="font-medium">{formatDate(viewNotification.nextMaintenanceDate)}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Next Maintenance</h4>
+                      <p className="text-xs md:text-sm font-medium">{formatDate(viewNotification.nextMaintenanceDate)}</p>
                     </div>
                   )}
                   {viewNotification.createdAt && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Created</h4>
-                      <p className="font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Created</h4>
+                      <p className="text-xs md:text-sm font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
               ) : viewNotification.notificationType?.includes('leave_') ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                   {viewNotification.employeeName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Employee Name</h4>
-                      <p className="font-medium">{viewNotification.employeeName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Employee Name</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.employeeName}</p>
                       <Button 
                         variant="link" 
                         size="sm" 
-                        className="p-0 h-auto text-xs"
+                        className="p-0 h-auto text-[10px] md:text-xs"
                         onClick={() => openLeavesInNewTab(viewNotification.employeeName)}
                       >
                         View Leaves →
@@ -3504,45 +3537,45 @@ const Notifications = () => {
                   )}
                   {viewNotification.employeeId && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Employee ID</h4>
-                      <p className="font-medium">{viewNotification.employeeId}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Employee ID</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.employeeId}</p>
                     </div>
                   )}
                   {viewNotification.leaveType && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Leave Type</h4>
-                      <Badge variant="outline" className="capitalize">
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Leave Type</h4>
+                      <Badge variant="outline" className="text-[8px] md:text-xs capitalize">
                         {viewNotification.leaveType}
                       </Badge>
                     </div>
                   )}
                   {viewNotification.leaveRequestType && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Request Type</h4>
-                      <p className="font-medium">{viewNotification.leaveRequestType}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Request Type</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.leaveRequestType}</p>
                     </div>
                   )}
                   {viewNotification.leaveDepartment && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Department</h4>
-                      <p className="font-medium">{viewNotification.leaveDepartment}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Department</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.leaveDepartment}</p>
                     </div>
                   )}
                   {viewNotification.leaveFromDate && viewNotification.leaveToDate && (
-                    <div className="col-span-2">
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Leave Dates</h4>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{formatLeaveDate(viewNotification.leaveFromDate)}</span>
+                    <div className="col-span-1 sm:col-span-2">
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Leave Dates</h4>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 md:gap-4">
+                        <div className="flex items-center gap-1 md:gap-2">
+                          <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                          <span className="text-xs md:text-sm">{formatLeaveDate(viewNotification.leaveFromDate)}</span>
                         </div>
-                        <span>to</span>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>{formatLeaveDate(viewNotification.leaveToDate)}</span>
+                        <span className="hidden sm:inline">to</span>
+                        <div className="flex items-center gap-1 md:gap-2">
+                          <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                          <span className="text-xs md:text-sm">{formatLeaveDate(viewNotification.leaveToDate)}</span>
                         </div>
                         {viewNotification.leaveTotalDays && (
-                          <Badge variant="secondary" className="ml-auto">
+                          <Badge variant="secondary" className="ml-0 sm:ml-auto text-[8px] md:text-xs">
                             {viewNotification.leaveTotalDays} days
                           </Badge>
                         )}
@@ -3551,92 +3584,92 @@ const Notifications = () => {
                   )}
                   {viewNotification.leaveStatus && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Status</h4>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Status</h4>
                       <Badge variant={
                         viewNotification.leaveStatus === 'approved' ? 'default' :
                         viewNotification.leaveStatus === 'rejected' ? 'destructive' :
                         viewNotification.leaveStatus === 'pending' ? 'secondary' :
                         'outline'
-                      } className="capitalize">
+                      } className="text-[8px] md:text-xs capitalize">
                         {viewNotification.leaveStatus}
                       </Badge>
                     </div>
                   )}
                   {viewNotification.leaveApprovedBy && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Approved By</h4>
-                      <p className="font-medium">{viewNotification.leaveApprovedBy}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Approved By</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.leaveApprovedBy}</p>
                     </div>
                   )}
                   {viewNotification.leaveRejectedBy && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Rejected By</h4>
-                      <p className="font-medium">{viewNotification.leaveRejectedBy}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Rejected By</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.leaveRejectedBy}</p>
                     </div>
                   )}
                   {viewNotification.createdAt && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Created</h4>
-                      <p className="font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Created</h4>
+                      <p className="text-xs md:text-sm font-medium">{new Date(viewNotification.createdAt).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-4">
                   {viewNotification.clientName && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Client</h4>
-                      <p className="font-medium">{viewNotification.clientName}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Client</h4>
+                      <p className="text-xs md:text-sm font-medium">{viewNotification.clientName}</p>
                     </div>
                   )}
                   {viewNotification.followUpDate && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Follow-up Date</h4>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span className="font-medium">{viewNotification.followUpDate}</span>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Follow-up Date</h4>
+                      <div className="flex items-center gap-0.5 md:gap-1">
+                        <Calendar className="h-3 w-3 md:h-4 md:w-4" />
+                        <span className="text-xs md:text-sm font-medium">{viewNotification.followUpDate}</span>
                       </div>
                     </div>
                   )}
                   {viewNotification.communicationType && (
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground mb-1">Type</h4>
-                      <p className="font-medium capitalize">{viewNotification.communicationType}</p>
+                      <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Type</h4>
+                      <p className="text-xs md:text-sm font-medium capitalize">{viewNotification.communicationType}</p>
                     </div>
                   )}
                   <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-1">Received</h4>
-                    <p className="font-medium">{viewNotification.time}</p>
+                    <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Received</h4>
+                    <p className="text-xs md:text-sm font-medium">{viewNotification.time}</p>
                   </div>
                 </div>
               )}
               
               <div>
-                <h4 className="font-medium text-sm text-muted-foreground mb-1">Message</h4>
-                <div className="p-3 border rounded-md bg-muted/50">
-                  <p className="text-sm">{viewNotification.message}</p>
+                <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Message</h4>
+                <div className="p-2 md:p-3 border rounded-md bg-muted/50">
+                  <p className="text-xs md:text-sm">{viewNotification.message}</p>
                 </div>
               </div>
               
               {viewNotification.notes && (
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-1">Notes</h4>
-                  <div className="p-3 border rounded-md bg-muted/50">
-                    <p className="text-sm">{viewNotification.notes}</p>
+                  <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Notes</h4>
+                  <div className="p-2 md:p-3 border rounded-md bg-muted/50">
+                    <p className="text-xs md:text-sm">{viewNotification.notes}</p>
                   </div>
                 </div>
               )}
               
               {viewNotification.leaveReason && (
                 <div>
-                  <h4 className="font-medium text-sm text-muted-foreground mb-1">Leave Reason</h4>
-                  <div className="p-3 border rounded-md bg-muted/50">
-                    <p className="text-sm">{viewNotification.leaveReason}</p>
+                  <h4 className="font-medium text-[10px] md:text-xs text-muted-foreground mb-0.5 md:mb-1">Leave Reason</h4>
+                  <div className="p-2 md:p-3 border rounded-md bg-muted/50">
+                    <p className="text-xs md:text-sm">{viewNotification.leaveReason}</p>
                   </div>
                 </div>
               )}
               
-              <div className="flex gap-2 pt-4">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 md:pt-4">
                 {!viewNotification.read ? (
                   <Button 
                     variant="outline" 
@@ -3644,7 +3677,7 @@ const Notifications = () => {
                       handleMarkAsRead(viewNotification.id);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     Mark as Read
                   </Button>
@@ -3655,7 +3688,7 @@ const Notifications = () => {
                       handleMarkAsUnread(viewNotification.id);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     Mark as Unread
                   </Button>
@@ -3667,7 +3700,7 @@ const Notifications = () => {
                       openSiteInNewTab(viewNotification.siteName);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     View Sites
                   </Button>
@@ -3679,7 +3712,7 @@ const Notifications = () => {
                       openTaskInNewTab(viewNotification.taskTitle);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     View Tasks
                   </Button>
@@ -3691,7 +3724,7 @@ const Notifications = () => {
                       openInventoryInNewTab(viewNotification.itemSku);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     View Inventory
                   </Button>
@@ -3703,7 +3736,7 @@ const Notifications = () => {
                       openMachinesInNewTab(viewNotification.machineName);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     View Machines
                   </Button>
@@ -3715,7 +3748,7 @@ const Notifications = () => {
                       openLeavesInNewTab(viewNotification.employeeName);
                       setDialogOpen(false);
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs md:text-sm h-8 md:h-10"
                   >
                     View Leaves
                   </Button>
@@ -3726,9 +3759,9 @@ const Notifications = () => {
                     handleDelete(viewNotification.id);
                     setDialogOpen(false);
                   }}
-                  className="flex-1"
+                  className="flex-1 text-xs md:text-sm h-8 md:h-10"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   Delete
                 </Button>
               </div>

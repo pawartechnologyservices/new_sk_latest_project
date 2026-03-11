@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { DashboardSidebar } from "@/components/shared/DashboardSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +80,17 @@ const Settings = () => {
     canDeleteUsers: true,
   });
   const [activeTab, setActiveTab] = useState("profile");
+  
+  // Add mobile sidebar state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const handleMenuClick = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
+  const handleMobileClose = () => {
+    setMobileSidebarOpen(false);
+  };
 
   useEffect(() => {
     loadData();
@@ -231,61 +244,103 @@ const Settings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header - CRM Style */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Settings & Configuration
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your account settings and preferences</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search settings..."
-                className="pl-10 w-64 rounded-full border-gray-300 bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Bell className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Header with hamburger menu */}
+      <DashboardHeader 
+        title="Settings & Configuration" 
+        onMenuClick={handleMenuClick}
+      />
 
-      <div className="p-6">
+      {/* Main App Sidebar - Only shown on mobile when open */}
+      {mobileSidebarOpen && (
+        <DashboardSidebar 
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={handleMobileClose}
+        />
+      )}
+
+      <div className="p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Sidebar Navigation */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Mobile Navigation - ONLY visible on mobile */}
+            <div className="block lg:hidden">
+              <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
+                <Button
+                  variant={activeTab === "profile" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab("profile")}
+                  className={`flex items-center gap-2 px-4 py-2 whitespace-nowrap ${activeTab === "profile" ? 'bg-blue-600' : ''}`}
+                >
+                  <User className="h-4 w-4" />
+                  Profile
+                </Button>
+                <Button
+                  variant={activeTab === "security" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab("security")}
+                  className={`flex items-center gap-2 px-4 py-2 whitespace-nowrap ${activeTab === "security" ? 'bg-blue-600' : ''}`}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Security
+                </Button>
+                <Button
+                  variant={activeTab === "permissions" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab("permissions")}
+                  className={`flex items-center gap-2 px-4 py-2 whitespace-nowrap ${activeTab === "permissions" ? 'bg-blue-600' : ''}`}
+                >
+                  <Shield className="h-4 w-4" />
+                  Permissions
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 whitespace-nowrap border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
+            </div>
+
+            {/* Desktop Sidebar Navigation - ONLY visible on desktop */}
+            <div className="hidden lg:block lg:w-1/4">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 sticky top-24">
                 <div className="p-6 border-b border-gray-200">
                   <h2 className="text-lg font-bold text-gray-900">Settings Menu</h2>
                 </div>
                 <div className="p-4 space-y-2">
                   <button
                     onClick={() => setActiveTab("profile")}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === "profile" ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'hover:bg-gray-100 text-gray-700'}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      activeTab === "profile" 
+                        ? 'bg-blue-50 text-blue-600 border border-blue-100' 
+                        : 'hover:bg-gray-100 text-gray-700'
+                    }`}
                   >
                     <User className="h-5 w-5" />
                     <span className="font-medium">Profile Settings</span>
                   </button>
                   <button
                     onClick={() => setActiveTab("security")}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === "security" ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'hover:bg-gray-100 text-gray-700'}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      activeTab === "security" 
+                        ? 'bg-blue-50 text-blue-600 border border-blue-100' 
+                        : 'hover:bg-gray-100 text-gray-700'
+                    }`}
                   >
                     <ShieldCheck className="h-5 w-5" />
                     <span className="font-medium">Security</span>
                   </button>
                   <button
                     onClick={() => setActiveTab("permissions")}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === "permissions" ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'hover:bg-gray-100 text-gray-700'}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      activeTab === "permissions" 
+                        ? 'bg-blue-50 text-blue-600 border border-blue-100' 
+                        : 'hover:bg-gray-100 text-gray-700'
+                    }`}
                   >
                     <Shield className="h-5 w-5" />
                     <span className="font-medium">Permissions</span>
@@ -308,7 +363,7 @@ const Settings = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="lg:col-span-3">
+            <div className="flex-1 lg:w-3/4">
               <AnimatePresence mode="wait">
                 {/* Profile Tab */}
                 {activeTab === "profile" && (
@@ -319,24 +374,24 @@ const Settings = () => {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-                      <div className="bg-white border-b border-gray-200 px-6 py-4">
-                        <div className="flex items-center justify-between">
+                    <div className="bg-white rounded-xl md:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                      <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div>
-                            <h2 className="text-xl font-bold text-gray-900">Profile Settings</h2>
-                            <p className="text-sm text-gray-500 mt-1">Manage your personal information and preferences</p>
+                            <h2 className="text-lg md:text-xl font-bold text-gray-900">Profile Settings</h2>
+                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Manage your personal information and preferences</p>
                           </div>
-                          <Badge variant="secondary" className="px-3 py-1">
+                          <Badge variant="secondary" className="px-2 md:px-3 py-0.5 md:py-1 text-xs md:text-sm w-fit">
                             Super Admin
                           </Badge>
                         </div>
                       </div>
-                      <div className="p-6">
-                        <form onSubmit={handleProfileUpdate} className="space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                <User className="h-4 w-4" />
+                      <div className="p-4 md:p-6">
+                        <form onSubmit={handleProfileUpdate} className="space-y-4 md:space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                            <div className="space-y-2 md:space-y-3">
+                              <Label className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <User className="h-3 w-3 md:h-4 md:w-4" />
                                 Full Name
                               </Label>
                               <Input 
@@ -344,26 +399,26 @@ const Settings = () => {
                                 onChange={(e) => setProfileData({...profileData, name: e.target.value})}
                                 disabled={loading.profile}
                                 placeholder="Enter your full name"
-                                className="h-11 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                className="h-9 md:h-11 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                               />
                             </div>
                             
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                <Mail className="h-4 w-4" />
+                            <div className="space-y-2 md:space-y-3">
+                              <Label className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Mail className="h-3 w-3 md:h-4 md:w-4" />
                                 Email Address
                               </Label>
                               <Input 
                                 value={profileData.email}
                                 disabled
-                                className="h-11 rounded-lg border-gray-300 bg-gray-50"
+                                className="h-9 md:h-11 text-xs md:text-sm rounded-lg border-gray-300 bg-gray-50"
                                 readOnly
                               />
                             </div>
                             
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                <Phone className="h-4 w-4" />
+                            <div className="space-y-2 md:space-y-3">
+                              <Label className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Phone className="h-3 w-3 md:h-4 md:w-4" />
                                 Phone Number
                               </Label>
                               <Input 
@@ -371,25 +426,25 @@ const Settings = () => {
                                 onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
                                 disabled={loading.profile}
                                 placeholder="Enter phone number"
-                                className="h-11 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                className="h-9 md:h-11 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                               />
                             </div>
                           </div>
                           
-                          <div className="flex justify-end pt-4">
+                          <div className="flex justify-end pt-3 md:pt-4">
                             <Button 
                               type="submit" 
                               disabled={loading.profile} 
-                              className="gap-2 h-11 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg"
+                              className="gap-1 md:gap-2 h-9 md:h-11 px-4 md:px-6 text-xs md:text-sm bg-blue-600 hover:bg-blue-700 rounded-lg w-full sm:w-auto"
                             >
                               {loading.profile ? (
                                 <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
                                   Saving...
                                 </>
                               ) : (
                                 <>
-                                  <Save className="h-4 w-4" />
+                                  <Save className="h-3 w-3 md:h-4 md:w-4" />
                                   Save Changes
                                 </>
                               )}
@@ -410,21 +465,21 @@ const Settings = () => {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-                      <div className="bg-white border-b border-gray-200 px-6 py-4">
+                    <div className="bg-white rounded-xl md:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                      <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h2 className="text-xl font-bold text-gray-900">Security Settings</h2>
-                            <p className="text-sm text-gray-500 mt-1">Manage your password and security preferences</p>
+                            <h2 className="text-lg md:text-xl font-bold text-gray-900">Security Settings</h2>
+                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Manage your password and security preferences</p>
                           </div>
                         </div>
                       </div>
-                      <div className="p-6">
-                        <form onSubmit={handlePasswordUpdate} className="space-y-6">
-                          <div className="space-y-4">
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                <KeyRound className="h-4 w-4" />
+                      <div className="p-4 md:p-6">
+                        <form onSubmit={handlePasswordUpdate} className="space-y-4 md:space-y-6">
+                          <div className="space-y-3 md:space-y-4">
+                            <div className="space-y-2 md:space-y-3">
+                              <Label className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <KeyRound className="h-3 w-3 md:h-4 md:w-4" />
                                 Current Password
                               </Label>
                               <div className="relative">
@@ -436,24 +491,24 @@ const Settings = () => {
                                   disabled={loading.password}
                                   placeholder="Enter current password"
                                   required
-                                  className="h-11 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pl-11 pr-11"
+                                  className="h-9 md:h-11 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pl-8 md:pl-11 pr-8 md:pr-11"
                                 />
-                                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Lock className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-gray-400" />
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-8 w-8"
+                                  className="absolute right-1 md:right-3 top-1/2 transform -translate-y-1/2 h-6 w-6 md:h-8 md:w-8"
                                   onClick={() => setShowPassword({...showPassword, current: !showPassword.current})}
                                 >
-                                  {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  {showPassword.current ? <EyeOff className="h-3 w-3 md:h-4 md:w-4" /> : <Eye className="h-3 w-3 md:h-4 md:w-4" />}
                                 </Button>
                               </div>
                             </div>
                             
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                <Key className="h-4 w-4" />
+                            <div className="space-y-2 md:space-y-3">
+                              <Label className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Key className="h-3 w-3 md:h-4 md:w-4" />
                                 New Password
                               </Label>
                               <div className="relative">
@@ -465,24 +520,24 @@ const Settings = () => {
                                   disabled={loading.password}
                                   placeholder="Enter new password"
                                   required
-                                  className="h-11 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pl-11 pr-11"
+                                  className="h-9 md:h-11 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pl-8 md:pl-11 pr-8 md:pr-11"
                                 />
-                                <Key className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Key className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-gray-400" />
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-8 w-8"
+                                  className="absolute right-1 md:right-3 top-1/2 transform -translate-y-1/2 h-6 w-6 md:h-8 md:w-8"
                                   onClick={() => setShowPassword({...showPassword, new: !showPassword.new})}
                                 >
-                                  {showPassword.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  {showPassword.new ? <EyeOff className="h-3 w-3 md:h-4 md:w-4" /> : <Eye className="h-3 w-3 md:h-4 md:w-4" />}
                                 </Button>
                               </div>
                             </div>
                             
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                                <KeyRound className="h-4 w-4" />
+                            <div className="space-y-2 md:space-y-3">
+                              <Label className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <KeyRound className="h-3 w-3 md:h-4 md:w-4" />
                                 Confirm Password
                               </Label>
                               <div className="relative">
@@ -494,38 +549,38 @@ const Settings = () => {
                                   disabled={loading.password}
                                   placeholder="Confirm new password"
                                   required
-                                  className="h-11 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pl-11 pr-11"
+                                  className="h-9 md:h-11 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pl-8 md:pl-11 pr-8 md:pr-11"
                                 />
-                                <Shield className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Shield className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-gray-400" />
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-8 w-8"
+                                  className="absolute right-1 md:right-3 top-1/2 transform -translate-y-1/2 h-6 w-6 md:h-8 md:w-8"
                                   onClick={() => setShowPassword({...showPassword, confirm: !showPassword.confirm})}
                                 >
-                                  {showPassword.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  {showPassword.confirm ? <EyeOff className="h-3 w-3 md:h-4 md:w-4" /> : <Eye className="h-3 w-3 md:h-4 md:w-4" />}
                                 </Button>
                               </div>
                             </div>
                           </div>
                           
-                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                            <div className="flex items-start gap-3">
-                              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div className="p-3 md:p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <div className="flex items-start gap-2 md:gap-3">
+                              <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                               <div>
-                                <p className="font-medium text-amber-800 mb-2">Password Requirements</p>
-                                <ul className="text-sm text-amber-700 space-y-1">
-                                  <li className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                <p className="text-xs md:text-sm font-medium text-amber-800 mb-1 md:mb-2">Password Requirements</p>
+                                <ul className="text-[10px] md:text-sm text-amber-700 space-y-0.5 md:space-y-1">
+                                  <li className="flex items-center gap-1 md:gap-2">
+                                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-amber-600" />
                                     Minimum 6 characters
                                   </li>
-                                  <li className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                  <li className="flex items-center gap-1 md:gap-2">
+                                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-amber-600" />
                                     Avoid common passwords
                                   </li>
-                                  <li className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                  <li className="flex items-center gap-1 md:gap-2">
+                                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-amber-600" />
                                     Update regularly for security
                                   </li>
                                 </ul>
@@ -533,20 +588,20 @@ const Settings = () => {
                             </div>
                           </div>
                           
-                          <div className="flex gap-3 pt-4">
+                          <div className="flex gap-2 md:gap-3 pt-3 md:pt-4">
                             <Button 
                               type="submit" 
                               disabled={loading.password} 
-                              className="gap-2 h-11 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg flex-1"
+                              className="gap-1 md:gap-2 h-9 md:h-11 px-4 md:px-6 text-xs md:text-sm bg-blue-600 hover:bg-blue-700 rounded-lg flex-1"
                             >
                               {loading.password ? (
                                 <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
                                   Updating...
                                 </>
                               ) : (
                                 <>
-                                  <ShieldCheck className="h-4 w-4" />
+                                  <ShieldCheck className="h-3 w-3 md:h-4 md:w-4" />
                                   Update Password
                                 </>
                               )}
@@ -567,36 +622,36 @@ const Settings = () => {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-                      <div className="bg-white border-b border-gray-200 px-6 py-4">
+                    <div className="bg-white rounded-xl md:rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                      <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h2 className="text-xl font-bold text-gray-900">Permission Settings</h2>
-                            <p className="text-sm text-gray-500 mt-1">Configure access controls and system permissions</p>
+                            <h2 className="text-lg md:text-xl font-bold text-gray-900">Permission Settings</h2>
+                            <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Configure access controls and system permissions</p>
                           </div>
                         </div>
                       </div>
-                      <div className="p-6">
-                        <div className="space-y-6">
-                          <div className="space-y-4">
+                      <div className="p-4 md:p-6">
+                        <div className="space-y-4 md:space-y-6">
+                          <div className="space-y-3 md:space-y-4">
                             {Object.entries(permissions).map(([key, value]) => (
                               <div
                                 key={key}
-                                className="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors gap-3"
                               >
-                                <div className="flex items-center gap-4">
-                                  <div className={`p-2 rounded-lg ${value ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                <div className="flex items-center gap-3 md:gap-4">
+                                  <div className={`p-1.5 md:p-2 rounded-lg ${value ? 'bg-green-100' : 'bg-gray-100'}`}>
                                     {value ? (
-                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                      <CheckCircle className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
                                     ) : (
-                                      <AlertCircle className="h-5 w-5 text-gray-400" />
+                                      <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-gray-400" />
                                     )}
                                   </div>
-                                  <div>
-                                    <Label className="font-medium text-gray-900 cursor-pointer capitalize">
+                                  <div className="flex-1 min-w-0">
+                                    <Label className="text-xs md:text-sm font-medium text-gray-900 cursor-pointer capitalize">
                                       {key.replace(/([A-Z])/g, ' $1').trim()}
                                     </Label>
-                                    <p className="text-sm text-gray-500 mt-1">
+                                    <p className="text-[10px] md:text-xs text-gray-500 mt-0.5 md:mt-1">
                                       {getPermissionDescription(key)}
                                     </p>
                                   </div>
@@ -607,29 +662,30 @@ const Settings = () => {
                                     setPermissions({...permissions, [key]: checked})
                                   }
                                   disabled={loading.permissions}
+                                  className="ml-auto sm:ml-0"
                                 />
                               </div>
                             ))}
                           </div>
                           
-                          <div className="flex items-center justify-between pt-6 border-t">
-                            <div className="text-sm text-gray-500">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-4 md:pt-6 border-t gap-3">
+                            <div className="text-[10px] md:text-xs text-gray-500">
                               <p>Super Admin has full system access.</p>
                               <p>Toggle switches to restrict specific actions.</p>
                             </div>
                             <Button 
                               onClick={handlePermissionsUpdate} 
                               disabled={loading.permissions} 
-                              className="gap-2 h-11 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg"
+                              className="gap-1 md:gap-2 h-9 md:h-11 px-4 md:px-6 text-xs md:text-sm bg-blue-600 hover:bg-blue-700 rounded-lg w-full sm:w-auto"
                             >
                               {loading.permissions ? (
                                 <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
                                   Saving...
                                 </>
                               ) : (
                                 <>
-                                  <Save className="h-4 w-4" />
+                                  <Save className="h-3 w-3 md:h-4 md:w-4" />
                                   Save Permissions
                                 </>
                               )}

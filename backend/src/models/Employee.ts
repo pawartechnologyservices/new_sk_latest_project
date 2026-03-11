@@ -1,5 +1,12 @@
-// backend/src/models/Employee.ts
 import mongoose, { Schema, Document } from 'mongoose';
+
+// Site History Entry Interface
+interface SiteHistoryEntry {
+  siteName: string;
+  assignedDate: Date;
+  leftDate?: Date;
+  daysWorked?: number;
+}
 
 export interface IEmployee extends Document {
   // Basic Information
@@ -66,6 +73,9 @@ export interface IEmployee extends Document {
   westcoatIssued: boolean;
   apronIssued: boolean;
   
+  // Site History - NEW FIELD
+  siteHistory?: SiteHistoryEntry[];
+  
   // Documents - Cloudinary URLs
   photo?: string;
   photoPublicId?: string;
@@ -87,7 +97,6 @@ const EmployeeSchema: Schema = new Schema(
       unique: true,
       trim: true,
       default: function() {
-        // Generate employee ID if not provided
         const date = new Date();
         const dateStr = date.getFullYear().toString().slice(2) + 
                       (date.getMonth() + 1).toString().padStart(2, '0') + 
@@ -115,9 +124,7 @@ const EmployeeSchema: Schema = new Schema(
       trim: true,
       validate: {
         validator: function(v: string) {
-          // Allow null/empty for validation, but not for required
           if (!v || v.trim() === '') return false;
-          // Check if it's exactly 10 digits
           return /^[0-9]{10}$/.test(v);
         },
         message: 'Please enter a valid 10-digit phone number'
@@ -139,10 +146,10 @@ const EmployeeSchema: Schema = new Schema(
       type: String,
       trim: true,
       uppercase: true,
-      default: null, // Use null instead of empty string
+      default: null,
       validate: {
         validator: function(v: string) {
-          if (!v || v.trim() === '') return true; // Allow empty/null
+          if (!v || v.trim() === '') return true;
           return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
         },
         message: 'Please enter a valid PAN format (e.g., ABCDE1234F) or leave empty'
@@ -176,17 +183,17 @@ const EmployeeSchema: Schema = new Schema(
     bloodGroup: {
       type: String,
       enum: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', null],
-      default: null // CRITICAL: Must be null, not empty string
+      default: null
     },
     gender: {
       type: String,
       enum: ['Male', 'Female', 'Transgender', null],
-      default: null // CRITICAL: Must be null
+      default: null
     },
     maritalStatus: {
       type: String,
       enum: ['Single', 'Married', 'Widow', 'Widower', 'Divorcee', null],
-      default: null // CRITICAL: Must be null
+      default: null
     },
     
     // Address
@@ -318,27 +325,27 @@ const EmployeeSchema: Schema = new Schema(
       default: null
     },
     
-    // Employment Details - UPDATED ENUM VALUES
+    // Employment Details
     department: {
       type: String,
       required: [true, 'Department is required'],
       enum: [
-        'Housekeeping',           // For HK STAFF, HK Supervisor, HK SUPERVISOR
-        'Security',               // For Security Guard, GATE ATTENDANT, Bouncer, Security SUP
-        'Parking Management',     // For Parking Attendent, PARKING
+        'Housekeeping',
+        'Security',
+        'Parking Management',
         'Waste Management',
         'STP Tank Cleaning',
         'Consumables Management',
-        'Administration',         // For MANAGER, Manager, OFFICE STAFF, Admin, RECEPTIONIST
-        'Finance',                // For ACCOUNTANT, ACCOUNDEND
-        'HR',                     // For HR
+        'Administration',
+        'Finance',
+        'HR',
         'IT',
-        'Operations',             // For OWC OPERATOR, OWC Opreter
+        'Operations',
         'Maintenance',
-        'Driver',                 // For Driver, DRIVER
-        'Supervisor',             // For Supervisor
+        'Driver',
+        'Supervisor',
         'Sales',
-        'General Staff'           // Default fallback
+        'General Staff'
       ],
       default: 'General Staff'
     },
@@ -401,6 +408,17 @@ const EmployeeSchema: Schema = new Schema(
       default: false
     },
     
+    // Site History - NEW FIELD
+    siteHistory: {
+      type: [{
+        siteName: { type: String, required: true },
+        assignedDate: { type: Date, required: true, default: Date.now },
+        leftDate: { type: Date },
+        daysWorked: { type: Number }
+      }],
+      default: []
+    },
+    
     // Cloudinary URLs
     photo: {
       type: String,
@@ -437,7 +455,6 @@ const EmployeeSchema: Schema = new Schema(
     toJSON: { 
       virtuals: true,
       transform: function(doc, ret) {
-        // Remove sensitive fields when converting to JSON
         delete ret.__v;
         delete ret.photoPublicId;
         delete ret.employeeSignaturePublicId;
@@ -480,7 +497,7 @@ EmployeeSchema.virtual('formattedDateOfExit').get(function() {
   return this.dateOfExit ? this.dateOfExit.toISOString().split('T')[0] : '';
 });
 
-// Middleware to handle validation errors - IMPROVED VERSION
+// Post-save middleware for error handling
 EmployeeSchema.post('save', function(error: any, doc: any, next: any) {
   if (error.name === 'MongoError' && error.code === 11000) {
     const field = Object.keys(error.keyPattern)[0];
@@ -498,7 +515,6 @@ EmployeeSchema.post('save', function(error: any, doc: any, next: any) {
     
     next(new Error(message));
   } else if (error.name === 'ValidationError') {
-    // Format validation errors better
     const errors = Object.values(error.errors).map((err: any) => {
       return `• ${err.message}`;
     });
@@ -510,7 +526,6 @@ EmployeeSchema.post('save', function(error: any, doc: any, next: any) {
 
 // Pre-save middleware to clean up data
 EmployeeSchema.pre('save', function(next) {
-  // Trim all string fields
   const stringFields = ['name', 'email', 'phone', 'aadharNumber', 'panNumber', 
                        'esicNumber', 'uanNumber', 'position', 'siteName',
                        'permanentAddress', 'localAddress', 'bankName', 
@@ -522,7 +537,6 @@ EmployeeSchema.pre('save', function(next) {
     }
   });
   
-  // Convert empty strings to null for optional fields
   const optionalFields = ['panNumber', 'esicNumber', 'uanNumber', 'permanentAddress',
                          'localAddress', 'bankName', 'accountNumber', 'ifscCode',
                          'branchName', 'fatherName', 'motherName', 'spouseName',
@@ -539,7 +553,7 @@ EmployeeSchema.pre('save', function(next) {
   next();
 });
 
-// Static method to get all valid departments
+// Static methods
 EmployeeSchema.statics.getValidDepartments = function() {
   return [
     'Housekeeping',
@@ -561,17 +575,14 @@ EmployeeSchema.statics.getValidDepartments = function() {
   ];
 };
 
-// Static method to get all valid blood groups
 EmployeeSchema.statics.getValidBloodGroups = function() {
   return ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 };
 
-// Static method to get all valid genders
 EmployeeSchema.statics.getValidGenders = function() {
   return ['Male', 'Female', 'Transgender'];
 };
 
-// Fix for TypeScript static methods
 interface EmployeeModel extends mongoose.Model<IEmployee> {
   getValidDepartments(): string[];
   getValidBloodGroups(): string[];

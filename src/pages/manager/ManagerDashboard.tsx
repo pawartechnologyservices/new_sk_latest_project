@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Shield, 
   ClipboardList, 
@@ -38,33 +39,201 @@ import {
   AlertTriangle,
   Zap,
   MapPin,
-  CalendarCheck
+  CalendarCheck,
+  Building,
+  RefreshCw,
+  Search,
+  Filter,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  UserCheck,
+  UserX,
+  UserMinus,
+  UserPlus as UserPlusIcon,
+  Home,
+  Shield as ShieldIcon,
+  Car,
+  Trash2,
+  Droplets,
+  ShoppingCart,
+  DollarSign,
+  Briefcase,
+  User,
+  Phone,
+  Mail,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Target as TargetIcon,
+  ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
 import { useRole } from "@/context/RoleContext";
 import userService from "@/services/userService";
+import { siteService, Site } from "@/services/SiteService";
+import taskService, { Task } from "@/services/TaskService";
+import axios from "axios";
 
 // Import Recharts for charts
 import {
   PieChart as RechartsPieChart,
   Pie,
   Cell,
-  ResponsiveContainer,
-  Legend,
   Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-  AreaChart,
-  Area
+  Legend,
+  ResponsiveContainer
 } from 'recharts';
+import { Input } from "@/components/ui/input";
+
+// API Base URL
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5001/api`;
+
+// Chart color constants
+const CHART_COLORS = {
+  present: '#10b981',
+  absent: '#ef4444',
+  weeklyOff: '#8b5cf6',
+  leave: '#f59e0b',
+  halfDay: '#3b82f6',
+  late: '#f59e0b',
+  payroll: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444']
+};
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: "easeOut"
+    }
+  }
+};
 
 // Types
+interface Employee {
+  id: string;
+  _id?: string;
+  employeeId?: string;
+  name: string;
+  email: string;
+  phone: string;
+  department: string;
+  position: string;
+  site: string;
+  siteName?: string;
+  status: 'present' | 'absent' | 'leave' | 'weekly-off';
+  checkInTime?: string;
+  checkOutTime?: string;
+  date: string;
+  remark?: string;
+  action?: 'fine' | 'advance' | 'other' | '' | 'none';
+  employeeStatus?: string;
+  role?: string;
+  gender?: string;
+  dateOfJoining?: string;
+  dateOfBirth?: string;
+  salary?: number | string;
+  assignedSites?: string[];
+  shift?: string;
+  workingHours?: string;
+  employeeType?: string;
+  reportingManager?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isOnBreak?: boolean;
+  hasCheckedOutToday?: boolean;
+  isManager?: boolean;
+  isSupervisor?: boolean;
+}
+
+interface AttendanceRecord {
+  _id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  totalHours: number;
+  breakTime: number;
+  status: 'present' | 'absent' | 'half-day' | 'leave' | 'weekly-off';
+  isCheckedIn: boolean;
+  isOnBreak: boolean;
+  supervisorId?: string;
+  remarks?: string;
+  siteName?: string;
+  department?: string;
+}
+
+interface SiteAttendanceData {
+  id: string;
+  siteId: string;
+  name: string;
+  siteName: string;
+  clientName?: string;
+  location?: string;
+  totalEmployees: number;
+  present: number;
+  absent: number;
+  weeklyOff: number;
+  leave: number;
+  shortage: number;
+  date: string;
+  daysInPeriod: number;
+  totalRequiredAttendance: number;
+  totalPresentAttendance: number;
+  periodShortage: number;
+  startDate: string;
+  endDate: string;
+  employees: Employee[];
+  isRealData: boolean;
+  attendanceRate: number;
+}
+
+// Interface for daily attendance summary (TOTAL ACROSS ALL MANAGER'S SITES)
+interface DailyAttendanceSummary {
+  date: string;
+  day: string;
+  present: number;
+  absent: number;
+  weeklyOff: number;
+  leave: number;
+  halfDay: number;
+  total: number;
+  rate: string;
+  index: number;
+  totalEmployees: number;
+  sitesWithData: number;
+  siteBreakdown?: {
+    [siteName: string]: {
+      total: number;
+      present: number;
+      absent: number;
+      weeklyOff: number;
+      leave: number;
+      halfDay: number;
+    }
+  };
+}
+
 interface AttendanceStatus {
   isCheckedIn: boolean;
   isOnBreak: boolean;
@@ -91,34 +260,6 @@ interface LeaveRequest {
   avatar: string;
 }
 
-interface TaskStatus {
-  name: string;
-  value: number;
-  color: string;
-  icon: React.ComponentType<any>;
-  count: number;
-  trend: 'up' | 'down' | 'stable';
-}
-
-interface MonthlyAttendanceData {
-  name: string;
-  value: number;
-  color: string;
-  fill: string;
-}
-
-interface QuickAction {
-  id: number;
-  title: string;
-  description: string;
-  icon: React.ComponentType<any>;
-  action: () => void;
-  color: string;
-  bgColor: string;
-  hoverColor: string;
-  gradient: string;
-}
-
 interface TaskDetail {
   id: string;
   _id: string;
@@ -141,23 +282,1081 @@ interface TaskDetail {
   isAssignedToMe?: boolean;
 }
 
-interface Site {
-  _id: string;
-  name: string;
-  clientName: string;
-  location: string;
-  status: string;
-  managerCount: number;
-  supervisorCount: number;
+interface QuickAction {
+  id: number;
+  title: string;
+  description: string;
+  icon: React.ComponentType<any>;
+  action: () => void;
+  color: string;
+  bgColor: string;
+  hoverColor: string;
+  gradient: string;
 }
 
-const ManagerDashboard = () => {
-  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
-  const { user: authUser } = useRole();
-  const navigate = useNavigate();
+interface OutletContext {
+  onMenuClick: () => void;
+}
+
+// Helper function to format date
+const formatDate = (date: Date | string) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDateDisplay = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Helper function to format time
+const formatTimeForDisplay = (timestamp: string | null): string => {
+  if (!timestamp || timestamp === "-" || timestamp === "" || timestamp === "null") return "-";
   
-  // API Base URL - Use relative URL or config-based URL
-  const API_URL = import.meta.env.VITE_API_URL || `http://localhost:5001/api`;
+  try {
+    if (typeof timestamp === 'string' && (timestamp.includes('AM') || timestamp.includes('PM'))) {
+      return timestamp;
+    }
+    
+    if (timestamp.includes('T')) {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: true 
+        });
+      }
+    }
+    
+    const timeParts = timestamp.split(':');
+    if (timeParts.length >= 2) {
+      const hours = parseInt(timeParts[0]);
+      const minutes = timeParts[1];
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes} ${period}`;
+    }
+    
+    return timestamp;
+  } catch (error) {
+    return timestamp || "-";
+  }
+};
+
+// Format duration for display
+const formatDuration = (hours: number): string => {
+  if (!hours || hours === 0) return "0m";
+  
+  const totalMinutes = Math.round(hours * 60);
+  const hoursPart = Math.floor(totalMinutes / 60);
+  const minutesPart = totalMinutes % 60;
+  
+  if (hoursPart > 0 && minutesPart > 0) {
+    return `${hoursPart}h ${minutesPart}m`;
+  } else if (hoursPart > 0) {
+    return `${hoursPart}h`;
+  } else {
+    return `${minutesPart}m`;
+  }
+};
+
+// Format short date
+const formatShortDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Format currency
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+};
+
+// Normalize site name for comparison
+const normalizeSiteName = (siteName: string | null | undefined): string => {
+  if (!siteName) return '';
+  return siteName
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '');
+};
+
+// Fetch employees from API - EXACTLY LIKE ManagerAttendance.tsx
+const fetchEmployees = async (): Promise<Employee[]> => {
+  try {
+    console.log('🔄 Fetching employees from API...');
+    
+    const response = await fetch(`${API_URL}/employees?limit=1000`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      let employeesData = [];
+      
+      if (Array.isArray(data)) {
+        employeesData = data;
+      } else if (data.success && Array.isArray(data.data)) {
+        employeesData = data.data;
+      } else if (Array.isArray(data.employees)) {
+        employeesData = data.employees;
+      } else if (data.data && Array.isArray(data.data.employees)) {
+        employeesData = data.data.employees;
+      }
+      
+      const transformedEmployees: Employee[] = employeesData.map((emp: any) => ({
+        id: emp._id || emp.id || `emp_${Math.random()}`,
+        _id: emp._id || emp.id,
+        employeeId: emp.employeeId || emp.employeeID || `EMP${String(Math.random()).slice(2, 6)}`,
+        name: emp.name || emp.employeeName || "Unknown Employee",
+        email: emp.email || "",
+        phone: emp.phone || emp.mobile || "",
+        department: emp.department || "Unknown Department",
+        position: emp.position || emp.designation || emp.role || "Employee",
+        site: emp.site || emp.siteName || "Main Site",
+        siteName: emp.siteName || emp.site || "Main Site",
+        status: "absent" as const,
+        employeeStatus: (emp.status || "active") as string,
+        role: emp.role || 'employee',
+        gender: emp.gender || '',
+        dateOfJoining: emp.dateOfJoining || emp.joinDate || '',
+        dateOfBirth: emp.dateOfBirth || '',
+        salary: emp.salary || emp.basicSalary || 0,
+        assignedSites: emp.assignedSites || emp.sites || [],
+        shift: emp.shift || 'General',
+        workingHours: emp.workingHours || '9:00 AM - 6:00 PM',
+        employeeType: emp.employeeType || emp.type || 'Full-time',
+        reportingManager: emp.reportingManager || emp.manager || '',
+        createdAt: emp.createdAt || emp.created || new Date().toISOString(),
+        updatedAt: emp.updatedAt || emp.updated || new Date().toISOString(),
+        date: new Date().toISOString().split('T')[0],
+        isManager: (emp.position?.toLowerCase() || '').includes('manager') || (emp.department?.toLowerCase() || '').includes('manager'),
+        isSupervisor: (emp.position?.toLowerCase() || '').includes('supervisor') || (emp.department?.toLowerCase() || '').includes('supervisor')
+      }));
+      
+      console.log(`✅ Loaded ${transformedEmployees.length} employees`);
+      return transformedEmployees;
+    } else {
+      throw new Error(data.message || 'Failed to load employees');
+    }
+  } catch (error: any) {
+    console.error('Error fetching employees:', error);
+    throw new Error(`Error loading employees: ${error.message}`);
+  }
+};
+
+// Fetch attendance records for a specific date - EXACTLY LIKE ManagerAttendance.tsx
+const fetchAttendanceRecords = async (date: string): Promise<AttendanceRecord[]> => {
+  try {
+    console.log(`🔄 Fetching attendance records for date: ${date}`);
+    const response = await fetch(`${API_URL}/attendance?date=${date}&limit=1000`);
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        return data.data.map((record: any) => ({
+          _id: record._id || record.id,
+          employeeId: record.employeeId || '',
+          employeeName: record.employeeName || 'Unknown',
+          date: record.date || date,
+          checkInTime: record.checkInTime || null,
+          checkOutTime: record.checkOutTime || null,
+          breakStartTime: record.breakStartTime || null,
+          breakEndTime: record.breakEndTime || null,
+          totalHours: Number(record.totalHours) || 0,
+          breakTime: Number(record.breakTime) || 0,
+          status: (record.status?.toLowerCase() || 'absent') as any,
+          isCheckedIn: Boolean(record.isCheckedIn),
+          isOnBreak: Boolean(record.isOnBreak),
+          supervisorId: record.supervisorId,
+          remarks: record.remarks || '',
+          siteName: record.siteName || record.site || '',
+          department: record.department || ''
+        }));
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+    return [];
+  }
+};
+
+// Fetch manager's assigned sites from tasks
+const fetchManagerSites = async (managerId: string): Promise<Site[]> => {
+  try {
+    console.log('Fetching tasks for manager:', managerId);
+    
+    const [allSites, allTasks] = await Promise.all([
+      siteService.getAllSites(),
+      taskService.getAllTasks()
+    ]);
+
+    // Filter sites where manager is assigned (based on tasks)
+    const managerSites = allSites.filter(site => {
+      const siteTasks = allTasks.filter(task => task.siteId === site._id);
+      
+      const isManagerAssigned = siteTasks.some(task => 
+        task.assignedUsers?.some((user: any) => 
+          user.userId === managerId && user.role === 'manager'
+        ) || task.assignedTo === managerId
+      );
+
+      return isManagerAssigned;
+    });
+
+    console.log(`Found ${managerSites.length} sites for manager`);
+    return managerSites;
+    
+  } catch (error) {
+    console.error('Error fetching manager sites:', error);
+    return [];
+  }
+};
+
+// Generate employee data for site for a specific date - EXACTLY LIKE ManagerAttendance.tsx
+const generateSiteEmployeeData = async (siteName: string, date: string): Promise<Employee[]> => {
+  try {
+    const allEmployees = await fetchEmployees();
+    
+    const siteEmployees = allEmployees.filter(emp => 
+      emp.site === siteName || emp.siteName === siteName
+    );
+    
+    console.log(`Found ${siteEmployees.length} employees for site: ${siteName}`);
+    
+    const attendanceRecords = await fetchAttendanceRecords(date);
+    
+    const employees: Employee[] = [];
+    
+    for (const employee of siteEmployees) {
+      const attendance = attendanceRecords.find(record => 
+        record.employeeId === employee._id || record.employeeId === employee.id
+      );
+      
+      let status: 'present' | 'absent' | 'leave' | 'weekly-off' = 'absent';
+      let checkInTime = '-';
+      let checkOutTime = '-';
+      let remark = '';
+      let isOnBreak = false;
+      let hasCheckedOutToday = false;
+      
+      if (attendance) {
+        if (attendance.status === 'present' || attendance.status === 'half-day') {
+          status = 'present';
+        } else if (attendance.status === 'leave') {
+          status = 'leave';
+        } else if (attendance.status === 'weekly-off') {
+          status = 'weekly-off';
+        } else {
+          status = 'absent';
+        }
+        
+        checkInTime = attendance.checkInTime ? formatTimeForDisplay(attendance.checkInTime) : '-';
+        checkOutTime = attendance.checkOutTime ? formatTimeForDisplay(attendance.checkOutTime) : '-';
+        remark = attendance.remarks || '';
+        isOnBreak = attendance.isOnBreak || false;
+        hasCheckedOutToday = attendance.checkOutTime ? true : false;
+      }
+      
+      employees.push({
+        ...employee,
+        status,
+        checkInTime,
+        checkOutTime,
+        date,
+        remark,
+        isOnBreak,
+        hasCheckedOutToday
+      });
+    }
+    
+    console.log(`Processed ${employees.length} employees for site: ${siteName}`);
+    return employees;
+  } catch (error) {
+    console.error('Error generating employee data:', error);
+    return [];
+  }
+};
+
+// Calculate site attendance data for a specific date - EXACTLY LIKE ManagerAttendance.tsx
+const calculateSiteAttendanceData = async (site: Site, date: string): Promise<SiteAttendanceData> => {
+  const employees = await generateSiteEmployeeData(site.name, date);
+  
+  const present = employees.filter(emp => emp.status === 'present').length;
+  const weeklyOff = employees.filter(emp => emp.status === 'weekly-off').length;
+  const leave = employees.filter(emp => emp.status === 'leave').length;
+  const absent = employees.filter(emp => emp.status === 'absent').length;
+  
+  const totalPresent = present + weeklyOff;
+  const totalRequired = employees.length;
+  const shortage = totalRequired - totalPresent;
+  const attendanceRate = totalRequired > 0 ? Math.round((totalPresent / totalRequired) * 100) : 0;
+  
+  return {
+    id: site._id,
+    siteId: site._id,
+    name: site.name,
+    siteName: site.name,
+    clientName: site.clientName,
+    location: site.location,
+    totalEmployees: employees.length,
+    present: totalPresent,
+    absent,
+    weeklyOff,
+    leave,
+    shortage,
+    date,
+    daysInPeriod: 1,
+    totalRequiredAttendance: totalRequired,
+    totalPresentAttendance: totalPresent,
+    periodShortage: shortage,
+    startDate: date,
+    endDate: date,
+    employees,
+    isRealData: employees.length > 0,
+    attendanceRate
+  };
+};
+
+// Fetch attendance data for manager's sites for the last 7 days - WITH CORRECT COUNTING
+const fetchManagerAttendanceData = async (managerId: string, days: number = 7): Promise<DailyAttendanceSummary[]> => {
+  try {
+    console.log(`🔄 Fetching attendance data for last ${days} days across manager's sites...`);
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days + 1);
+    
+    const startDateStr = formatDate(startDate);
+    const endDateStr = formatDate(endDate);
+    
+    // First, fetch manager's sites
+    const managerSites = await fetchManagerSites(managerId);
+    
+    if (managerSites.length === 0) {
+      console.log('No sites assigned to manager');
+      return [];
+    }
+    
+    // Calculate total employees across all sites by summing site employees
+    let totalEmployeesAllSites = 0;
+    const siteEmployeeCounts: { [siteName: string]: number } = {};
+    
+    for (const site of managerSites) {
+      const employees = await generateSiteEmployeeData(site.name, formatDate(new Date()));
+      siteEmployeeCounts[site.name] = employees.length;
+      totalEmployeesAllSites += employees.length;
+    }
+    
+    console.log(`Total employees across all manager's sites: ${totalEmployeesAllSites}`);
+    console.log('Site employee counts:', siteEmployeeCounts);
+    
+    // Try to fetch attendance records for the date range
+    let allRecords: AttendanceRecord[] = [];
+    
+    try {
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: { 
+          startDate: startDateStr, 
+          endDate: endDateStr,
+          limit: 10000
+        }
+      });
+      
+      if (response.data) {
+        if (response.data.success && Array.isArray(response.data.data)) {
+          allRecords = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          allRecords = response.data;
+        } else if (response.data.attendance && Array.isArray(response.data.attendance)) {
+          allRecords = response.data.attendance;
+        }
+      }
+    } catch (error) {
+      console.log('Main attendance endpoint failed, trying range endpoint:', error);
+      
+      try {
+        const response = await axios.get(`${API_URL}/attendance/range`, {
+          params: { startDate: startDateStr, endDate: endDateStr }
+        });
+        
+        if (response.data) {
+          if (response.data.success && Array.isArray(response.data.data)) {
+            allRecords = response.data.data;
+          } else if (Array.isArray(response.data)) {
+            allRecords = response.data;
+          } else if (response.data.attendance && Array.isArray(response.data.attendance)) {
+            allRecords = response.data.attendance;
+          }
+        }
+      } catch (rangeError) {
+        console.log('Range endpoint failed, falling back to day-by-day:', rangeError);
+        
+        const tempDate = new Date(startDate);
+        while (tempDate <= endDate) {
+          const dateStr = formatDate(tempDate);
+          try {
+            const response = await axios.get(`${API_URL}/attendance`, {
+              params: { date: dateStr }
+            });
+            
+            if (response.data) {
+              let dayRecords = [];
+              if (response.data.success && Array.isArray(response.data.data)) {
+                dayRecords = response.data.data;
+              } else if (Array.isArray(response.data)) {
+                dayRecords = response.data;
+              } else if (response.data.attendance && Array.isArray(response.data.attendance)) {
+                dayRecords = response.data.attendance;
+              }
+              
+              allRecords.push(...dayRecords);
+            }
+          } catch (dayError) {
+            console.log(`No data for ${dateStr}`);
+          }
+          
+          tempDate.setDate(tempDate.getDate() + 1);
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+    }
+    
+    console.log(`✅ Fetched ${allRecords.length} attendance records total`);
+    
+    // Create a set of employee IDs from all sites
+    const allSiteEmployees: Employee[] = [];
+    for (const site of managerSites) {
+      const employees = await generateSiteEmployeeData(site.name, formatDate(new Date()));
+      allSiteEmployees.push(...employees);
+    }
+    
+    const employeeIdsFromSites = new Set(allSiteEmployees.map(emp => emp._id || emp.id));
+    
+    // Process records into daily summaries
+    const dailySummaries: { [key: string]: DailyAttendanceSummary } = {};
+    
+    // Initialize all dates in range with CORRECT TOTAL EMPLOYEE COUNT
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      const dateStr = formatDate(currentDate);
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
+      
+      dailySummaries[dateStr] = {
+        date: dateStr,
+        day: dateStr === formatDate(new Date()) ? 'Today' :
+             dateStr === formatDate(new Date(Date.now() - 86400000)) ? 'Yesterday' : dayName,
+        present: 0,
+        absent: 0,
+        weeklyOff: 0,
+        leave: 0,
+        halfDay: 0,
+        total: 0,
+        rate: '0.0%',
+        index: days - Math.floor((new Date(endDate).getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)),
+        totalEmployees: totalEmployeesAllSites,
+        sitesWithData: 0,
+        siteBreakdown: {}
+      };
+      
+      // Initialize site breakdown for this date with correct per-site totals
+      Object.keys(siteEmployeeCounts).forEach(siteName => {
+        if (dailySummaries[dateStr].siteBreakdown) {
+          dailySummaries[dateStr].siteBreakdown![siteName] = {
+            total: siteEmployeeCounts[siteName],
+            present: 0,
+            absent: 0,
+            weeklyOff: 0,
+            leave: 0,
+            halfDay: 0
+          };
+        }
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Track which sites have data for each date
+    const sitesWithDataPerDate: { [date: string]: Set<string> } = {};
+    
+    // Filter records to only include employees from manager's sites and count them
+    allRecords.forEach(record => {
+      // Only process if this employee belongs to manager's sites
+      if (employeeIdsFromSites.has(record.employeeId) && dailySummaries[record.date]) {
+        dailySummaries[record.date].total++;
+        
+        // Track unique sites for this date
+        if (record.siteName) {
+          if (!sitesWithDataPerDate[record.date]) {
+            sitesWithDataPerDate[record.date] = new Set();
+          }
+          sitesWithDataPerDate[record.date].add(record.siteName);
+        }
+        
+        // Update site breakdown with correct counts
+        if (record.siteName && dailySummaries[record.date].siteBreakdown?.[record.siteName]) {
+          if (record.status === 'present') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].present++;
+          } else if (record.status === 'weekly-off') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].weeklyOff++;
+          } else if (record.status === 'leave') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].leave++;
+          } else if (record.status === 'half-day') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].halfDay++;
+          } else {
+            dailySummaries[record.date].siteBreakdown![record.siteName].absent++;
+          }
+        }
+        
+        // Update totals
+        if (record.status === 'present') {
+          dailySummaries[record.date].present++;
+        } else if (record.status === 'weekly-off') {
+          dailySummaries[record.date].weeklyOff++;
+        } else if (record.status === 'leave') {
+          dailySummaries[record.date].leave++;
+        } else if (record.status === 'half-day') {
+          dailySummaries[record.date].halfDay++;
+        } else {
+          dailySummaries[record.date].absent++;
+        }
+      }
+    });
+    
+    // Set sitesWithData count
+    Object.keys(sitesWithDataPerDate).forEach(date => {
+      if (dailySummaries[date]) {
+        dailySummaries[date].sitesWithData = sitesWithDataPerDate[date].size;
+      }
+    });
+    
+    // Calculate unaccounted employees for each date
+    Object.values(dailySummaries).forEach(summary => {
+      // Calculate total accounted employees from attendance records
+      const totalAccounted = summary.present + summary.weeklyOff + summary.leave + summary.halfDay;
+      
+      // If total accounted is less than total employees, add the difference to absent
+      if (totalAccounted < summary.totalEmployees) {
+        const unaccounted = summary.totalEmployees - totalAccounted;
+        summary.absent += unaccounted;
+        console.log(`Date ${summary.date}: Total employees=${summary.totalEmployees}, Accounted=${totalAccounted}, Unaccounted=${unaccounted} added to absent`);
+      }
+      
+      // Update site breakdown for unaccounted employees
+      if (summary.siteBreakdown) {
+        Object.keys(summary.siteBreakdown).forEach(siteName => {
+          const siteData = summary.siteBreakdown![siteName];
+          const accountedSite = siteData.present + siteData.weeklyOff + siteData.leave + siteData.halfDay;
+          if (accountedSite < siteData.total) {
+            siteData.absent += (siteData.total - accountedSite);
+          }
+        });
+      }
+      
+      // Calculate attendance rate (present + weekly off considered as present for rate)
+      const totalPresentWithWO = summary.present + summary.weeklyOff;
+      summary.rate = summary.totalEmployees > 0 
+        ? ((totalPresentWithWO / summary.totalEmployees) * 100).toFixed(1) + '%'
+        : '0.0%';
+    });
+    
+    // Sort by date descending (most recent first)
+    const summaries = Object.values(dailySummaries).sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    
+    console.log(`📊 Processed ${summaries.length} daily summaries for manager's sites`);
+    console.log(`📈 Total employees across manager's sites: ${totalEmployeesAllSites}`);
+    
+    return summaries;
+    
+  } catch (error: any) {
+    console.error('Error fetching attendance data:', error);
+    toast.error('Failed to fetch attendance data', {
+      description: error.message || 'Using demo data instead'
+    });
+    
+    // Generate demo data as fallback
+    return generateDemoAttendanceData(days, managerId);
+  }
+};
+
+// Generate demo attendance data as fallback
+const generateDemoAttendanceData = (days: number, managerId: string): DailyAttendanceSummary[] => {
+  console.log('Generating demo attendance data for manager...');
+  const data = [];
+  const today = new Date();
+  
+  // Demo site counts for manager
+  const demoSites = [
+    'Site A',
+    'Site B',
+    'Site C'
+  ];
+  
+  // Demo employee counts per site - TOTAL should be sum of these
+  const siteEmployeeCounts: { [key: string]: number } = {
+    'Site A': 25,
+    'Site B': 18,
+    'Site C': 12
+  };
+  
+  // CORRECT: This is the sum of all employees across all sites
+  const totalEmployees = Object.values(siteEmployeeCounts).reduce((a, b) => a + b, 0);
+  console.log(`Demo data: Total employees across all sites = ${totalEmployees}`);
+
+  for (let i = 0; i < days; i++) {
+    const date = new Date();
+    date.setDate(today.getDate() - i);
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+    const dayName = i === 0 ? 'Today' :
+      i === 1 ? 'Yesterday' :
+        date.toLocaleDateString('en-US', { weekday: 'long' });
+
+    let totalPresent = 0;
+    let totalWeeklyOff = 0;
+    let totalLeave = 0;
+    let totalHalfDay = 0;
+    let totalAbsent = 0;
+    
+    const siteBreakdown: { [siteName: string]: { total: number; present: number; absent: number; weeklyOff: number; leave: number; halfDay: number } } = {};
+    
+    // Calculate per site
+    Object.entries(siteEmployeeCounts).forEach(([siteName, siteTotal]) => {
+      let present, weeklyOff, leave, halfDay, absent;
+      
+      if (isWeekend) {
+        // Weekend pattern
+        weeklyOff = Math.floor(siteTotal * 0.7);
+        present = Math.floor(siteTotal * 0.15);
+        leave = Math.floor(siteTotal * 0.05);
+        halfDay = Math.floor(siteTotal * 0.05);
+        absent = siteTotal - present - weeklyOff - leave - halfDay;
+      } else {
+        // Weekday pattern
+        present = Math.floor(siteTotal * 0.75);
+        weeklyOff = Math.floor(siteTotal * 0.05);
+        leave = Math.floor(siteTotal * 0.05);
+        halfDay = Math.floor(siteTotal * 0.05);
+        absent = siteTotal - present - weeklyOff - leave - halfDay;
+      }
+      
+      siteBreakdown[siteName] = {
+        total: siteTotal,
+        present,
+        absent,
+        weeklyOff,
+        leave,
+        halfDay
+      };
+      
+      totalPresent += present;
+      totalWeeklyOff += weeklyOff;
+      totalLeave += leave;
+      totalHalfDay += halfDay;
+      totalAbsent += absent;
+    });
+
+    const totalPresentWithWO = totalPresent + totalWeeklyOff;
+    const rate = totalEmployees > 0 ? ((totalPresentWithWO / totalEmployees) * 100).toFixed(1) + '%' : '0.0%';
+
+    data.push({
+      date: date.toISOString().split('T')[0],
+      day: dayName,
+      present: totalPresent,
+      absent: totalAbsent,
+      weeklyOff: totalWeeklyOff,
+      leave: totalLeave,
+      halfDay: totalHalfDay,
+      total: totalEmployees,
+      rate,
+      index: i,
+      totalEmployees,
+      sitesWithData: demoSites.length,
+      siteBreakdown
+    });
+  }
+
+  return data;
+};
+
+// Site Employee Details Component
+interface SiteEmployeeDetailsProps {
+  siteData: SiteAttendanceData;
+  onBack: () => void;
+  selectedDate: string;
+}
+
+const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({ siteData, onBack, selectedDate }) => {
+  const [activeTab, setActiveTab] = useState<'all' | 'present' | 'absent' | 'weekly-off' | 'leave'>('all');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    if (siteData?.employees && siteData.employees.length > 0) {
+      setEmployees(siteData.employees);
+    }
+  }, [siteData?.employees]);
+
+  const allEmployees = employees;
+  const presentEmployees = allEmployees.filter(emp => emp.status === 'present');
+  const weeklyOffEmployees = allEmployees.filter(emp => emp.status === 'weekly-off');
+  const leaveEmployees = allEmployees.filter(emp => emp.status === 'leave');
+  const absentEmployees = allEmployees.filter(emp => emp.status === 'absent');
+
+  const filteredEmployees = useMemo(() => {
+    let filtered = [];
+    switch (activeTab) {
+      case 'present':
+        filtered = presentEmployees;
+        break;
+      case 'absent':
+        filtered = absentEmployees;
+        break;
+      case 'weekly-off':
+        filtered = weeklyOffEmployees;
+        break;
+      case 'leave':
+        filtered = leaveEmployees;
+        break;
+      default:
+        filtered = allEmployees;
+    }
+
+    if (employeeSearch) {
+      filtered = filtered.filter(emp =>
+        emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+        (emp.employeeId && emp.employeeId.toLowerCase().includes(employeeSearch.toLowerCase())) ||
+        emp.department.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+        (emp.email && emp.email.toLowerCase().includes(employeeSearch.toLowerCase()))
+      );
+    }
+
+    return filtered;
+  }, [activeTab, employeeSearch, allEmployees, presentEmployees, absentEmployees, weeklyOffEmployees, leaveEmployees]);
+
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredEmployees, currentPage]);
+
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'present':
+        return "bg-green-100 text-green-800 border-green-200";
+      case 'absent':
+        return "bg-red-100 text-red-800 border-red-200";
+      case 'weekly-off':
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      case 'leave':
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-4 sm:p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <div className="flex items-center gap-4 mb-4">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {siteData.name} - Employee Details
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {formatDateDisplay(selectedDate)} • {siteData.totalEmployees} employees
+              {siteData.clientName && ` • Client: ${siteData.clientName}`}
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Summary Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6"
+      >
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">Total Employees</p>
+                <p className="text-2xl font-bold text-blue-600">{siteData.totalEmployees}</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-50 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-800">Present</p>
+                <p className="text-2xl font-bold text-green-600">{siteData.present}</p>
+              </div>
+              <UserCheck className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-purple-50 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-800">Weekly Off</p>
+                <p className="text-2xl font-bold text-purple-600">{siteData.weeklyOff}</p>
+              </div>
+              <Calendar className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">Leave</p>
+                <p className="text-2xl font-bold text-blue-600">{siteData.leave}</p>
+              </div>
+              <Clock className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-800">Absent</p>
+                <p className="text-2xl font-bold text-red-600">{siteData.absent}</p>
+              </div>
+              <XCircle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="mb-6"
+      >
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
+                <Button
+                  variant={activeTab === 'all' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
+                >
+                  All ({allEmployees.length})
+                </Button>
+                <Button
+                  variant={activeTab === 'present' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setActiveTab('present'); setCurrentPage(1); }}
+                >
+                  Present ({presentEmployees.length})
+                </Button>
+                <Button
+                  variant={activeTab === 'weekly-off' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setActiveTab('weekly-off'); setCurrentPage(1); }}
+                >
+                  Weekly Off ({weeklyOffEmployees.length})
+                </Button>
+                <Button
+                  variant={activeTab === 'leave' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setActiveTab('leave'); setCurrentPage(1); }}
+                >
+                  Leave ({leaveEmployees.length})
+                </Button>
+                <Button
+                  variant={activeTab === 'absent' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setActiveTab('absent'); setCurrentPage(1); }}
+                >
+                  Absent ({absentEmployees.length})
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2 w-full lg:w-auto">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search employees..."
+                  value={employeeSearch}
+                  onChange={(e) => { setEmployeeSearch(e.target.value); setCurrentPage(1); }}
+                  className="w-full lg:w-64"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Employee Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Employee Details - {filteredEmployees.length} employees found
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="h-12 px-4 text-left font-medium">Employee ID</th>
+                      <th className="h-12 px-4 text-left font-medium">Name</th>
+                      <th className="h-12 px-4 text-left font-medium">Department</th>
+                      <th className="h-12 px-4 text-left font-medium">Position</th>
+                      <th className="h-12 px-4 text-left font-medium">Status</th>
+                      <th className="h-12 px-4 text-left font-medium">Check In</th>
+                      <th className="h-12 px-4 text-left font-medium">Check Out</th>
+                      <th className="h-12 px-4 text-left font-medium">Contact</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedEmployees.length > 0 ? (
+                      paginatedEmployees.map((employee) => (
+                        <tr key={employee.id} className="border-b hover:bg-muted/50">
+                          <td className="p-4 align-middle font-mono text-xs">
+                            {employee.employeeId || employee.id}
+                          </td>
+                          <td className="p-4 align-middle">
+                            <div className="font-medium">{employee.name}</div>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <Badge variant="outline">{employee.department}</Badge>
+                          </td>
+                          <td className="p-4 align-middle">{employee.position}</td>
+                          <td className="p-4 align-middle">
+                            <Badge className={getStatusBadge(employee.status)}>
+                              {employee.status === 'weekly-off' ? 'Weekly Off' : 
+                               employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+                              {employee.isOnBreak && <span className="ml-1 text-xs">(Break)</span>}
+                            </Badge>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              {employee.checkInTime || '-'}
+                            </div>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              {employee.checkOutTime || '-'}
+                            </div>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <div className="space-y-1">
+                              {employee.email && (
+                                <div className="flex items-center gap-1 text-xs">
+                                  <Mail className="h-3 w-3" />
+                                  {employee.email}
+                                </div>
+                              )}
+                              {employee.phone && (
+                                <div className="flex items-center gap-1 text-xs">
+                                  <Phone className="h-3 w-3" />
+                                  {employee.phone}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                          No employees found for the selected filters.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredEmployees.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-4 gap-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of {filteredEmployees.length} entries
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
+                      First
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                      Previous
+                    </Button>
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                      Next
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
+};
+
+const ManagerDashboard = () => {
+  const { onMenuClick } = useOutletContext<OutletContext>();
+  const navigate = useNavigate();
+  const { user: authUser } = useRole();
   
   // Current user state
   const [managerId, setManagerId] = useState<string>('');
@@ -167,8 +1366,9 @@ const ManagerDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
   const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
-  // Attendance state
+  // Attendance state for manager self
   const [attendance, setAttendance] = useState<AttendanceStatus>({
     isCheckedIn: false,
     isOnBreak: false,
@@ -182,76 +1382,51 @@ const ManagerDashboard = () => {
     hasCheckedOutToday: false
   });
 
-  // New state for additional data
+  // SITE ATTENDANCE DATA
+  const [sites, setSites] = useState<Site[]>([]);
+  const [siteAttendanceData, setSiteAttendanceData] = useState<SiteAttendanceData[]>([]);
+  const [filteredSiteData, setFilteredSiteData] = useState<SiteAttendanceData[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>(formatDate(new Date()));
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showSiteDetails, setShowSiteDetails] = useState(false);
+  const [selectedSite, setSelectedSite] = useState<SiteAttendanceData | null>(null);
+  const itemsPerPage = 10;
+
+  // 7-DAY ATTENDANCE PIE CHARTS
+  const [attendanceData, setAttendanceData] = useState<DailyAttendanceSummary[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [totalEmployeesManagerSites, setTotalEmployeesManagerSites] = useState(0);
+  
+  // UI navigation for 7-day pie charts
+  const [currentDayIndex, setCurrentDayIndex] = useState(0);
+  const [sixDaysStartIndex, setSixDaysStartIndex] = useState(1);
+  const [showSiteBreakdown, setShowSiteBreakdown] = useState(false);
+
+  // Leave requests
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [pendingLeaveCount, setPendingLeaveCount] = useState<number>(0);
   
-  // Enhanced task status data with all tasks
-  const [taskStatusData, setTaskStatusData] = useState<TaskStatus[]>([
-    { 
-      name: "Completed", 
-      value: 0, 
-      color: "#10b981",
-      icon: CheckSquare,
-      count: 0,
-      trend: 'up'
-    },
-    { 
-      name: "In Progress", 
-      value: 0, 
-      color: "#3b82f6",
-      icon: PlayCircle,
-      count: 0,
-      trend: 'up'
-    },
-    { 
-      name: "Pending", 
-      value: 0, 
-      color: "#f59e0b",
-      icon: Clock,
-      count: 0,
-      trend: 'stable'
-    },
-    { 
-      name: "Overdue", 
-      value: 0, 
-      color: "#ef4444",
-      icon: AlertTriangle,
-      count: 0,
-      trend: 'down'
-    }
-  ]);
-  
-  // Tasks assigned to manager
+  // Tasks
   const [assignedTasks, setAssignedTasks] = useState<TaskDetail[]>([]);
-  
-  // Line chart data for tasks over time
-  const [taskLineData, setTaskLineData] = useState([
-    { day: 'Mon', completed: 0, inProgress: 0, pending: 0 },
-    { day: 'Tue', completed: 0, inProgress: 0, pending: 0 },
-    { day: 'Wed', completed: 0, inProgress: 0, pending: 0 },
-    { day: 'Thu', completed: 0, inProgress: 0, pending: 0 },
-    { day: 'Fri', completed: 0, inProgress: 0, pending: 0 },
-    { day: 'Sat', completed: 0, inProgress: 0, pending: 0 },
-    { day: 'Sun', completed: 0, inProgress: 0, pending: 0 },
-  ]);
-  
-  const [monthlyAttendanceData, setMonthlyAttendanceData] = useState<MonthlyAttendanceData[]>([
-    { name: "Present", value: 0, color: "#10b981", fill: "#10b981" },
-    { name: "Absent", value: 0, color: "#ef4444", fill: "#ef4444" },
-    { name: "Half Day", value: 0, color: "#f59e0b", fill: "#f59e0b" },
-    { name: "Late", value: 0, color: "#8b5cf6", fill: "#8b5cf6" }
-  ]);
 
-  // Updated stats - removed teamMembers, added presentDays and activeSites
+  // Stats
   const [stats, setStats] = useState({
     presentDays: 0,
-    activeSites: 0,
+    totalSites: 0,
     pendingLeaves: 0,
-    productivityScore: 0
+    productivityScore: 0,
+    totalEmployees: 0,
+    totalPresent: 0,
+    totalAbsent: 0,
+    totalWeeklyOff: 0,
+    totalLeave: 0,
+    totalHalfDay: 0,
+    attendanceRate: 0
   });
 
-  // Enhanced Quick Actions with CORRECTED navigation paths
+  // Enhanced Quick Actions
   const quickActions: QuickAction[] = [
     {
       id: 1,
@@ -308,7 +1483,7 @@ const ManagerDashboard = () => {
           
           if (userId) {
             const allUsersResponse = await userService.getAllUsers();
-            const foundUser = allUsersResponse.allUsers.find(user => 
+            const foundUser = allUsersResponse.allUsers.find((user: any) => 
               user._id === userId || user.id === userId
             );
             
@@ -316,7 +1491,6 @@ const ManagerDashboard = () => {
               setManagerId(foundUser._id);
               setManagerName(foundUser.name || foundUser.firstName || 'Manager');
             } else {
-              // Fallback to localStorage
               const storedUser = localStorage.getItem("sk_user");
               if (storedUser) {
                 const user = JSON.parse(storedUser);
@@ -334,40 +1508,42 @@ const ManagerDashboard = () => {
     fetchCurrentUser();
   }, [authUser]);
 
-  // Load all data when managerId is available
-  useEffect(() => {
-    if (managerId) {
-      fetchAllData();
-    }
-  }, [managerId]);
-
-  // Fetch all dashboard data
-  const fetchAllData = async () => {
-    setIsLoading(true);
-    setIsStatsLoading(true);
+  // Load attendance data for 7-day pie charts
+  const loadAttendanceData = async (showRefreshToast: boolean = false) => {
+    if (!managerId) return;
     
     try {
-      // Fetch attendance status
-      await fetchAttendanceStatus();
+      if (showRefreshToast) {
+        setRefreshing(true);
+      } else {
+        setLoadingAttendance(true);
+      }
+      setAttendanceError(null);
+
+      const data = await fetchManagerAttendanceData(managerId, 7);
+      setAttendanceData(data);
       
-      // Fetch monthly attendance data from attendance page
-      await fetchMonthlyAttendanceData();
-      
-      // Fetch leave requests and pending count
-      await fetchLeaveRequests();
-      
-      // Fetch task statistics - specifically tasks assigned to manager
-      await fetchTaskStatistics();
-      
-      // Fetch active sites count
-      await fetchActiveSites();
-      
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load some dashboard data');
+      if (data.length > 0) {
+        setTotalEmployeesManagerSites(data[0].totalEmployees);
+      }
+
+      if (data.length > 0) {
+        setCurrentDayIndex(0);
+        setSixDaysStartIndex(Math.min(1, data.length - 6));
+      }
+
+      if (showRefreshToast) {
+        toast.success('Attendance data refreshed successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to load attendance data:', error);
+      setAttendanceError(error.message || 'Failed to load attendance data');
+      toast.error('Failed to load attendance data', {
+        description: error.message || 'Please try again later'
+      });
     } finally {
-      setIsLoading(false);
-      setIsStatsLoading(false);
+      setLoadingAttendance(false);
+      setRefreshing(false);
     }
   };
 
@@ -399,68 +1575,11 @@ const ManagerDashboard = () => {
     }
   };
 
-  // Fetch monthly attendance data from attendance page API
-  const fetchMonthlyAttendanceData = async () => {
-    try {
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
-      
-      // Fetch monthly attendance summary
-      const response = await fetch(
-        `${API_URL}/manager-attendance/summary/${managerId}?year=${year}&month=${month}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Monthly attendance API response:', data);
-        
-        if (data.success && data.data && data.data.stats) {
-          const stats = data.data.stats;
-          
-          // Calculate days in month
-          const daysInMonth = new Date(year, month, 0).getDate();
-          const presentDays = stats.presentDays || 0;
-          const absentDays = stats.absentDays || 0;
-          const lateDays = stats.lateDays || 0;
-          const halfDays = stats.halfDays || 0;
-          
-          // Update monthly attendance data
-          setMonthlyAttendanceData([
-            { name: "Present", value: presentDays, color: "#10b981", fill: "#10b981" },
-            { name: "Absent", value: absentDays, color: "#ef4444", fill: "#ef4444" },
-            { name: "Half Day", value: halfDays, color: "#f59e0b", fill: "#f59e0b" },
-            { name: "Late", value: lateDays, color: "#8b5cf6", fill: "#8b5cf6" }
-          ]);
-          
-          // Calculate attendance rate for stats
-          const attendanceRate = daysInMonth > 0 ? Math.round((presentDays / daysInMonth) * 100) : 0;
-          
-          // Update stats with present days
-          setStats(prev => ({
-            ...prev,
-            presentDays: presentDays,
-            productivityScore: attendanceRate
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching monthly attendance data:', error);
-    }
-  };
-
-  // Fetch leave requests from leave management page
+  // Fetch leave requests
   const fetchLeaveRequests = async () => {
     try {
-      // Fetch department from user info
       const allUsersResponse = await userService.getAllUsers();
-      const foundUser = allUsersResponse.allUsers.find(user => 
+      const foundUser = allUsersResponse.allUsers.find((user: any) => 
         user._id === managerId || user.id === managerId
       );
       
@@ -469,33 +1588,22 @@ const ManagerDashboard = () => {
         managerDepartment = foundUser.department;
       }
       
-      // Fetch leave requests for the manager's department
       const response = await fetch(
-        `${API_URL}/leaves/supervisor?department=${encodeURIComponent(managerDepartment)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
+        `${API_URL}/leaves/supervisor?department=${encodeURIComponent(managerDepartment)}`
       );
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Leave requests API response:', data);
         
         if (Array.isArray(data)) {
-          // Count pending leaves
           const pendingLeaves = data.filter((leave: any) => leave.status === 'pending').length;
           setPendingLeaveCount(pendingLeaves);
           
-          // Update stats
           setStats(prev => ({
             ...prev,
             pendingLeaves: pendingLeaves
           }));
           
-          // Get only the 3 most recent pending leave requests for display
           const recentLeaves = data
             .filter((leave: any) => leave.status === 'pending')
             .sort((a: any, b: any) => new Date(b.createdAt || b.appliedDate).getTime() - new Date(a.createdAt || a.appliedDate).getTime())
@@ -518,29 +1626,18 @@ const ManagerDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching leave requests:', error);
-      toast.error('Failed to load leave requests');
     }
   };
 
-  // Fetch task statistics - specifically tasks assigned to manager
-  const fetchTaskStatistics = async () => {
+  // Fetch tasks assigned to manager
+  const fetchAssignedTasks = async () => {
     try {
-      console.log('Fetching tasks for manager:', managerId, managerName);
-      
-      // Try multiple endpoints to get tasks
       let tasksData: any[] = [];
       
-      // Method 1: Try tasks assigned to manager endpoint
       try {
-        const response = await fetch(`${API_URL}/tasks/manager/${managerId}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
+        const response = await fetch(`${API_URL}/tasks/manager/${managerId}`);
         if (response.ok) {
           const data = await response.json();
-          console.log('Tasks from manager endpoint:', data);
-          
           if (Array.isArray(data)) {
             tasksData = data;
           }
@@ -549,18 +1646,11 @@ const ManagerDashboard = () => {
         console.log('Error with manager tasks endpoint, trying all tasks:', error);
       }
       
-      // Method 2: If no data from manager endpoint, try all tasks
       if (tasksData.length === 0) {
         try {
-          const response = await fetch(`${API_URL}/tasks`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          
+          const response = await fetch(`${API_URL}/tasks`);
           if (response.ok) {
             const data = await response.json();
-            console.log('All tasks from API:', data);
-            
             if (Array.isArray(data)) {
               tasksData = data;
             }
@@ -570,45 +1660,42 @@ const ManagerDashboard = () => {
         }
       }
       
-      // Process tasks and filter those assigned to current manager
       if (tasksData.length > 0) {
-        console.log('Processing tasks, total:', tasksData.length);
-        
-        // Filter tasks assigned to the current manager
         const assignedToManager = tasksData.filter((task: any) => {
-          // Check if task is assigned to current manager by ID or name
           const isAssignedById = task.assignedTo === managerId;
           const isAssignedByName = task.assignedToName?.toLowerCase() === managerName?.toLowerCase();
           const isAssignedByAssignee = task.assignee === managerId;
-          const isCurrentUserAssigned = task.assignedTo && 
-            (isAssignedById || isAssignedByName || isAssignedByAssignee);
-          
-          console.log(`Task ${task.title}: assignedTo=${task.assignedTo}, managerId=${managerId}, matches=${isCurrentUserAssigned}`);
-          return isCurrentUserAssigned;
+          return task.assignedTo && (isAssignedById || isAssignedByName || isAssignedByAssignee);
         });
         
-        console.log('Tasks assigned to manager:', assignedToManager.length, assignedToManager);
-        
-        // Process assigned tasks
         const tasks: TaskDetail[] = assignedToManager.map((task: any) => {
-          // Determine progress based on status
           let progress = 0;
           if (task.status === 'completed') progress = 100;
-          else if (task.status === 'in-progress') progress = Math.floor(Math.random() * 70) + 30; // 30-100%
-          else if (task.status === 'pending') progress = Math.floor(Math.random() * 30); // 0-29%
+          else if (task.status === 'in-progress') progress = Math.floor(Math.random() * 70) + 30;
+          else if (task.status === 'pending') progress = Math.floor(Math.random() * 30);
+          
+          let status = task.status || 'pending';
+          if (status === 'pending' && task.dueDate) {
+            const dueDate = new Date(task.dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (dueDate < today) {
+              status = 'overdue';
+            }
+          }
           
           return {
-            id: task._id || task.id || `task_${Math.random()}`,
-            _id: task._id || task.id || `task_${Math.random()}`,
+            id: task._id || task.id,
+            _id: task._id || task.id,
             title: task.title || 'Untitled Task',
             description: task.description || '',
             assignee: task.assignee || task.assignedTo,
             assignedTo: task.assignedTo,
-            assignedToName: task.assignedToName || managerName || 'Unknown',
-            priority: (task.priority || 'medium') as 'high' | 'medium' | 'low',
-            dueDate: task.dueDate || task.deadline || new Date().toISOString(),
-            deadline: task.deadline || task.dueDate || new Date().toISOString(),
-            status: (task.status || 'pending') as TaskDetail['status'],
+            assignedToName: task.assignedToName || managerName,
+            priority: (task.priority || 'medium') as any,
+            dueDate: task.dueDate || task.deadline,
+            deadline: task.deadline || task.dueDate,
+            status: status as any,
             progress: task.progress || progress,
             siteName: task.siteName,
             siteId: task.siteId,
@@ -621,306 +1708,229 @@ const ManagerDashboard = () => {
         });
         
         setAssignedTasks(tasks);
-        
-        // Calculate task status counts for assigned tasks only
-        const completedTasks = tasks.filter((task: TaskDetail) => task.status === 'completed');
-        const inProgressTasks = tasks.filter((task: TaskDetail) => task.status === 'in-progress');
-        const pendingTasks = tasks.filter((task: TaskDetail) => task.status === 'pending');
-        const overdueTasks = tasks.filter((task: TaskDetail) => {
-          if (task.status === 'pending' && task.dueDate) {
-            const dueDate = new Date(task.dueDate);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            return dueDate < today;
-          }
-          return false;
-        });
-        
-        // Update task status data
-        setTaskStatusData([
-          { 
-            name: "Completed", 
-            value: completedTasks.length, 
-            color: "#10b981",
-            icon: CheckSquare,
-            count: completedTasks.length,
-            trend: completedTasks.length > 0 ? 'up' : 'stable'
-          },
-          { 
-            name: "In Progress", 
-            value: inProgressTasks.length, 
-            color: "#3b82f6",
-            icon: PlayCircle,
-            count: inProgressTasks.length,
-            trend: inProgressTasks.length > 0 ? 'up' : 'stable'
-          },
-          { 
-            name: "Pending", 
-            value: pendingTasks.length, 
-            color: "#f59e0b",
-            icon: Clock,
-            count: pendingTasks.length,
-            trend: 'stable'
-          },
-          { 
-            name: "Overdue", 
-            value: overdueTasks.length, 
-            color: "#ef4444",
-            icon: AlertTriangle,
-            count: overdueTasks.length,
-            trend: overdueTasks.length > 0 ? 'up' : 'down'
-          }
-        ]);
-        
-        // Generate line chart data for the week
-        const weekData = generateWeeklyTaskData(tasks);
-        setTaskLineData(weekData);
-        
-      } else {
-        console.log('No tasks data found, using demo data');
-        // Create demo tasks for testing
-        createDemoTasks();
       }
-      
     } catch (error) {
-      console.error('Error fetching task statistics:', error);
-      toast.error('Failed to load task statistics');
-      // Create demo tasks as fallback
-      createDemoTasks();
+      console.error('Error fetching tasks:', error);
     }
   };
 
-  // Create demo tasks for testing
-  const createDemoTasks = () => {
-    const demoTasks: TaskDetail[] = [
-      {
-        id: 'demo_task_1',
-        _id: 'demo_task_1',
-        title: 'Daily Site Inspection',
-        description: 'Complete daily safety inspection of all equipment',
-        assignee: managerId,
-        assignedTo: managerId,
-        assignedToName: managerName,
-        priority: 'high',
-        dueDate: new Date().toISOString(),
-        deadline: new Date().toISOString(),
-        status: 'in-progress',
-        progress: 65,
-        siteName: 'Site A',
-        clientName: 'Client A',
-        taskType: 'inspection',
-        createdAt: new Date().toISOString(),
-        source: 'superadmin',
-        isAssignedToMe: true
-      },
-      {
-        id: 'demo_task_2',
-        _id: 'demo_task_2',
-        title: 'Team Meeting Preparation',
-        description: 'Prepare agenda and materials for weekly team meeting',
-        assignee: managerId,
-        assignedTo: managerId,
-        assignedToName: managerName,
-        priority: 'medium',
-        dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-        deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'pending',
-        progress: 20,
-        siteName: 'Site A',
-        clientName: 'Client A',
-        taskType: 'meeting',
-        createdAt: new Date().toISOString(),
-        source: 'manager',
-        isAssignedToMe: true
-      },
-      {
-        id: 'demo_task_3',
-        _id: 'demo_task_3',
-        title: 'Monthly Safety Report',
-        description: 'Complete monthly safety inspection report',
-        assignee: managerId,
-        assignedTo: managerId,
-        assignedToName: managerName,
-        priority: 'high',
-        dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        deadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'overdue',
-        progress: 40,
-        siteName: 'Site B',
-        clientName: 'Client B',
-        taskType: 'report',
-        createdAt: new Date().toISOString(),
-        source: 'superadmin',
-        isAssignedToMe: true
-      },
-      {
-        id: 'demo_task_4',
-        _id: 'demo_task_4',
-        title: 'Team Training Session',
-        description: 'Conduct safety training for new hires',
-        assignee: managerId,
-        assignedTo: managerId,
-        assignedToName: managerName,
-        priority: 'medium',
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'pending',
-        progress: 10,
-        siteName: 'Site A',
-        clientName: 'Client A',
-        taskType: 'training',
-        createdAt: new Date().toISOString(),
-        source: 'manager',
-        isAssignedToMe: true
-      }
-    ];
-    
-    setAssignedTasks(demoTasks);
-    
-    // Update task status data
-    setTaskStatusData([
-      { 
-        name: "Completed", 
-        value: 0, 
-        color: "#10b981",
-        icon: CheckSquare,
-        count: 0,
-        trend: 'stable'
-      },
-      { 
-        name: "In Progress", 
-        value: 1, 
-        color: "#3b82f6",
-        icon: PlayCircle,
-        count: 1,
-        trend: 'up'
-      },
-      { 
-        name: "Pending", 
-        value: 2, 
-        color: "#f59e0b",
-        icon: Clock,
-        count: 2,
-        trend: 'stable'
-      },
-      { 
-        name: "Overdue", 
-        value: 1, 
-        color: "#ef4444",
-        icon: AlertTriangle,
-        count: 1,
-        trend: 'up'
-      }
-    ]);
-    
-    // Generate line chart data
-    const weekData = generateWeeklyTaskData(demoTasks);
-    setTaskLineData(weekData);
-  };
-
-  // Fetch active sites count
-  const fetchActiveSites = async () => {
+  // Fetch site attendance data for all manager's sites
+  const fetchSiteAttendanceData = async (managerSites: Site[], date: string) => {
     try {
-      const response = await fetch(`${API_URL}/sites?status=active`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      setRefreshing(true);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Active sites API response:', data);
+      const data: SiteAttendanceData[] = [];
+      let totalEmployeesAllSites = 0;
+      let totalPresentAllSites = 0;
+      let totalAbsentAllSites = 0;
+      let totalWeeklyOffAllSites = 0;
+      let totalLeaveAllSites = 0;
+      
+      for (const site of managerSites) {
+        const siteData = await calculateSiteAttendanceData(site, date);
+        data.push(siteData);
         
-        if (Array.isArray(data)) {
-          // Count active sites
-          const activeSitesCount = data.length;
-          
-          // Update stats
-          setStats(prev => ({
-            ...prev,
-            activeSites: activeSitesCount
-          }));
-        }
+        totalEmployeesAllSites += siteData.totalEmployees;
+        totalPresentAllSites += siteData.present;
+        totalAbsentAllSites += siteData.absent;
+        totalWeeklyOffAllSites += siteData.weeklyOff;
+        totalLeaveAllSites += siteData.leave;
       }
-    } catch (error) {
-      console.error('Error fetching active sites:', error);
-      // Set default active sites
+      
+      setSiteAttendanceData(data);
+      
+      const attendanceRate = totalEmployeesAllSites > 0 
+        ? Math.round((totalPresentAllSites / totalEmployeesAllSites) * 100) 
+        : 0;
+      
       setStats(prev => ({
         ...prev,
-        activeSites: 3 // Default value for demo
+        totalSites: managerSites.length,
+        totalEmployees: totalEmployeesAllSites,
+        totalPresent: totalPresentAllSites,
+        totalAbsent: totalAbsentAllSites,
+        totalWeeklyOff: totalWeeklyOffAllSites,
+        totalLeave: totalLeaveAllSites,
+        totalHalfDay: 0,
+        attendanceRate
       }));
+      
+      console.log(`Total employees across all sites: ${totalEmployeesAllSites}`);
+      
+    } catch (error) {
+      console.error('Error calculating site attendance:', error);
+      toast.error('Error calculating attendance data');
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  // Generate weekly task data for line chart
-  const generateWeeklyTaskData = (tasks: TaskDetail[]) => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const weekData = days.map(day => ({
-      day,
-      completed: 0,
-      inProgress: 0,
-      pending: 0
-    }));
+  // Load all data
+  const loadAllData = async () => {
+    setIsLoading(true);
+    setIsStatsLoading(true);
     
-    // For demo purposes, distribute tasks across the week
-    tasks.forEach((task, index) => {
-      const dayIndex = index % 7;
-      if (task.status === 'completed') {
-        weekData[dayIndex].completed += 1;
-      } else if (task.status === 'in-progress') {
-        weekData[dayIndex].inProgress += 1;
-      } else if (task.status === 'pending' || task.status === 'overdue') {
-        weekData[dayIndex].pending += 1;
-      }
-    });
-    
-    return weekData;
-  };
-
-  // Format time for display
-  const formatTimeForDisplay = (timestamp: string): string => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Format date for display
-  const formatDateForDisplay = (timestamp: string): string => {
-    return new Date(timestamp).toLocaleDateString([], { 
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  // Format short date
-  const formatShortDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Check if manager can check in today
-  const canCheckInToday = (): boolean => {
-    if (!attendance.isCheckedIn && !attendance.hasCheckedOutToday) {
-      return true;
+    try {
+      const managerSites = await fetchManagerSites(managerId);
+      setSites(managerSites);
+      
+      await Promise.all([
+        fetchAttendanceStatus(),
+        fetchLeaveRequests(),
+        fetchAssignedTasks(),
+        fetchSiteAttendanceData(managerSites, selectedDate),
+        loadAttendanceData()
+      ]);
+      
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      toast.error('Failed to load some dashboard data');
+    } finally {
+      setIsLoading(false);
+      setIsStatsLoading(false);
     }
-    return false;
   };
 
-  // Check if manager can check out today
-  const canCheckOutToday = (): boolean => {
-    return attendance.isCheckedIn && !attendance.hasCheckedOutToday;
+  // Initial load
+  useEffect(() => {
+    if (managerId) {
+      loadAllData();
+    }
+  }, [managerId]);
+
+  // Recalculate when date changes
+  useEffect(() => {
+    if (sites.length > 0) {
+      fetchSiteAttendanceData(sites, selectedDate);
+    }
+  }, [selectedDate]);
+
+  // Filter sites based on search
+  useEffect(() => {
+    if (!siteAttendanceData || siteAttendanceData.length === 0) {
+      setFilteredSiteData([]);
+      return;
+    }
+    
+    const filtered = siteAttendanceData.filter(site =>
+      site.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.location?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    setFilteredSiteData(filtered);
+    setCurrentPage(1);
+  }, [siteAttendanceData, searchTerm]);
+
+  // Paginate sites
+  const paginatedSites = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredSiteData.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredSiteData, currentPage]);
+
+  const totalPages = Math.ceil(filteredSiteData.length / itemsPerPage);
+
+  // Get current day data for pie chart
+  const currentDayData = useMemo(() => {
+    if (attendanceData.length === 0) {
+      return {
+        date: new Date().toISOString().split('T')[0],
+        day: 'Today',
+        present: 0,
+        absent: 0,
+        weeklyOff: 0,
+        leave: 0,
+        halfDay: 0,
+        total: 0,
+        rate: '0.0%',
+        index: 0,
+        totalEmployees: totalEmployeesManagerSites,
+        sitesWithData: 0,
+        siteBreakdown: {}
+      };
+    }
+    return attendanceData[currentDayIndex] || attendanceData[0];
+  }, [attendanceData, currentDayIndex, totalEmployeesManagerSites]);
+
+  // Get six days data
+  const sixDaysData = useMemo(() => {
+    if (attendanceData.length === 0) return [];
+    return attendanceData.slice(sixDaysStartIndex, sixDaysStartIndex + 6);
+  }, [attendanceData, sixDaysStartIndex]);
+
+  // Current day pie data - NOW INCLUDING WEEKLY OFF IN SEPARATE COLOR
+  const currentDayPieData = [
+    { name: 'Present', value: currentDayData.present, color: CHART_COLORS.present },
+    { name: 'Weekly Off', value: currentDayData.weeklyOff, color: CHART_COLORS.weeklyOff },
+    { name: 'Leave', value: currentDayData.leave, color: CHART_COLORS.leave },
+    { name: 'Absent', value: currentDayData.absent, color: CHART_COLORS.absent }
+  ].filter(item => item.value > 0); // Only show categories with values > 0
+
+  // Navigation handlers for pie charts
+  const handlePreviousDay = () => {
+    setCurrentDayIndex(prev => (prev > 0 ? prev - 1 : attendanceData.length - 1));
+  };
+
+  const handleNextDay = () => {
+    setCurrentDayIndex(prev => (prev < attendanceData.length - 1 ? prev + 1 : 0));
+  };
+
+  const handleSixDaysPrevious = () => {
+    setSixDaysStartIndex(prev => {
+      const newIndex = prev + 6;
+      const maxIndex = attendanceData.length - 6;
+      return newIndex <= maxIndex ? newIndex : prev;
+    });
+  };
+
+  const handleSixDaysNext = () => {
+    setSixDaysStartIndex(prev => {
+      const newIndex = prev - 6;
+      return newIndex >= 1 ? newIndex : prev;
+    });
+  };
+
+  const canGoSixDaysPrevious = sixDaysStartIndex < attendanceData.length - 6;
+  const canGoSixDaysNext = sixDaysStartIndex > 1;
+
+  const getDateRangeText = () => {
+    if (sixDaysData.length === 0) return '';
+
+    const firstDate = new Date(sixDaysData[0].date);
+    const lastDate = new Date(sixDaysData[sixDaysData.length - 1].date);
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    };
+
+    return `${formatDate(firstDate)} - ${formatDate(lastDate)}`;
+  };
+
+  // Handle view details
+  const handleViewDetails = (site: SiteAttendanceData) => {
+    setSelectedSite(site);
+    setShowSiteDetails(true);
+  };
+
+  // Handle back from details
+  const handleBackFromDetails = () => {
+    setShowSiteDetails(false);
+    setSelectedSite(null);
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    await loadAllData();
+    toast.success('Dashboard data refreshed!');
   };
 
   // Handle check in
   const handleCheckIn = async () => {
-    if (!canCheckInToday()) {
-      toast.error(attendance.hasCheckedOutToday 
-        ? "You have already checked out for today" 
-        : "You are already checked in");
+    if (attendance.isCheckedIn || attendance.hasCheckedOutToday) {
+      toast.error(attendance.hasCheckedOutToday ? "Already checked out for today" : "Already checked in");
       return;
     }
 
@@ -928,19 +1938,13 @@ const ManagerDashboard = () => {
     try {
       const response = await fetch(`${API_URL}/manager-attendance/checkin`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          managerId, 
-          managerName 
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ managerId, managerName })
       });
 
       const data = await response.json();
-      
       if (data.success) {
-        toast.success(data.message || "Successfully checked in!");
+        toast.success("Checked in successfully!");
         setAttendance(prev => ({
           ...prev,
           isCheckedIn: true,
@@ -951,8 +1955,7 @@ const ManagerDashboard = () => {
         toast.error(data.message || "Failed to check in");
       }
     } catch (error) {
-      console.error('Error checking in:', error);
-      toast.error("Failed to check in. Please try again.");
+      toast.error("Failed to check in");
     } finally {
       setIsAttendanceLoading(false);
     }
@@ -960,7 +1963,7 @@ const ManagerDashboard = () => {
 
   // Handle check out
   const handleCheckOut = async () => {
-    if (!canCheckOutToday()) {
+    if (!attendance.isCheckedIn || attendance.hasCheckedOutToday) {
       toast.error("Cannot check out");
       return;
     }
@@ -969,16 +1972,13 @@ const ManagerDashboard = () => {
     try {
       const response = await fetch(`${API_URL}/manager-attendance/checkout`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ managerId })
       });
 
       const data = await response.json();
-      
       if (data.success) {
-        toast.success(data.message || "Successfully checked out!");
+        toast.success("Checked out successfully!");
         setAttendance(prev => ({
           ...prev,
           isCheckedIn: false,
@@ -990,8 +1990,7 @@ const ManagerDashboard = () => {
         toast.error(data.message || "Failed to check out");
       }
     } catch (error) {
-      console.error('Error checking out:', error);
-      toast.error("Failed to check out. Please try again.");
+      toast.error("Failed to check out");
     } finally {
       setIsAttendanceLoading(false);
     }
@@ -1000,7 +1999,7 @@ const ManagerDashboard = () => {
   // Handle break in
   const handleBreakIn = async () => {
     if (!attendance.isCheckedIn || attendance.isOnBreak) {
-      toast.error(attendance.isOnBreak ? "Already on break" : "Must be checked in to take a break");
+      toast.error(attendance.isOnBreak ? "Already on break" : "Must be checked in");
       return;
     }
 
@@ -1008,16 +2007,13 @@ const ManagerDashboard = () => {
     try {
       const response = await fetch(`${API_URL}/manager-attendance/breakin`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ managerId })
       });
 
       const data = await response.json();
-      
       if (data.success) {
-        toast.success(data.message || "Break started!");
+        toast.success("Break started!");
         setAttendance(prev => ({
           ...prev,
           isOnBreak: true,
@@ -1027,8 +2023,7 @@ const ManagerDashboard = () => {
         toast.error(data.message || "Failed to start break");
       }
     } catch (error) {
-      console.error('Error starting break:', error);
-      toast.error("Failed to start break. Please try again.");
+      toast.error("Failed to start break");
     } finally {
       setIsAttendanceLoading(false);
     }
@@ -1037,7 +2032,7 @@ const ManagerDashboard = () => {
   // Handle break out
   const handleBreakOut = async () => {
     if (!attendance.isOnBreak) {
-      toast.error("Not currently on break");
+      toast.error("Not on break");
       return;
     }
 
@@ -1045,16 +2040,13 @@ const ManagerDashboard = () => {
     try {
       const response = await fetch(`${API_URL}/manager-attendance/breakout`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ managerId })
       });
 
       const data = await response.json();
-      
       if (data.success) {
-        toast.success(data.message || "Break ended!");
+        toast.success("Break ended!");
         setAttendance(prev => ({
           ...prev,
           isOnBreak: false,
@@ -1065,215 +2057,138 @@ const ManagerDashboard = () => {
         toast.error(data.message || "Failed to end break");
       }
     } catch (error) {
-      console.error('Error ending break:', error);
-      toast.error("Failed to end break. Please try again.");
+      toast.error("Failed to end break");
     } finally {
       setIsAttendanceLoading(false);
     }
   };
 
-  // Handle leave request action
+  // Handle leave action
   const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject') => {
     try {
       const response = await fetch(`${API_URL}/leaves/${leaveId}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: action === 'approve' ? 'approved' : 'rejected',
           managerId,
-          managerName,
-          remarks: `${action === 'approve' ? 'Approved' : 'Rejected'} by manager`
+          managerName
         })
       });
 
       const data = await response.json();
-      
       if (data.success) {
         const updatedLeaves = leaveRequests.map(leave => 
-          leave.id === leaveId 
-            ? { ...leave, status: action === 'approve' ? 'approved' : 'rejected' }
-            : leave
+          leave.id === leaveId ? { ...leave, status: action === 'approve' ? 'approved' : 'rejected' } : leave
         );
         setLeaveRequests(updatedLeaves);
         
-        // Update pending leave count
         const newPendingCount = updatedLeaves.filter(l => l.status === 'pending').length;
         setPendingLeaveCount(newPendingCount);
-        setStats(prev => ({
-          ...prev,
-          pendingLeaves: newPendingCount
-        }));
+        setStats(prev => ({ ...prev, pendingLeaves: newPendingCount }));
         
         const leave = leaveRequests.find(l => l.id === leaveId);
-        const message = action === 'approve' 
-          ? `Leave approved for ${leave?.employeeName}`
-          : `Leave rejected for ${leave?.employeeName}`;
-        
-        toast.success(message);
+        toast.success(`${action === 'approve' ? 'Approved' : 'Rejected'} leave for ${leave?.employeeName}`);
       } else {
         toast.error(data.message || `Failed to ${action} leave`);
       }
     } catch (error) {
-      console.error(`Error ${action}ing leave:`, error);
-      toast.error(`Failed to ${action} leave. Please try again.`);
+      toast.error(`Failed to ${action} leave`);
     }
+  };
+
+  // Handle export
+  const handleExport = () => {
+    const headers = ['Site Name', 'Client', 'Location', 'Total Employees', 'Present', 'Weekly Off', 'Leave', 'Absent', 'Shortage', 'Attendance Rate'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredSiteData.map(site => [
+        `"${site.name}"`,
+        `"${site.clientName || '-'}"`,
+        `"${site.location || '-'}"`,
+        site.totalEmployees,
+        site.present,
+        site.weeklyOff,
+        site.leave,
+        site.absent,
+        site.shortage,
+        `${site.attendanceRate}%`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `site_attendance_${selectedDate}.csv`);
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.success('Data exported successfully');
+  };
+
+  // Custom tooltips
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-3 border rounded-lg shadow-lg"
+        >
+          <p className="font-semibold text-sm">{data.name}</p>
+          <p className="text-sm" style={{ color: data.payload.fill }}>
+            {data.value} employees ({((data.value / currentDayData.totalEmployees) * 100).toFixed(1)}%)
+          </p>
+        </motion.div>
+      );
+    }
+    return null;
   };
 
   // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
-      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      Excellent: "bg-green-100 text-green-800 border-green-200",
+      Good: "bg-blue-100 text-blue-800 border-blue-200",
+      Average: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      Poor: "bg-red-100 text-red-800 border-red-200"
+    };
+    return styles[status] || "bg-gray-100 text-gray-800 border-gray-200";
   };
 
-  // Get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved': return <CheckCircle className="h-4 w-4" />;
-      case 'rejected': return <XCircle className="h-4 w-4" />;
-      case 'pending': return <AlertCircle className="h-4 w-4" />;
-      default: return <AlertCircle className="h-4 w-4" />;
-    }
-  };
-
-  // Custom tooltip for pie chart
-  const CustomPieTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border rounded-lg shadow-lg">
-          <p className="font-medium">{payload[0].name}</p>
-          <p className="text-sm">{payload[0].value} days</p>
-          <p className="text-xs text-gray-500">
-            {((payload[0].value / monthlyAttendanceData.reduce((a, b) => a + b.value, 0)) * 100).toFixed(1)}%
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom label for pie chart
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.7;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
+  // If showing site details
+  if (showSiteDetails && selectedSite) {
     return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
-        dominantBaseline="central"
-        className="text-xs font-bold drop-shadow-lg"
-        stroke="rgba(0,0,0,0.5)"
-        strokeWidth="0.5"
-      >
-        {`${name}: ${(percent * 100).toFixed(0)}%`}
-      </text>
+      <SiteEmployeeDetails
+        siteData={selectedSite}
+        onBack={handleBackFromDetails}
+        selectedDate={selectedDate}
+      />
     );
-  };
+  }
 
-  // Custom tooltip for line chart
-  const CustomLineTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white p-3 border rounded-lg shadow-lg">
-          <p className="font-medium">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading dashboard...</p>
         </div>
-      );
-    }
-    return null;
-  };
-
-  // Get priority color
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  // Get status color for tasks
-  const getTaskStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in-progress': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  // Get progress color
-  const getProgressColor = (progress: number) => {
-    if (progress >= 75) return 'bg-green-500';
-    if (progress >= 50) return 'bg-blue-500';
-    if (progress >= 25) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
-  // Format date for task display
-  const formatTaskDate = (dateString: string) => {
-    if (!dateString) return 'No due date';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Handle task click
-  const handleTaskClick = (task: TaskDetail) => {
-    toast.info("Task Details", {
-      description: `
-        <div class="space-y-2">
-          <div><strong>Task:</strong> ${task.title}</div>
-          <div><strong>Description:</strong> ${task.description}</div>
-          <div><strong>Status:</strong> ${task.status}</div>
-          <div><strong>Priority:</strong> ${task.priority}</div>
-          <div><strong>Progress:</strong> ${task.progress}%</div>
-          <div><strong>Due Date:</strong> ${formatTaskDate(task.dueDate)}</div>
-          ${task.siteName ? `<div><strong>Site:</strong> ${task.siteName}</div>` : ''}
-          <div><strong>Assigned to:</strong> ${task.assignedToName}</div>
-        </div>
-      `,
-      duration: 10000,
-    });
-  };
-
-  // Refresh all data
-  const handleRefresh = async () => {
-    await fetchAllData();
-    toast.success("Dashboard data refreshed!");
-  };
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <DashboardHeader 
         title="Manager Dashboard" 
-        subtitle={`Welcome back, ${managerName}! Here's your daily overview`}
+        subtitle={`Welcome back, ${managerName}! Here's your site attendance overview`}
         onMenuClick={onMenuClick}
       />
 
       <div className="p-6 space-y-6">
-        {/* Welcome Banner */}
-       
         {/* Attendance Controls */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1284,7 +2199,7 @@ const ManagerDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Timer className="h-5 w-5 text-blue-600" />
-                Attendance Control - {managerName}
+                Your Attendance Control
                 {isAttendanceLoading && (
                   <Badge variant="outline" className="ml-2">
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -1294,16 +2209,10 @@ const ManagerDashboard = () => {
               </CardTitle>
               <CardDescription>
                 Manage your work hours and breaks
-                {attendance.lastCheckInDate && (
-                  <span className="block text-xs mt-1">
-                    Last check-in: {formatDateForDisplay(attendance.lastCheckInDate)}
-                  </span>
-                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Check In/Out */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Work Status</span>
@@ -1314,26 +2223,18 @@ const ManagerDashboard = () => {
                   <div className="flex gap-2">
                     <Button
                       onClick={handleCheckIn}
-                      disabled={!canCheckInToday() || isAttendanceLoading || !managerId}
+                      disabled={attendance.isCheckedIn || attendance.hasCheckedOutToday || isAttendanceLoading}
                       className="flex-1 flex items-center gap-2"
                     >
-                      {isAttendanceLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <LogIn className="h-4 w-4" />
-                      )}
+                      {isAttendanceLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
                       {isAttendanceLoading ? "Processing..." : "Check In"}
                     </Button>
                     <Button
                       onClick={handleCheckOut}
-                      disabled={!canCheckOutToday() || isAttendanceLoading || !managerId}
+                      disabled={!attendance.isCheckedIn || attendance.hasCheckedOutToday || isAttendanceLoading}
                       className="flex-1 flex items-center gap-2"
                     >
-                      {isAttendanceLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <LogOut className="h-4 w-4" />
-                      )}
+                      {isAttendanceLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                       {isAttendanceLoading ? "Processing..." : "Check Out"}
                     </Button>
                   </div>
@@ -1344,7 +2245,6 @@ const ManagerDashboard = () => {
                   )}
                 </div>
 
-                {/* Break In/Out */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Break Status</span>
@@ -1355,38 +2255,24 @@ const ManagerDashboard = () => {
                   <div className="flex gap-2">
                     <Button
                       onClick={handleBreakIn}
-                      disabled={!attendance.isCheckedIn || attendance.isOnBreak || isAttendanceLoading || !managerId}
+                      disabled={!attendance.isCheckedIn || attendance.isOnBreak || isAttendanceLoading}
                       className="flex-1 flex items-center gap-2"
                     >
-                      {isAttendanceLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Coffee className="h-4 w-4" />
-                      )}
+                      {isAttendanceLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Coffee className="h-4 w-4" />}
                       {isAttendanceLoading ? "Processing..." : "Break In"}
                     </Button>
                     <Button
                       onClick={handleBreakOut}
-                      disabled={!attendance.isOnBreak || isAttendanceLoading || !managerId}
+                      disabled={!attendance.isOnBreak || isAttendanceLoading}
                       className="flex-1 flex items-center gap-2"
                     >
-                      {isAttendanceLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Timer className="h-4 w-4" />
-                      )}
+                      {isAttendanceLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Timer className="h-4 w-4" />}
                       {isAttendanceLoading ? "Processing..." : "Break Out"}
                     </Button>
                   </div>
-                  {attendance.breakStartTime && attendance.isOnBreak && (
-                    <p className="text-xs text-gray-500">
-                      Break started: {formatTimeForDisplay(attendance.breakStartTime)}
-                    </p>
-                  )}
                 </div>
               </div>
 
-              {/* Summary */}
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -1398,174 +2284,526 @@ const ManagerDashboard = () => {
                     <p className="font-medium">{attendance.breakTime.toFixed(2)}h</p>
                   </div>
                 </div>
-                <div className="mt-2 text-xs text-gray-500">
-                  <p>Manager: {managerName} (ID: {managerId})</p>
-                  {attendance.hasCheckedOutToday && (
-                    <p className="text-green-600">
-                      ✓ Already checked out for today
-                    </p>
-                  )}
-                </div>
+                {attendance.hasCheckedOutToday && (
+                  <p className="text-xs text-green-600 mt-2">
+                    ✓ Already checked out for today
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Stats Cards - UPDATED with 4 new cards */}
+        {/* 7 Days Attendance Rate Pie Charts - WITH WEEKLY OFF IN SEPARATE COLOR */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          transition={{ delay: 0.2 }}
         >
-          {/* Present Days Card */}
-          <Card className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-green-500">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Present Days</CardTitle>
-              <div className="p-2 bg-green-50 rounded-lg">
-                <CalendarCheck className="h-4 w-4 text-green-600" />
+          <Card className="border-2 border-blue-100/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <CardHeader className="px-4 sm:px-6 bg-gradient-to-r from-blue-50 to-blue-100/30 rounded-t-lg border-b">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
+                    <PieChartIcon className="h-5 w-5" />
+                    7 Days Attendance - Your Assigned Sites
+                  </CardTitle>
+                  <p className="text-sm text-blue-600/80 mt-1">
+                    Daily attendance overview for {totalEmployeesManagerSites} employees across {sites.length} sites
+                    {!loadingAttendance && attendanceData.length > 0 && (
+                      <span className="ml-2 text-green-600">
+                        • {currentDayData.sitesWithData > 0 ? 'Real Data' : 'Demo Data'}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <Badge variant="outline" className="bg-white/80 border-blue-200">
+                  <Eye className="h-3 w-3 mr-1" />
+                  All Sites Combined
+                </Badge>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.presentDays}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.presentDays > 0 ? `${Math.round((stats.presentDays / monthlyAttendanceData.reduce((a, b) => a + b.value, 0)) * 100)}% attendance rate` : "No attendance recorded"}
-              </p>
-            </CardContent>
-          </Card>
-          
-          {/* Active Sites Card */}
-          <Card className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-blue-500">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Active Sites</CardTitle>
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <MapPin className="h-4 w-4 text-blue-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeSites}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.activeSites > 0 ? "Active sites under management" : "No active sites"}
-              </p>
-            </CardContent>
-          </Card>
-          
-          {/* Pending Leaves Card */}
-          <Card className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-yellow-500">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Leaves</CardTitle>
-              <div className="p-2 bg-yellow-50 rounded-lg">
-                <Calendar className="h-4 w-4 text-yellow-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingLeaves}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.pendingLeaves > 0 ? `${stats.pendingLeaves} requests awaiting approval` : "No pending leaves"}
-              </p>
-            </CardContent>
-          </Card>
-          
-          {/* Productivity Card */}
-          <Card className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-purple-500">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Productivity</CardTitle>
-              <div className="p-2 bg-purple-50 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.productivityScore}%</div>
-              <p className="text-xs text-muted-foreground">Based on attendance and task completion</p>
+            <CardContent className="px-4 sm:px-6">
+              {loadingAttendance ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-3" />
+                  <span className="text-muted-foreground">Loading attendance data across all sites...</span>
+                </div>
+              ) : attendanceData.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Attendance Data</h3>
+                  <p className="text-gray-500 mb-4">No attendance records found for the last 7 days.</p>
+                  <Button onClick={handleRefresh} variant="outline">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* 6 Days Small Pie Charts - UPDATED TO SHOW WEEKLY OFF */}
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Historical Overview - All Sites Combined
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {getDateRangeText()} | Total Employees: {totalEmployeesManagerSites}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSixDaysPrevious}
+                          disabled={!canGoSixDaysPrevious}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSixDaysNext}
+                          disabled={!canGoSixDaysNext}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {sixDaysData.map((dayData, index) => {
+                        const pieData = [
+                          { name: 'Present', value: dayData.present, color: CHART_COLORS.present },
+                          { name: 'Weekly Off', value: dayData.weeklyOff, color: CHART_COLORS.weeklyOff },
+                          { name: 'Leave', value: dayData.leave, color: CHART_COLORS.leave },
+                          { name: 'Absent', value: dayData.absent, color: CHART_COLORS.absent }
+                        ].filter(item => item.value > 0);
+
+                        return (
+                          <motion.div
+                            key={`${dayData.date}-${index}`}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <Card
+                              className="cursor-pointer transform transition-all duration-200 hover:shadow-lg border-2 hover:border-blue-300"
+                              onClick={() => navigate(`/manager/attendance?date=${dayData.date}`)}
+                            >
+                              <CardContent className="p-3">
+                                <div className="text-center mb-2">
+                                  <p className="text-xs font-medium text-gray-700">{dayData.day}</p>
+                                  <p className="text-xs text-muted-foreground">{dayData.date}</p>
+                                  <Badge variant={
+                                    parseFloat(dayData.rate) > 90 ? 'default' :
+                                      parseFloat(dayData.rate) > 80 ? 'secondary' : 'destructive'
+                                  } className="mt-1 text-xs">
+                                    {dayData.rate}
+                                  </Badge>
+                                </div>
+                                <div className="h-32">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <RechartsPieChart>
+                                      <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={40}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                        labelLine={false}
+                                      >
+                                        {pieData.map((entry, cellIndex) => (
+                                          <Cell key={`cell-${cellIndex}`} fill={entry.color} />
+                                        ))}
+                                      </Pie>
+                                      <Tooltip />
+                                    </RechartsPieChart>
+                                  </ResponsiveContainer>
+                                </div>
+                                <div className="text-center mt-2">
+                                  <div className="flex justify-center items-center gap-2 text-xs flex-wrap">
+                                    {dayData.present > 0 && (
+                                      <div className="flex items-center">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                        <span>{dayData.present}</span>
+                                      </div>
+                                    )}
+                                    {dayData.weeklyOff > 0 && (
+                                      <div className="flex items-center">
+                                        <div className="w-2 h-2 bg-purple-500 rounded-full mr-1"></div>
+                                        <span>{dayData.weeklyOff}</span>
+                                      </div>
+                                    )}
+                                    {dayData.leave > 0 && (
+                                      <div className="flex items-center">
+                                        <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+                                        <span>{dayData.leave}</span>
+                                      </div>
+                                    )}
+                                    {dayData.absent > 0 && (
+                                      <div className="flex items-center">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                                        <span>{dayData.absent}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground mt-1">
+                                    Total: {dayData.totalEmployees}
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Main Today's Pie Chart - WITH WEEKLY OFF */}
+                  <div className="border-t pt-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                          Today's Overview - All Sites Combined
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Total Employees: {currentDayData.totalEmployees} | 
+                          Attendance Rate: {currentDayData.rate} | 
+                          Sites with Data: {currentDayData.sitesWithData}
+                        </p>
+                        <div className="flex gap-4 mt-2 text-xs flex-wrap">
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                            Present: {currentDayData.present}
+                          </span>
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-purple-500 rounded-full mr-1"></span>
+                            Weekly Off: {currentDayData.weeklyOff}
+                          </span>
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-orange-500 rounded-full mr-1"></span>
+                            Leave: {currentDayData.leave}
+                          </span>
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
+                            Absent: {currentDayData.absent}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handlePreviousDay}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-muted-foreground mx-2 min-w-[60px] text-center">
+                          Day {currentDayIndex + 1}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleNextDay}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <motion.div
+                        whileHover={{ scale: 1.01 }}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/manager/attendance?date=${currentDayData.date}`)}
+                      >
+                        <div className="w-full h-80 bg-gradient-to-br from-blue-50/50 to-green-50/50 rounded-xl p-4 border-2 border-blue-200/50 hover:border-blue-400 transition-colors duration-300 backdrop-blur-sm">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RechartsPieChart>
+                              <Pie
+                                data={currentDayPieData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {currentDayPieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip content={<CustomPieTooltip />} />
+                              <Legend />
+                            </RechartsPieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </motion.div>
+
+                      {/* Detailed Breakdown Card */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Detailed Attendance Breakdown</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                              <span className="font-medium">Present</span>
+                              <div className="text-right">
+                                <span className="font-bold text-green-600 text-lg">{currentDayData.present}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.present / totalEmployeesManagerSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                              <span className="font-medium">Weekly Off</span>
+                              <div className="text-right">
+                                <span className="font-bold text-purple-600 text-lg">{currentDayData.weeklyOff}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.weeklyOff / totalEmployeesManagerSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                              <span className="font-medium">On Leave</span>
+                              <div className="text-right">
+                                <span className="font-bold text-orange-600 text-lg">{currentDayData.leave}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.leave / totalEmployeesManagerSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                              <span className="font-medium">Absent</span>
+                              <div className="text-right">
+                                <span className="font-bold text-red-600 text-lg">{currentDayData.absent}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.absent / totalEmployeesManagerSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg mt-4 border-t pt-4">
+                              <span className="font-medium text-blue-800">Total Employees</span>
+                              <span className="font-bold text-blue-600 text-xl">{totalEmployeesManagerSites}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-center mt-4"
+                    >
+                      <p className="text-sm text-muted-foreground">
+                        Click on the pie chart to view detailed site-wise attendance for {currentDayData.date}
+                      </p>
+                    </motion.div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Charts and Leave Requests */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Monthly Attendance Pie Chart - INCREASED SIZE */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="lg:col-span-2"
-          >
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChartIcon className="h-5 w-5 text-blue-600" />
-                  Monthly Attendance Overview
-                </CardTitle>
-                <CardDescription>
-                  Your attendance breakdown for this month
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isStatsLoading ? (
-                  <div className="flex items-center justify-center h-80">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {/* Site Attendance Overview Table */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <Card className="border-2 border-blue-100/50 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/30 rounded-t-lg border-b">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
+                    <Building className="h-5 w-5" />
+                    Site-wise Attendance Overview
+                  </CardTitle>
+                  <CardDescription className="text-sm text-blue-600/80 mt-1">
+                    Total employees across all your assigned sites: {stats.totalEmployees}
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-white/80 border-blue-200">
+                  {sites.length} {sites.length === 1 ? 'Site' : 'Sites'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-40"
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setSelectedDate(formatDate(new Date()))}>
+                    Today
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-1 max-w-sm">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search sites..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExport}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </div>
+              </div>
+
+              {/* Sites Table */}
+              {refreshing ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2">Loading attendance data...</span>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="h-12 px-4 text-left font-medium">Site Name</th>
+                          <th className="h-12 px-4 text-left font-medium">Client</th>
+                          <th className="h-12 px-4 text-left font-medium">Location</th>
+                          <th className="h-12 px-4 text-left font-medium">Total</th>
+                          <th className="h-12 px-4 text-left font-medium text-green-700 bg-green-50">Present</th>
+                          <th className="h-12 px-4 text-left font-medium text-purple-700 bg-purple-50">Weekly Off</th>
+                          <th className="h-12 px-4 text-left font-medium text-blue-700 bg-blue-50">Leave</th>
+                          <th className="h-12 px-4 text-left font-medium text-red-700 bg-red-50">Absent</th>
+                          <th className="h-12 px-4 text-left font-medium text-red-700 bg-red-50">Shortage</th>
+                          <th className="h-12 px-4 text-left font-medium">Rate</th>
+                          <th className="h-12 px-4 text-left font-medium">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedSites.length > 0 ? (
+                          paginatedSites.map((site) => {
+                            const status = site.attendanceRate >= 90 ? 'Excellent' :
+                                          site.attendanceRate >= 80 ? 'Good' :
+                                          site.attendanceRate >= 70 ? 'Average' : 'Poor';
+                            
+                            return (
+                              <tr key={site.id} className="border-b hover:bg-muted/50">
+                                <td className="p-4 align-middle font-medium">
+                                  <div className="font-medium">{site.name}</div>
+                                  {site.isRealData && (
+                                    <Badge variant="outline" className="mt-1 text-xs bg-green-50">
+                                      Real Data
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="p-4 align-middle">{site.clientName || '-'}</td>
+                                <td className="p-4 align-middle">
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-muted-foreground" />
+                                    {site.location || '-'}
+                                  </div>
+                                </td>
+                                <td className="p-4 align-middle font-bold">{site.totalEmployees}</td>
+                                <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{site.present}</td>
+                                <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">{site.weeklyOff}</td>
+                                <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{site.leave}</td>
+                                <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{site.absent}</td>
+                                <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{site.shortage}</td>
+                                <td className="p-4 align-middle font-bold">{site.attendanceRate}%</td>
+                                <td className="p-4 align-middle">
+                                  <Button variant="outline" size="sm" onClick={() => handleViewDetails(site)}>
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={11} className="p-8 text-center text-muted-foreground">
+                              {filteredSiteData.length === 0 ? (
+                                <div className="text-center py-8">
+                                  <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Sites Found</h3>
+                                  <p className="text-gray-500">
+                                    {searchTerm
+                                      ? 'No sites match your search criteria.'
+                                      : 'No sites are currently assigned to you.'}
+                                  </p>
+                                </div>
+                              ) : (
+                                'No data available'
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                ) : (
-                  <div className="h-80 flex flex-col lg:flex-row items-center justify-center">
-                    <div className="w-full lg:w-1/2 h-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RechartsPieChart>
-                          <Pie
-                            data={monthlyAttendanceData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={renderCustomizedLabel}
-                            outerRadius={120} 
-                            innerRadius={40} 
-                            fill="#8884d8"
-                            dataKey="value"
-                            paddingAngle={2}
-                          >
-                            {monthlyAttendanceData.map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.color}
-                                stroke="#fff"
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip content={<CustomPieTooltip />} />
-                        </RechartsPieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="w-full lg:w-1/2 mt-4 lg:mt-0 lg:pl-6">
-                      <div className="space-y-3">
-                        {monthlyAttendanceData.map((item, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: item.color }}
-                              />
-                              <span className="text-sm font-medium">{item.name}</span>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-bold">{item.value} days</div>
-                              <div className="text-xs text-gray-500">
-                                {((item.value / monthlyAttendanceData.reduce((a, b) => a + b.value, 0)) * 100).toFixed(1)}%
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+
+                  {/* Pagination */}
+                  {filteredSiteData.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-4 gap-4">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredSiteData.length)} of {filteredSiteData.length} sites
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
+                          First
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}>
+                          Previous
+                        </Button>
+                        <span className="text-sm">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages}>
+                          Next
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>
+                          Last
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-          {/* Team Leave Requests - SHOWING 3 RECENT REQUESTS */}
+        {/* Additional Sections - Leave Requests and Tasks */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Leave Requests */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
             <Card className="h-full">
@@ -1575,7 +2813,7 @@ const ManagerDashboard = () => {
                   Recent Leave Requests
                 </CardTitle>
                 <CardDescription>
-                  {pendingLeaveCount} pending requests
+                  {pendingLeaveCount} pending {pendingLeaveCount === 1 ? 'request' : 'requests'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1589,23 +2827,20 @@ const ManagerDashboard = () => {
                         transition={{ delay: index * 0.1 }}
                         className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs bg-gray-100">
-                              {leave.avatar}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-sm">{leave.employeeName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {leave.type} • {formatShortDate(leave.startDate)}
-                            </div>
+                        <div>
+                          <div className="font-medium text-sm">{leave.employeeName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {leave.type} • {formatShortDate(leave.startDate)}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge 
                             variant="outline" 
-                            className={`text-xs ${getStatusColor(leave.status)}`}
+                            className={`text-xs ${
+                              leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              leave.status === 'approved' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}
                           >
                             {leave.status}
                           </Badge>
@@ -1651,246 +2886,80 @@ const ManagerDashboard = () => {
               </CardContent>
             </Card>
           </motion.div>
-        </div>
 
-        {/* Task Status Overview with Tabs */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5 text-green-600" />
-                    Tasks Assigned to You
-                  </CardTitle>
-                  <CardDescription>
-                    Track tasks assigned specifically to you
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="w-fit">
-                    Total: {assignedTasks.length} Tasks
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
+          {/* Assigned Tasks */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+          >
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-green-600" />
+                  Your Tasks
+                </CardTitle>
+                <CardDescription>
+                  {assignedTasks.length} {assignedTasks.length === 1 ? 'task' : 'tasks'} assigned to you
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {assignedTasks.slice(0, 3).map((task, index) => (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="p-3 rounded-lg border hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => navigate("/manager/tasks")}
+                    >
+                      <div className="font-medium text-sm truncate">{task.title}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className={
+                          task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }>
+                          {task.priority}
+                        </Badge>
+                        <Badge variant="outline" className={
+                          task.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          task.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                          task.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }>
+                          {task.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Due: {formatShortDate(task.dueDate)}
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {assignedTasks.length === 0 && (
+                    <div className="text-center py-4">
+                      <ClipboardList className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No tasks assigned to you</p>
+                    </div>
+                  )}
+                  
+                  <Button 
+                    variant="ghost" 
+                    className="w-full mt-2"
                     onClick={() => navigate("/manager/tasks")}
-                    className="h-8"
                   >
                     View All Tasks
-                    <ArrowRight className="h-3 w-3 ml-1" />
+                    <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="all-tasks" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="overview" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger value="charts" className="flex items-center gap-2">
-                    <LineChartIcon className="h-4 w-4" />
-                    Charts
-                  </TabsTrigger>
-                  <TabsTrigger value="all-tasks" className="flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4" />
-                    All Tasks
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="overview" className="space-y-4">
-                  {isStatsLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={taskStatusData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="name" stroke="#666" />
-                            <YAxis stroke="#666" />
-                            <Tooltip />
-                            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                              {taskStatusData.map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={entry.color}
-                                  stroke="#fff"
-                                  strokeWidth={1}
-                                />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                        {taskStatusData.map((item, index) => {
-                          const Icon = item.icon;
-                          return (
-                            <Card key={index} className="border-l-4" style={{ borderLeftColor: item.color }}>
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="text-2xl font-bold">{item.count}</div>
-                                    <div className="text-sm text-muted-foreground">{item.name}</div>
-                                  </div>
-                                  <div className={`p-2 rounded-lg`} style={{ backgroundColor: `${item.color}20` }}>
-                                    <Icon className="h-5 w-5" style={{ color: item.color }} />
-                                  </div>
-                                </div>
-                                <div className="mt-2 text-xs">
-                                  <span className={item.trend === 'up' ? 'text-green-600' : item.trend === 'down' ? 'text-red-600' : 'text-yellow-600'}>
-                                    {item.trend === 'up' ? '↗ Increase' : item.trend === 'down' ? '↘ Decrease' : '→ Stable'}
-                                  </span>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="charts" className="space-y-4">
-                  {isStatsLoading ? (
-                    <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={taskLineData}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="day" stroke="#666" />
-                          <YAxis stroke="#666" />
-                          <Tooltip content={<CustomLineTooltip />} />
-                          <Line 
-                            type="monotone" 
-                            dataKey="completed" 
-                            stroke="#10b981" 
-                            strokeWidth={2}
-                            dot={{ r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="inProgress" 
-                            stroke="#3b82f6" 
-                            strokeWidth={2}
-                            dot={{ r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="pending" 
-                            stroke="#f59e0b" 
-                            strokeWidth={2}
-                            dot={{ r: 4 }}
-                            activeDot={{ r: 6 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="all-tasks">
-                  <div className="space-y-3">
-                    {assignedTasks.length > 0 ? (
-                      assignedTasks.map((task, index) => (
-                        <motion.div
-                          key={task.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 transition-colors cursor-pointer"
-                          onClick={() => handleTaskClick(task)}
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="flex flex-col min-w-0 flex-1">
-                              <div className="font-medium truncate">{task.title}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {task.description}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {task.siteName && `Site: ${task.siteName} • `}
-                                Assigned to you • Due: {formatTaskDate(task.dueDate)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 shrink-0">
-                            <Badge variant="outline" className={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                            <Badge variant="outline" className={getTaskStatusColor(task.status)}>
-                              {task.status}
-                            </Badge>
-                            <div className="w-24 shrink-0">
-                              <div className="flex justify-between text-xs mb-1">
-                                <span>Progress</span>
-                                <span>{task.progress}%</span>
-                              </div>
-                              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full ${getProgressColor(task.progress)} transition-all duration-500`}
-                                  style={{ width: `${task.progress}%` }}
-                                />
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTaskClick(task);
-                              }}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </motion.div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8">
-                        <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="font-medium text-lg mb-2">No Tasks Assigned to You</h3>
-                        <p className="text-muted-foreground mb-4">
-                          You don't have any tasks assigned to you yet.
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={() => navigate("/manager/tasks")}
-                          className="mt-2"
-                        >
-                          <ClipboardList className="h-4 w-4 mr-2" />
-                          View All Tasks
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
 
-        {/* Quick Actions - ONLY 4 ACTIONS */}
+        {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

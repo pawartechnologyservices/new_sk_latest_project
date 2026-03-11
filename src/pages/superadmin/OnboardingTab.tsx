@@ -34,6 +34,7 @@ interface Employee {
   esicNumber?: string;
   panNumber?: string;
   photo?: string;
+  photoPublicId?: string;
   // Additional fields
   siteName?: string;
   dateOfBirth?: string;
@@ -67,6 +68,8 @@ interface Employee {
   authorizedSignature?: string;
   createdAt?: string;
   updatedAt?: string;
+  isManager?: boolean;
+  isSupervisor?: boolean;
 }
 
 interface SalaryStructure {
@@ -177,7 +180,7 @@ interface NewEmployeeForm {
   salary: string;
   
   // Documents
-  photo: File | null;
+  photo: File | string | null;
   employeeSignature: File | null;
   authorizedSignature: File | null;
 }
@@ -223,6 +226,11 @@ interface EPFForm11Data {
   declarationDate: string;
   declarationPlace: string;
   employerDeclarationDate: string;
+  
+  // Additional fields for employer declaration
+  kycStatus?: "not_uploaded" | "uploaded_not_approved" | "uploaded_approved";
+  transferRequestGenerated?: boolean;
+  physicalClaimFiled?: boolean;
 }
 
 interface OnboardingTabProps {
@@ -234,12 +242,15 @@ interface OnboardingTabProps {
   setNewJoinees?: React.Dispatch<React.SetStateAction<Employee[]>>;
   leftEmployees?: Employee[];
   setLeftEmployees?: React.Dispatch<React.SetStateAction<Employee[]>>;
+  // Add these props to receive updates from parent
+  onEmployeeUpdate?: (updatedEmployee: Employee) => void;
+  onEmployeesBulkUpdate?: (updatedEmployees: Employee[]) => void;
 }
 
 // Departments array
 const departments = [
-  "Housekeeping Management", 
-  "Security Management", 
+  "Housekeeping ", 
+  "Security ", 
   "Parking Management", 
   "Waste Management", 
   "STP Tank Cleaning", 
@@ -326,9 +337,12 @@ const OnboardingTab = ({
   newJoinees = [],
   setNewJoinees,
   leftEmployees,
-  setLeftEmployees
+  setLeftEmployees,
+  onEmployeeUpdate,
+  onEmployeesBulkUpdate
 }: OnboardingTabProps) => {
   const [loading, setLoading] = useState(false);
+  const [isSavingEPF, setIsSavingEPF] = useState(false);
   const [activeTab, setActiveTab] = useState("onboarding");
   const [newEmployee, setNewEmployee] = useState<NewEmployeeForm>(resetNewEmployeeForm());
   const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([]);
@@ -336,6 +350,7 @@ const OnboardingTab = ({
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [createdEmployeeData, setCreatedEmployeeData] = useState<Employee | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [epfFormData, setEpfFormData] = useState<EPFForm11Data>({
     memberName: "",
     fatherOrSpouseName: "",
@@ -370,7 +385,10 @@ const OnboardingTab = ({
     epsAmountWithdrawnAfterSep2014: false,
     declarationDate: new Date().toISOString().split("T")[0],
     declarationPlace: "Mumbai",
-    employerDeclarationDate: new Date().toISOString().split("T")[0]
+    employerDeclarationDate: new Date().toISOString().split("T")[0],
+    kycStatus: "not_uploaded",
+    transferRequestGenerated: false,
+    physicalClaimFiled: false
   });
 
   // New states for Excel import
@@ -385,6 +403,9 @@ const OnboardingTab = ({
   const [siteSearch, setSiteSearch] = useState("");
   const [showSiteDropdown, setShowSiteDropdown] = useState(false);
   const [filteredSites, setFilteredSites] = useState<Site[]>([]);
+  const [selectedSiteDetails, setSelectedSiteDetails] = useState<Site | null>(null);
+  const [currentSiteStaffCount, setCurrentSiteStaffCount] = useState<number>(0);
+  const [availableStaffPositions, setAvailableStaffPositions] = useState<number>(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -393,9 +414,17 @@ const OnboardingTab = ({
   const signatureEmployeeRef = useRef<HTMLInputElement>(null);
   const signatureAuthorizedRef = useRef<HTMLInputElement>(null);
   const documentUploadRef = useRef<HTMLInputElement>(null);
-  // New refs for Excel import and site search
   const excelImportRef = useRef<HTMLInputElement>(null);
   const siteSearchRef = useRef<HTMLInputElement>(null);
+
+  // Clean up object URL when component unmounts or photo changes
+  useEffect(() => {
+    return () => {
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+      }
+    };
+  }, [photoPreview]);
 
   // Fetch sites from API
   const fetchSites = async () => {
@@ -443,6 +472,35 @@ const OnboardingTab = ({
     setFilteredSites(filtered);
   }, [siteSearch, sites]);
 
+  // Calculate current staff count for selected site - FIXED: This will update whenever employees change
+  useEffect(() => {
+    if (newEmployee.siteName && sites.length > 0) {
+      const site = sites.find(s => s.name === newEmployee.siteName);
+      setSelectedSiteDetails(site || null);
+      
+      if (site) {
+        // Count current employees at this site (active employees only)
+        const siteEmployees = employees.filter(emp => 
+          emp.siteName === site.name && 
+          emp.status === "active"
+        );
+        setCurrentSiteStaffCount(siteEmployees.length);
+        
+        // Calculate regular staff count (excluding managers and supervisors)
+        const regularStaffCount = calculateRegularStaffCount(site);
+        setAvailableStaffPositions(regularStaffCount);
+      } else {
+        // Site not found in sites list
+        setCurrentSiteStaffCount(0);
+        setAvailableStaffPositions(0);
+      }
+    } else {
+      setSelectedSiteDetails(null);
+      setCurrentSiteStaffCount(0);
+      setAvailableStaffPositions(0);
+    }
+  }, [newEmployee.siteName, sites, employees]); // Added employees to dependencies
+
   // Handle site selection
   const handleSiteSelect = (site: Site) => {
     setNewEmployee(prev => ({ ...prev, siteName: site.name }));
@@ -457,7 +515,54 @@ const OnboardingTab = ({
     setSiteSearch("");
   };
 
-  // Calculate total staff for a site
+  // Calculate regular staff count (excluding managers and supervisors)
+  const calculateRegularStaffCount = (site: Site | null) => {
+    if (!site) return 0;
+    
+    if (site.staffDeployment && Array.isArray(site.staffDeployment)) {
+      // Sum all staff counts
+      const totalStaff = site.staffDeployment.reduce((sum, item) => sum + (item.count || 0), 0);
+      
+      // Subtract manager and supervisor counts if they exist in staffDeployment
+      const managerCount = site.staffDeployment.find(item => item.role?.toLowerCase() === "manager")?.count || 0;
+      const supervisorCount = site.staffDeployment.find(item => item.role?.toLowerCase() === "supervisor")?.count || 0;
+      
+      return totalStaff - managerCount - supervisorCount;
+    }
+    
+    // If staffDeployment doesn't exist, use totalStaff and subtract managerCount and supervisorCount
+    const totalStaff = site.totalStaff || 0;
+    const managerCount = site.managerCount || 0;
+    const supervisorCount = site.supervisorCount || 0;
+    
+    return totalStaff - managerCount - supervisorCount;
+  };
+
+  // Check if site has available positions
+  const hasAvailablePositions = (site: Site | null): boolean => {
+    if (!site) return false;
+    
+    const regularStaffCount = calculateRegularStaffCount(site);
+    const siteEmployees = employees.filter(emp => 
+      emp.siteName === site.name && 
+      emp.status === "active"
+    );
+    return siteEmployees.length < regularStaffCount;
+  };
+
+  // Get available positions count
+  const getAvailablePositions = (site: Site | null): number => {
+    if (!site) return 0;
+    
+    const regularStaffCount = calculateRegularStaffCount(site);
+    const siteEmployees = employees.filter(emp => 
+      emp.siteName === site.name && 
+      emp.status === "active"
+    );
+    return Math.max(0, regularStaffCount - siteEmployees.length);
+  };
+
+  // Calculate total staff for a site (including managers and supervisors)
   const calculateTotalStaff = (site: Site) => {
     if (site.totalStaff !== undefined) return site.totalStaff;
     if (site.staffDeployment && Array.isArray(site.staffDeployment)) {
@@ -471,7 +576,9 @@ const OnboardingTab = ({
     <div className="relative w-full">
       <div className="relative">
         <div 
-          className="flex items-center justify-between w-full px-3 py-2.5 text-sm border border-gray-300 rounded-md cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          className={`flex items-center justify-between w-full px-3 py-2.5 text-sm border rounded-md cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+            newEmployee.siteName && selectedSiteDetails && !hasAvailablePositions(selectedSiteDetails) ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
+          }`}
           onClick={() => {
             setShowSiteDropdown(!showSiteDropdown);
             if (!showSiteDropdown) {
@@ -569,99 +676,128 @@ const OnboardingTab = ({
               </div>
             ) : (
               <div className="overflow-y-auto max-h-64">
-                {filteredSites.map((site) => (
-                  <div
-                    key={site._id}
-                    className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                      newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
-                    }`}
-                    onClick={() => handleSiteSelect(site)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className={`h-2 w-2 rounded-full flex-shrink-0 ${site.status === 'active' ? 'bg-green-500' : 'bg-gray-300'}`} />
-                          <span className={`font-medium truncate ${newEmployee.siteName === site.name ? 'text-blue-700' : 'text-gray-900'}`}>
-                            {site.name}
-                          </span>
-                          {newEmployee.siteName === site.name && (
-                            <Check className="h-3 w-3 text-blue-600 flex-shrink-0" />
-                          )}
-                        </div>
-                        
-                        <div className="mt-2 space-y-1.5">
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <Building className="h-3 w-3" />
-                            <span className="truncate">Client: {site.clientName}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">{site.location}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <Users className="h-3 w-3" />
-                            <span>Staff: {calculateTotalStaff(site)}</span>
-                            {site.managerCount && site.managerCount > 0 && (
-                              <span className="text-gray-500">• Managers: {site.managerCount}</span>
+                {filteredSites.map((site) => {
+                  const regularStaffCount = calculateRegularStaffCount(site);
+                  const siteEmployees = employees.filter(emp => 
+                    emp.siteName === site.name && 
+                    emp.status === "active"
+                  );
+                  const availablePositions = regularStaffCount - siteEmployees.length;
+                  const isFull = availablePositions <= 0;
+                  
+                  return (
+                    <div
+                      key={site._id}
+                      className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                        newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                      } ${isFull ? 'opacity-60' : ''}`}
+                      onClick={() => !isFull && handleSiteSelect(site)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className={`h-2 w-2 rounded-full flex-shrink-0 ${site.status === 'active' ? 'bg-green-500' : 'bg-gray-300'}`} />
+                            <span className={`font-medium truncate ${newEmployee.siteName === site.name ? 'text-blue-700' : 'text-gray-900'}`}>
+                              {site.name}
+                            </span>
+                            {newEmployee.siteName === site.name && (
+                              <Check className="h-3 w-3 text-blue-600 flex-shrink-0" />
                             )}
                           </div>
                           
-                          {site.services && site.services.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {site.services.slice(0, 2).map((service, idx) => (
-                                <Badge 
-                                  key={idx} 
-                                  variant="outline"
-                                  className="text-[10px] px-1.5 py-0 h-4"
-                                >
-                                  {service}
-                                </Badge>
-                              ))}
-                              {site.services.length > 2 && (
-                                <Badge 
-                                  variant="outline"
-                                  className="text-[10px] px-1.5 py-0 h-4"
-                                >
-                                  +{site.services.length - 2}
-                                </Badge>
-                              )}
+                          <div className="mt-2 space-y-1.5">
+                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <Building className="h-3 w-3" />
+                              <span className="truncate">Client: {site.clientName}</span>
                             </div>
-                          )}
+                            
+                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">{site.location}</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <Users className="h-3 w-3" />
+                              <span>Regular Staff: {regularStaffCount}</span>
+                              <span className="text-gray-400 mx-1">|</span>
+                              <span className={isFull ? 'text-red-600 font-medium' : 'text-green-600'}>
+                                Available: {availablePositions}
+                              </span>
+                            </div>
+                            
+                            {site.managerCount && site.managerCount > 0 && (
+                              <div className="text-xs text-gray-500">
+                                Managers: {site.managerCount} | Supervisors: {site.supervisorCount || 0}
+                              </div>
+                            )}
+                            
+                            {site.services && site.services.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {site.services.slice(0, 2).map((service, idx) => (
+                                  <Badge 
+                                    key={idx} 
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-4"
+                                  >
+                                    {service}
+                                  </Badge>
+                                ))}
+                                {site.services.length > 2 && (
+                                  <Badge 
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-4"
+                                  >
+                                    +{site.services.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                            
+                            {site.manager && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Manager: <span className="font-medium">{site.manager}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="ml-2 flex-shrink-0 space-y-1">
+                          <Badge 
+                            variant={site.status === 'active' ? "default" : "secondary"}
+                            className={`text-xs ${site.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-gray-100 text-gray-800'}`}
+                          >
+                            {site.status === 'active' ? 'Active' : 'Inactive'}
+                          </Badge>
                           
-                          {site.manager && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Manager: <span className="font-medium">{site.manager}</span>
-                            </div>
+                          {isFull && (
+                            <Badge variant="destructive" className="text-xs">
+                              Full
+                            </Badge>
                           )}
                         </div>
                       </div>
                       
-                      <div className="ml-2 flex-shrink-0">
-                        <Badge 
-                          variant={site.status === 'active' ? "default" : "secondary"}
-                          className={`text-xs ${site.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-gray-100 text-gray-800'}`}
-                        >
-                          {site.status === 'active' ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
+                      {site.contractEndDate && (
+                        <div className="mt-2 text-xs">
+                          <span className="text-gray-500">Contract ends: </span>
+                          <span className="font-medium">
+                            {new Date(site.contractEndDate).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {isFull && (
+                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-1 rounded">
+                          No regular staff positions available
+                        </div>
+                      )}
                     </div>
-                    
-                    {site.contractEndDate && (
-                      <div className="mt-2 text-xs">
-                        <span className="text-gray-500">Contract ends: </span>
-                        <span className="font-medium">
-                          {new Date(site.contractEndDate).toLocaleDateString('en-IN', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             
@@ -695,9 +831,49 @@ const OnboardingTab = ({
         />
       )}
       
+      {/* Site Status Display */}
+      {newEmployee.siteName && selectedSiteDetails && (
+        <div className="mt-2 space-y-2">
+          <div className={`p-3 rounded-md ${
+            currentSiteStaffCount >= availableStaffPositions 
+              ? 'bg-red-50 border border-red-200' 
+              : 'bg-green-50 border border-green-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Staff Status:</span>
+              <Badge variant={currentSiteStaffCount >= availableStaffPositions ? "destructive" : "default"}>
+                {currentSiteStaffCount}/{availableStaffPositions} Staff
+              </Badge>
+            </div>
+            <div className="mt-2 text-xs space-y-1">
+              <div className="flex justify-between">
+                <span>Regular Staff Capacity:</span>
+                <span className="font-medium">{availableStaffPositions}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Currently Onboarded:</span>
+                <span className="font-medium">{currentSiteStaffCount}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
+                <span>Available Positions:</span>
+                <span className={availableStaffPositions - currentSiteStaffCount <= 0 ? 'text-red-600' : 'text-green-600'}>
+                  {Math.max(0, availableStaffPositions - currentSiteStaffCount)}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {currentSiteStaffCount >= availableStaffPositions && (
+            <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+              ⚠️ This site has reached its regular staff capacity. No more regular staff can be onboarded.
+            </div>
+          )}
+        </div>
+      )}
+      
       {/* Validation message */}
       {!newEmployee.siteName && (
-        <div className="text-xs text-gray-500 mt-1">
+        <div className="text-xs text-amber-600 mt-1">
           Required field. Select from available sites.
         </div>
       )}
@@ -965,6 +1141,66 @@ const OnboardingTab = ({
       return;
     }
 
+    // Validate site capacities first
+    const siteCounts: { [key: string]: number } = {};
+    const siteDetails: { [key: string]: Site } = {};
+    
+    sites.forEach(site => {
+      siteDetails[site.name] = site;
+    });
+    
+    const employeesBySite: { [key: string]: NewEmployeeForm[] } = {};
+    
+    excelData.forEach(emp => {
+      if (emp.siteName) {
+        if (!employeesBySite[emp.siteName]) {
+          employeesBySite[emp.siteName] = [];
+        }
+        employeesBySite[emp.siteName].push(emp);
+      }
+    });
+    
+    // Check each site's capacity
+    const sitesExceedingCapacity: string[] = [];
+    
+    for (const siteName in employeesBySite) {
+      const site = siteDetails[siteName];
+      if (!site) {
+        sitesExceedingCapacity.push(`${siteName} (Site not found)`);
+        continue;
+      }
+      
+      const regularStaffCount = calculateRegularStaffCount(site);
+      const currentStaff = employees.filter(emp => 
+        emp.siteName === siteName && 
+        emp.status === "active"
+      ).length;
+      
+      const importCount = employeesBySite[siteName].length;
+      const totalAfterImport = currentStaff + importCount;
+      
+      if (totalAfterImport > regularStaffCount) {
+        sitesExceedingCapacity.push(
+          `${siteName}: Would exceed capacity (Current: ${currentStaff}, Importing: ${importCount}, Capacity: ${regularStaffCount})`
+        );
+      }
+    }
+    
+    if (sitesExceedingCapacity.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-semibold">Cannot import due to capacity issues:</p>
+          <ul className="list-disc pl-4 mt-1 text-sm">
+            {sitesExceedingCapacity.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      );
+      setImporting(false);
+      return;
+    }
+
     setImporting(true);
     setImportProgress(0);
     
@@ -1144,7 +1380,7 @@ const OnboardingTab = ({
     toast.success('Template downloaded successfully');
   };
 
-  // Initialize EPF Form with employee data (KEEPING ORIGINAL LOGIC)
+  // Initialize EPF Form with employee data
   const initializeEPFForm = (employee: Employee) => {
     setCreatedEmployeeData(employee);
     
@@ -1221,7 +1457,7 @@ const OnboardingTab = ({
     return autoFilledFields.includes(fieldName);
   };
 
-  // Camera functions (KEEPING ORIGINAL LOGIC)
+  // Camera functions
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -1269,11 +1505,17 @@ const OnboardingTab = ({
 
   const useCapturedPhoto = () => {
     if (capturedImage) {
+      // Create a blob from the data URL
       fetch(capturedImage)
         .then(res => res.blob())
         .then(blob => {
           const file = new File([blob], 'employee-photo.jpg', { type: 'image/jpeg' });
           setNewEmployee({...newEmployee, photo: file});
+          
+          // Create preview URL
+          const previewUrl = URL.createObjectURL(file);
+          setPhotoPreview(previewUrl);
+          
           toast.success("Photo captured successfully!");
         })
         .catch(error => {
@@ -1301,7 +1543,7 @@ const OnboardingTab = ({
     };
   }, []);
 
-  // Handle file upload (KEEPING ORIGINAL LOGIC)
+  // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -1310,58 +1552,29 @@ const OnboardingTab = ({
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            const MAX_WIDTH = 400;
-            const MAX_HEIGHT = 400;
-            let { width, height } = img;
-
-            if (width > height) {
-              if (width > MAX_WIDTH) {
-                height *= MAX_WIDTH / width;
-                width = MAX_WIDTH;
-              }
-            } else {
-              if (height > MAX_HEIGHT) {
-                width *= MAX_HEIGHT / height;
-                height = MAX_HEIGHT;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            ctx.drawImage(img, 0, 0, width, height);
-
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const compressedFile = new File([blob], file.name, { 
-                  type: 'image/jpeg', 
-                  lastModified: Date.now() 
-                });
-                setNewEmployee({...newEmployee, photo: compressedFile});
-                toast.success("Photo uploaded and compressed successfully!");
-              }
-            }, 'image/jpeg', 0.8);
-          }
-        };
-        img.onerror = () => {
-          toast.error("Error loading image. Please try another file.");
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => {
-        toast.error("Error reading file. Please try again.");
-      };
-      reader.readAsDataURL(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setPhotoPreview(previewUrl);
+      setNewEmployee({...newEmployee, photo: file});
+      
+      toast.success("Photo selected successfully!");
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
-  // UPDATED: Handle add employee with better error handling and validation
+  const handleRemovePhoto = () => {
+    setNewEmployee({...newEmployee, photo: null});
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+      setPhotoPreview(null);
+    }
+  };
+
+  // Handle add employee
   const handleAddEmployee = async () => {
     // Validate required fields
     const requiredFields = [
@@ -1413,6 +1626,20 @@ const OnboardingTab = ({
     if (isNaN(salaryValue) || salaryValue <= 0) {
       toast.error("Please enter a valid salary amount greater than 0");
       return;
+    }
+
+    // Validate site capacity
+    if (selectedSiteDetails) {
+      const regularStaffCount = calculateRegularStaffCount(selectedSiteDetails);
+      const siteEmployees = employees.filter(emp => 
+        emp.siteName === selectedSiteDetails.name && 
+        emp.status === "active"
+      );
+      
+      if (siteEmployees.length >= regularStaffCount) {
+        toast.error(`Cannot onboard employee: Site "${selectedSiteDetails.name}" has reached its regular staff capacity (${regularStaffCount} staff).`);
+        return;
+      }
     }
 
     setLoading(true);
@@ -1534,6 +1761,7 @@ const OnboardingTab = ({
         esicNumber: createdEmployee.esicNumber,
         panNumber: createdEmployee.panNumber,
         photo: createdEmployee.photo,
+        photoPublicId: createdEmployee.photoPublicId,
         siteName: createdEmployee.siteName,
         dateOfBirth: createdEmployee.dateOfBirth,
         bloodGroup: createdEmployee.bloodGroup,
@@ -1571,9 +1799,13 @@ const OnboardingTab = ({
       // Update employees list with the new employee
       setEmployees(prev => [...prev, processedEmployee]);
       
-      // Reset form FIRST
+      // Reset form
       setNewEmployee(resetNewEmployeeForm());
       setUploadedDocuments([]);
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+        setPhotoPreview(null);
+      }
       
       // Then initialize EPF Form and switch tabs
       initializeEPFForm(processedEmployee);
@@ -1594,7 +1826,7 @@ const OnboardingTab = ({
     }
   };
 
-  // Handle document upload (KEEPING ORIGINAL LOGIC)
+  // Handle document upload
   const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
@@ -1608,7 +1840,7 @@ const OnboardingTab = ({
     setUploadedDocuments(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Handle signature upload (KEEPING ORIGINAL LOGIC)
+  // Handle signature upload
   const handleSignatureUpload = (type: 'employee' | 'authorized', event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -1621,7 +1853,7 @@ const OnboardingTab = ({
     }
   };
 
-  // Handle EPF form change (KEEPING ORIGINAL LOGIC)
+  // Handle EPF form change
   const handleEPFFormChange = (field: keyof EPFForm11Data, value: any) => {
     setEpfFormData(prev => ({
       ...prev,
@@ -1629,7 +1861,7 @@ const OnboardingTab = ({
     }));
   };
 
-  // Handle save EPF form (KEEPING ORIGINAL LOGIC)
+  // Handle save EPF form
   const handleSaveEPFForm = async () => {
     if (!epfFormData.memberName || !epfFormData.aadharNumber || !createdEmployeeData) {
       toast.error("Please fill all required fields and select an employee");
@@ -1649,13 +1881,17 @@ const OnboardingTab = ({
     }
 
     try {
-      // Use _id (MongoDB ObjectId) instead of employeeId
+      setIsSavingEPF(true);
+      
+      // Use _id (MongoDB ObjectId) as employeeId
       const employeeId = createdEmployeeData._id;
       
       if (!employeeId) {
-        toast.error("Invalid employee data");
+        toast.error("Invalid employee data - missing ID");
         return;
       }
+      
+      console.log('Saving EPF Form for employee:', employeeId);
       
       const response = await fetch(`${API_URL}/epf-forms`, {
         method: "POST",
@@ -1664,12 +1900,12 @@ const OnboardingTab = ({
         },
         body: JSON.stringify({
           ...epfFormData,
-          employeeId: employeeId,
-          employeeNumber: createdEmployeeData.employeeId,
+          employeeId: employeeId, // Send MongoDB _id
+          employeeNumber: createdEmployeeData.employeeId, // Also send employee number for reference
           firstEmploymentWages: parseFloat(epfFormData.firstEmploymentWages) || 0,
-          enrolledDate: new Date(epfFormData.enrolledDate || createdEmployeeData.joinDate || createdEmployeeData.dateOfJoining || new Date()),
-          declarationDate: new Date(epfFormData.declarationDate || new Date()),
-          employerDeclarationDate: new Date(epfFormData.employerDeclarationDate || new Date())
+          enrolledDate: epfFormData.enrolledDate || createdEmployeeData.joinDate || createdEmployeeData.dateOfJoining || new Date().toISOString().split('T')[0],
+          declarationDate: epfFormData.declarationDate || new Date().toISOString().split('T')[0],
+          employerDeclarationDate: epfFormData.employerDeclarationDate || new Date().toISOString().split('T')[0]
         })
       });
 
@@ -1683,6 +1919,7 @@ const OnboardingTab = ({
         toast.success("EPF Form saved successfully!");
         setActiveTab("onboarding");
         setCreatedEmployeeData(null);
+        
         // Reset EPF form data
         setEpfFormData({
           memberName: "",
@@ -1726,10 +1963,12 @@ const OnboardingTab = ({
     } catch (error: any) {
       console.error("Error saving EPF Form:", error);
       toast.error(error.message || "Error saving EPF Form");
+    } finally {
+      setIsSavingEPF(false);
     }
   };
 
-  // Handle print EPF form (KEEPING ORIGINAL LOGIC)
+  // Handle print EPF form
   const handlePrintEPFForm = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -1944,10 +2183,9 @@ const OnboardingTab = ({
                   <div class="value">${epfFormData.previousPFAccountNumber}</div>
                 </div>
               </div>
-
               <div class="field-row">
                 <div class="field-group half-width">
-                  <div class="label">c) Date of Exit from previous Employment ? (dd/mm/yyyy)</div>
+                  <div class="label">c) Date of Exit from previous Employment</div>
                   <div class="value">${epfFormData.dateOfExit}</div>
                 </div>
                 <div class="field-group half-width">
@@ -1955,7 +2193,6 @@ const OnboardingTab = ({
                   <div class="value">${epfFormData.schemeCertificateNumber}</div>
                 </div>
               </div>
-
               <div class="field-row">
                 <div class="field-group half-width">
                   <div class="label">e) Pension Payment Order (PPO) (If issued)</div>
@@ -2102,17 +2339,17 @@ const OnboardingTab = ({
 
               <div class="field-row">
                 <div class="checkbox-group">
-                  <input type="checkbox" class="checkbox"> The KYC details of the above member in the JAN database have not been uploaded
+                  <input type="checkbox" class="checkbox" ${epfFormData.kycStatus === "not_uploaded" ? "checked" : ""}> The KYC details of the above member in the JAN database have not been uploaded
                 </div>
               </div>
               <div class="field-row">
                 <div class="checkbox-group">
-                  <input type="checkbox" class="checkbox"> Have been uploaded but not approved
+                  <input type="checkbox" class="checkbox" ${epfFormData.kycStatus === "uploaded_not_approved" ? "checked" : ""}> Have been uploaded but not approved
                 </div>
               </div>
               <div class="field-row">
                 <div class="checkbox-group">
-                  <input type="checkbox" class="checkbox"> Have been uploaded and approved with DSC
+                  <input type="checkbox" class="checkbox" ${epfFormData.kycStatus === "uploaded_approved" ? "checked" : ""}> Have been uploaded and approved with DSC
                 </div>
               </div>
 
@@ -2124,12 +2361,12 @@ const OnboardingTab = ({
 
               <div class="field-row">
                 <div class="checkbox-group">
-                  <input type="checkbox" class="checkbox"> The KYC details of the above member in the UAN database have been approved with Digital Signature Certificate and transfer request has been generated on portal
+                  <input type="checkbox" class="checkbox" ${epfFormData.transferRequestGenerated ? "checked" : ""}> The KYC details of the above member in the UAN database have been approved with Digital Signature Certificate and transfer request has been generated on portal
                 </div>
               </div>
               <div class="field-row">
                 <div class="checkbox-group">
-                  <input type="checkbox" class="checkbox"> As the DSC of establishment are not registered with EPFO, the member has been informed to file physical claim (Form-13) for transfer of funds from his previous establishment.
+                  <input type="checkbox" class="checkbox" ${epfFormData.physicalClaimFiled ? "checked" : ""}> As the DSC of establishment are not registered with EPFO, the member has been informed to file physical claim (Form-13) for transfer of funds from his previous establishment.
                 </div>
               </div>
 
@@ -2163,10 +2400,36 @@ const OnboardingTab = ({
     printWindow.document.close();
   };
 
-  // Function to manually open EPF form for an existing employee (KEEPING ORIGINAL LOGIC)
+  // Function to manually open EPF form for an existing employee
   const handleOpenEPFForm = (employee: Employee) => {
     initializeEPFForm(employee);
   };
+
+  // FIXED: Function to update employee site from parent component
+  const updateEmployeeSite = (employeeId: string, newSiteName: string) => {
+    setEmployees(prevEmployees => 
+      prevEmployees.map(emp => 
+        emp._id === employeeId ? { ...emp, siteName: newSiteName } : emp
+      )
+    );
+  };
+
+  // FIXED: Function to bulk update employee sites from parent component
+  const bulkUpdateEmployeeSites = (employeeIds: string[], newSiteName: string) => {
+    setEmployees(prevEmployees => 
+      prevEmployees.map(emp => 
+        employeeIds.includes(emp._id) ? { ...emp, siteName: newSiteName } : emp
+      )
+    );
+  };
+
+  // FIXED: Expose update functions to parent component
+  useEffect(() => {
+    if (onEmployeeUpdate) {
+      // This is just to expose the function - you'll need to pass it through a ref or context
+      // For now, we'll assume the parent can call setEmployees directly
+    }
+  }, [onEmployeeUpdate]);
 
   return (
     <div className="space-y-6">
@@ -2376,11 +2639,15 @@ const OnboardingTab = ({
                     
                     <div className="flex justify-between items-start flex-col md:flex-row gap-4">
                       <div className="border-2 border-dashed border-gray-400 w-20 h-24 md:w-24 md:h-32 flex items-center justify-center text-xs text-muted-foreground text-center p-2 mx-auto md:mx-0">
-                        {newEmployee.photo ? (
+                        {photoPreview || (newEmployee.photo && typeof newEmployee.photo === 'string') ? (
                           <img 
-                            src={newEmployee.photo instanceof File 
-                              ? URL.createObjectURL(newEmployee.photo) 
-                              : newEmployee.photo} 
+                            src={photoPreview || newEmployee.photo as string} 
+                            alt="Employee" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : newEmployee.photo instanceof File ? (
+                          <img 
+                            src={URL.createObjectURL(newEmployee.photo)} 
                             alt="Employee" 
                             className="w-full h-full object-cover"
                           />
@@ -2443,7 +2710,7 @@ const OnboardingTab = ({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setNewEmployee({...newEmployee, photo: null})}
+                          onClick={handleRemovePhoto}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -2984,6 +3251,7 @@ const OnboardingTab = ({
                       </FormField>
                     </div>
                     
+                    
                     <div className="space-y-4">
                       <FormField label="Authorized Signature" id="authorizedSignature">
                         <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center">
@@ -3138,7 +3406,7 @@ const OnboardingTab = ({
           </Card>
         </TabsContent>
 
-        {/* EPF Form Tab - KEEPING ORIGINAL LOGIC */}
+        {/* EPF Form Tab */}
         <TabsContent value="epf-form">
           {createdEmployeeData ? (
             <Card>
@@ -3180,7 +3448,7 @@ const OnboardingTab = ({
                     </div>
                   </div>
 
-                  {/* EPF Form Content - KEEPING ORIGINAL STRUCTURE */}
+                  {/* EPF Form Content */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField label="1. Name of Member (Aadhar Name)" required>
                       <div className="relative">
@@ -3189,6 +3457,7 @@ const OnboardingTab = ({
                           onChange={(e) => handleEPFFormChange('memberName', e.target.value)}
                           placeholder="Enter full name as per Aadhar"
                           className="bg-gray-50"
+                          required
                         />
                         <div className="absolute right-2 top-2">
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -3202,13 +3471,33 @@ const OnboardingTab = ({
                           value={epfFormData.fatherOrSpouseName}
                           onChange={(e) => handleEPFFormChange('fatherOrSpouseName', e.target.value)}
                           placeholder={`Enter ${epfFormData.relationshipType === 'father' ? 'father' : 'spouse'} name`}
-                          className={isAutoFilledField('fatherOrSpouseName') ? "bg-gray-50" : ""}
+                          className="bg-gray-50"
                         />
-                        {isAutoFilledField('fatherOrSpouseName') && (
-                          <div className="absolute right-2 top-2">
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                          </div>
-                        )}
+                        <div className="absolute right-2 top-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 mt-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="father"
+                            name="relationshipType"
+                            checked={epfFormData.relationshipType === "father"}
+                            onChange={() => handleEPFFormChange('relationshipType', 'father')}
+                          />
+                          <Label htmlFor="father" className="text-sm">Father</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            id="spouse"
+                            name="relationshipType"
+                            checked={epfFormData.relationshipType === "spouse"}
+                            onChange={() => handleEPFFormChange('relationshipType', 'spouse')}
+                          />
+                          <Label htmlFor="spouse" className="text-sm">Spouse</Label>
+                        </div>
                       </div>
                     </FormField>
 
@@ -3218,20 +3507,18 @@ const OnboardingTab = ({
                           type="date"
                           value={epfFormData.dateOfBirth}
                           onChange={(e) => handleEPFFormChange('dateOfBirth', e.target.value)}
-                          className={isAutoFilledField('dateOfBirth') ? "bg-gray-50" : ""}
+                          className="bg-gray-50"
                         />
-                        {isAutoFilledField('dateOfBirth') && (
-                          <div className="absolute right-2 top-2">
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                          </div>
-                        )}
+                        <div className="absolute right-2 top-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                        </div>
                       </div>
                     </FormField>
 
                     <FormField label="4. Gender">
                       <div className="relative">
                         <Select value={epfFormData.gender} onValueChange={(value) => handleEPFFormChange('gender', value)}>
-                          <SelectTrigger className={isAutoFilledField('gender') ? "bg-gray-50" : ""}>
+                          <SelectTrigger className="bg-gray-50">
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -3240,11 +3527,9 @@ const OnboardingTab = ({
                             <SelectItem value="Transgender">Transgender</SelectItem>
                           </SelectContent>
                         </Select>
-                        {isAutoFilledField('gender') && (
-                          <div className="absolute right-2 top-2">
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                          </div>
-                        )}
+                        <div className="absolute right-2 top-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                        </div>
                       </div>
                     </FormField>
 
@@ -3252,7 +3537,7 @@ const OnboardingTab = ({
                     <FormField label="5. Marital Status">
                       <div className="relative">
                         <Select value={epfFormData.maritalStatus} onValueChange={(value) => handleEPFFormChange('maritalStatus', value)}>
-                          <SelectTrigger className={isAutoFilledField('maritalStatus') ? "bg-gray-50" : ""}>
+                          <SelectTrigger className="bg-gray-50">
                             <SelectValue placeholder="Select marital status" />
                           </SelectTrigger>
                           <SelectContent>
@@ -3263,11 +3548,9 @@ const OnboardingTab = ({
                             <SelectItem value="Divorcee">Divorcee</SelectItem>
                           </SelectContent>
                         </Select>
-                        {isAutoFilledField('maritalStatus') && (
-                          <div className="absolute right-2 top-2">
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                          </div>
-                        )}
+                        <div className="absolute right-2 top-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                        </div>
                       </div>
                     </FormField>
 
@@ -3278,13 +3561,11 @@ const OnboardingTab = ({
                           value={epfFormData.email}
                           onChange={(e) => handleEPFFormChange('email', e.target.value)}
                           placeholder="Enter email address"
-                          className={isAutoFilledField('email') ? "bg-gray-50" : ""}
+                          className="bg-gray-50"
                         />
-                        {isAutoFilledField('email') && (
-                          <div className="absolute right-2 top-2">
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                          </div>
-                        )}
+                        <div className="absolute right-2 top-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                        </div>
                       </div>
                     </FormField>
 
@@ -3294,106 +3575,123 @@ const OnboardingTab = ({
                           value={epfFormData.mobileNumber}
                           onChange={(e) => handleEPFFormChange('mobileNumber', e.target.value)}
                           placeholder="Enter mobile number"
-                          className={isAutoFilledField('mobileNumber') ? "bg-gray-50" : ""}
+                          className="bg-gray-50"
                         />
-                        {isAutoFilledField('mobileNumber') && (
-                          <div className="absolute right-2 top-2">
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                          </div>
-                        )}
+                        <div className="absolute right-2 top-2">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                        </div>
                       </div>
                     </FormField>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg">
-                    <div className="space-y-2">
-                      <Label>7. Whether earlier member of the Employee's Provident Fund Scheme, 1952 ?</Label>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={epfFormData.previousEPFMember}
-                            onChange={(e) => handleEPFFormChange('previousEPFMember', e.target.checked)}
-                          />
-                          <Label>Yes</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!epfFormData.previousEPFMember}
-                            onChange={(e) => handleEPFFormChange('previousEPFMember', !e.target.checked)}
-                          />
-                          <Label>No</Label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>8. Whether earlier member of the Employee's Pension Scheme, 1995 ?</Label>
-                      <div className="flex gap-4">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={epfFormData.previousPensionMember}
-                            onChange={(e) => handleEPFFormChange('previousPensionMember', e.target.checked)}
-                          />
-                          <Label>Yes</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={!epfFormData.previousPensionMember}
-                            onChange={(e) => handleEPFFormChange('previousPensionMember', !e.target.checked)}
-                          />
-                          <Label>No</Label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 p-4 border rounded-lg">
-                    <h4 className="font-semibold">9. Previous Employment details ? (If Yes, 7 & 8 details above)</h4>
+                  {/* Previous Membership Section */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold border-b pb-2">Previous Membership Details</h4>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField label="a) Universal Account Number (UAN)">
-                        <Input
-                          value={epfFormData.previousUAN}
-                          onChange={(e) => handleEPFFormChange('previousUAN', e.target.value)}
-                          placeholder="Enter previous UAN"
-                        />
-                      </FormField>
-                      <FormField label="b) Previous PF Account Number">
-                        <Input
-                          value={epfFormData.previousPFAccountNumber}
-                          onChange={(e) => handleEPFFormChange('previousPFAccountNumber', e.target.value)}
-                          placeholder="Enter previous PF account number"
-                        />
-                      </FormField>
-                      <FormField label="c) Date of Exit from previous Employment">
-                        <Input
-                          type="date"
-                          value={epfFormData.dateOfExit}
-                          onChange={(e) => handleEPFFormChange('dateOfExit', e.target.value)}
-                        />
-                      </FormField>
-                      <FormField label="d) Scheme Certificate No (If issued)">
-                        <Input
-                          value={epfFormData.schemeCertificateNumber}
-                          onChange={(e) => handleEPFFormChange('schemeCertificateNumber', e.target.value)}
-                          placeholder="Enter scheme certificate number"
-                        />
-                      </FormField>
-                      <FormField label="e) Pension Payment Order (PPO) (If issued)">
-                        <Input
-                          value={epfFormData.pensionPaymentOrder}
-                          onChange={(e) => handleEPFFormChange('pensionPaymentOrder', e.target.value)}
-                          placeholder="Enter PPO number"
-                        />
-                      </FormField>
+                      <div className="space-y-2">
+                        <Label>7. Whether earlier member of the Employee's Provident Fund Scheme, 1952 ?</Label>
+                        <div className="flex gap-4">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={epfFormData.previousEPFMember}
+                              onChange={(e) => handleEPFFormChange('previousEPFMember', e.target.checked)}
+                            />
+                            <Label>Yes</Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={!epfFormData.previousEPFMember}
+                              onChange={(e) => handleEPFFormChange('previousEPFMember', !e.target.checked)}
+                            />
+                            <Label>No</Label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>8. Whether earlier member of the Employee's Pension Scheme, 1995 ?</Label>
+                        <div className="flex gap-4">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={epfFormData.previousPensionMember}
+                              onChange={(e) => handleEPFFormChange('previousPensionMember', e.target.checked)}
+                            />
+                            <Label>Yes</Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={!epfFormData.previousPensionMember}
+                              onChange={(e) => handleEPFFormChange('previousPensionMember', !e.target.checked)}
+                            />
+                            <Label>No</Label>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+
+                    {(epfFormData.previousEPFMember || epfFormData.previousPensionMember) && (
+                      <div className="space-y-4 mt-4 p-4 border rounded-lg bg-gray-50">
+                        <h5 className="font-medium">9. Previous Employment details ? (If Yes, 7 & 8 details above)</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="previousUAN">a) Universal Account Number (UAN)</Label>
+                            <Input
+                              id="previousUAN"
+                              value={epfFormData.previousUAN}
+                              onChange={(e) => handleEPFFormChange('previousUAN', e.target.value)}
+                              placeholder="Enter previous UAN"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="previousPFAccountNumber">b) Previous PF Account Number</Label>
+                            <Input
+                              id="previousPFAccountNumber"
+                              value={epfFormData.previousPFAccountNumber}
+                              onChange={(e) => handleEPFFormChange('previousPFAccountNumber', e.target.value)}
+                              placeholder="Enter previous PF account number"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="dateOfExit">c) Date of Exit from previous Employment</Label>
+                            <Input
+                              id="dateOfExit"
+                              type="date"
+                              value={epfFormData.dateOfExit}
+                              onChange={(e) => handleEPFFormChange('dateOfExit', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="schemeCertificateNumber">d) Scheme Certificate No (If issued)</Label>
+                            <Input
+                              id="schemeCertificateNumber"
+                              value={epfFormData.schemeCertificateNumber}
+                              onChange={(e) => handleEPFFormChange('schemeCertificateNumber', e.target.value)}
+                              placeholder="Enter scheme certificate number"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="pensionPaymentOrder">e) Pension Payment Order (PPO) (If issued)</Label>
+                            <Input
+                              id="pensionPaymentOrder"
+                              value={epfFormData.pensionPaymentOrder}
+                              onChange={(e) => handleEPFFormChange('pensionPaymentOrder', e.target.value)}
+                              placeholder="Enter PPO number"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-4 p-4 border rounded-lg">
-                    <h4 className="font-semibold">10. International Worker Details</h4>
+                  {/* International Worker Section */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold border-b pb-2">10. International Worker Details</h4>
+                    
                     <div className="space-y-2">
                       <Label>a) International Worker</Label>
                       <div className="flex gap-4">
@@ -3418,108 +3716,122 @@ const OnboardingTab = ({
 
                     {epfFormData.internationalWorker && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <FormField label="b) Country of origin">
+                        <div className="space-y-2">
+                          <Label htmlFor="countryOfOrigin">b) Country of Origin</Label>
                           <Input
+                            id="countryOfOrigin"
                             value={epfFormData.countryOfOrigin}
                             onChange={(e) => handleEPFFormChange('countryOfOrigin', e.target.value)}
                             placeholder="Enter country name"
                           />
-                        </FormField>
-                        <FormField label="c) Passport No.">
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="passportNumber">c) Passport No.</Label>
                           <Input
+                            id="passportNumber"
                             value={epfFormData.passportNumber}
                             onChange={(e) => handleEPFFormChange('passportNumber', e.target.value)}
                             placeholder="Enter passport number"
                           />
-                        </FormField>
-                        <FormField label="d) Passport Validity From">
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="passportValidityFrom">d) Passport Validity From</Label>
                           <Input
+                            id="passportValidityFrom"
                             type="date"
                             value={epfFormData.passportValidityFrom}
                             onChange={(e) => handleEPFFormChange('passportValidityFrom', e.target.value)}
                           />
-                        </FormField>
-                        <FormField label="d) Passport Validity To">
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="passportValidityTo">d) Passport Validity To</Label>
                           <Input
+                            id="passportValidityTo"
                             type="date"
                             value={epfFormData.passportValidityTo}
                             onChange={(e) => handleEPFFormChange('passportValidityTo', e.target.value)}
                           />
-                        </FormField>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-4 p-4 border rounded-lg">
-                    <h4 className="font-semibold">11. KYC Details : (attach self attested copies of following KYC's)</h4>
+                  {/* KYC Details Section */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold border-b pb-2">11. KYC Details : (attach self attested copies of following KYC's)</h4>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField label="a) Bank Account No. & IFSC Code">
+                      <div className="space-y-2">
+                        <Label htmlFor="bankAccountNumber">a) Bank Account No. & IFS Code</Label>
                         <div className="relative">
                           <Input
+                            id="bankAccountNumber"
                             value={epfFormData.bankAccountNumber}
                             onChange={(e) => handleEPFFormChange('bankAccountNumber', e.target.value)}
                             placeholder="Enter bank account number"
-                            className={isAutoFilledField('bankAccountNumber') ? "bg-gray-50" : ""}
+                            className="bg-gray-50"
                           />
-                          {isAutoFilledField('bankAccountNumber') && (
-                            <div className="absolute right-2 top-2">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                            </div>
-                          )}
+                          <div className="absolute right-2 top-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                          </div>
                         </div>
-                      </FormField>
-                      <FormField label="IFSC Code">
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ifscCode">IFSC Code</Label>
                         <div className="relative">
                           <Input
+                            id="ifscCode"
                             value={epfFormData.ifscCode}
                             onChange={(e) => handleEPFFormChange('ifscCode', e.target.value)}
                             placeholder="Enter IFSC code"
-                            className={isAutoFilledField('ifscCode') ? "bg-gray-50" : ""}
+                            className="bg-gray-50"
                           />
-                          {isAutoFilledField('ifscCode') && (
-                            <div className="absolute right-2 top-2">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                            </div>
-                          )}
+                          <div className="absolute right-2 top-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                          </div>
                         </div>
-                      </FormField>
-                      <FormField label="b) AADHAR Number" required>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="aadharNumber">
+                          b) AADHAR Number <span className="text-red-500">*</span>
+                        </Label>
                         <div className="relative">
                           <Input
+                            id="aadharNumber"
                             value={epfFormData.aadharNumber}
                             onChange={(e) => handleEPFFormChange('aadharNumber', e.target.value)}
                             placeholder="Enter Aadhar number"
+                            className="bg-gray-50"
                             required
-                            className={isAutoFilledField('aadharNumber') ? "bg-gray-50" : ""}
                           />
-                          {isAutoFilledField('aadharNumber') && (
-                            <div className="absolute right-2 top-2">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                            </div>
-                          )}
+                          <div className="absolute right-2 top-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                          </div>
                         </div>
-                      </FormField>
-                      <FormField label="c) Permanent Account Number (PAN)">
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="panNumber">c) Permanent Account Number (PAN)</Label>
                         <div className="relative">
                           <Input
+                            id="panNumber"
                             value={epfFormData.panNumber}
                             onChange={(e) => handleEPFFormChange('panNumber', e.target.value)}
                             placeholder="Enter PAN number"
-                            className={isAutoFilledField('panNumber') ? "bg-gray-50" : ""}
+                            className="bg-gray-50"
                           />
-                          {isAutoFilledField('panNumber') && (
-                            <div className="absolute right-2 top-2">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                            </div>
-                          )}
+                          <div className="absolute right-2 top-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                          </div>
                         </div>
-                      </FormField>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-4 p-4 border rounded-lg">
-                    <h4 className="font-semibold">12. Declaration Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Declaration Details Section */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold border-b pb-2">12. Declaration Details</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>First EPF Member</Label>
                         <div className="flex gap-4">
@@ -3542,42 +3854,42 @@ const OnboardingTab = ({
                         </div>
                       </div>
 
-                      <FormField label="Enrolled Date">
+                      <div className="space-y-2">
+                        <Label htmlFor="enrolledDate">Enrolled Date</Label>
                         <div className="relative">
                           <Input
+                            id="enrolledDate"
                             type="date"
                             value={epfFormData.enrolledDate}
                             onChange={(e) => handleEPFFormChange('enrolledDate', e.target.value)}
-                            className={isAutoFilledField('enrolledDate') ? "bg-gray-50" : ""}
+                            className="bg-gray-50"
                           />
-                          {isAutoFilledField('enrolledDate') && (
-                            <div className="absolute right-2 top-2">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                            </div>
-                          )}
+                          <div className="absolute right-2 top-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                          </div>
                         </div>
-                      </FormField>
+                      </div>
 
-                      <FormField label="First Employment EPF Wages">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstEmploymentWages">First Employment EPF Wages</Label>
                         <div className="relative">
                           <Input
+                            id="firstEmploymentWages"
                             value={epfFormData.firstEmploymentWages}
                             onChange={(e) => handleEPFFormChange('firstEmploymentWages', e.target.value)}
                             placeholder="Enter wages"
-                            className={isAutoFilledField('firstEmploymentWages') ? "bg-gray-50" : ""}
+                            className="bg-gray-50"
                           />
-                          {isAutoFilledField('firstEmploymentWages') && (
-                            <div className="absolute right-2 top-2">
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
-                            </div>
-                          )}
+                          <div className="absolute right-2 top-2">
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
+                          </div>
                         </div>
-                      </FormField>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                       <div className="space-y-2">
-                        <Label className="text-sm">EPF Member before 01/09/2014</Label>
+                        <Label className="text-sm">Are you EPF Member before 01/09/2014</Label>
                         <div className="flex gap-4">
                           <div className="flex items-center gap-2">
                             <input
@@ -3599,7 +3911,7 @@ const OnboardingTab = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm">EPF Amount Withdrawn?</Label>
+                        <Label className="text-sm">If Yes, EPF Amount Withdrawn?</Label>
                         <div className="flex gap-4">
                           <div className="flex items-center gap-2">
                             <input
@@ -3621,7 +3933,7 @@ const OnboardingTab = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm">EPS Amount Withdrawn?</Label>
+                        <Label className="text-sm">If Yes, EPS (Pension) Amount Withdrawn?</Label>
                         <div className="flex gap-4">
                           <div className="flex items-center gap-2">
                             <input
@@ -3643,7 +3955,7 @@ const OnboardingTab = ({
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm">EPS Amount Withdrawn after Sep 2014?</Label>
+                        <Label className="text-sm">After Sep 2014 earned EPS (Pension) Amount Withdrawn before Join current Employer?</Label>
                         <div className="flex gap-4">
                           <div className="flex items-center gap-2">
                             <input
@@ -3666,6 +3978,7 @@ const OnboardingTab = ({
                     </div>
                   </div>
 
+                  {/* Undertaking Section */}
                   <div className="p-4 border rounded-lg bg-gray-50">
                     <h4 className="font-semibold mb-2">UNDERTAKING</h4>
                     <p className="text-sm">1) Certified that the particulars are true to the best of my knowledge</p>
@@ -3675,60 +3988,132 @@ const OnboardingTab = ({
                     <p className="text-sm">4) In case of changes in above details, the same will be intimated to employer at the earliest.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg">
-                    <div className="space-y-4">
-                      <h4 className="font-semibold">Employee Declaration</h4>
-                      <FormField label="Date">
+                  {/* Employee Declaration */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <h4 className="font-semibold">Employee Declaration</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="declarationDate">Date</Label>
                         <Input
+                          id="declarationDate"
                           type="date"
                           value={epfFormData.declarationDate}
                           onChange={(e) => handleEPFFormChange('declarationDate', e.target.value)}
                         />
-                      </FormField>
-                      <FormField label="Place">
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="declarationPlace">Place</Label>
                         <Input
+                          id="declarationPlace"
                           value={epfFormData.declarationPlace}
                           onChange={(e) => handleEPFFormChange('declarationPlace', e.target.value)}
                           placeholder="Enter place"
                         />
-                      </FormField>
-                      <FormField label="Signature of Member">
-                        <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
-                          <span className="text-muted-foreground">Employee Signature</span>
-                        </div>
-                      </FormField>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Signature of Member</Label>
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
+                        <span className="text-muted-foreground">Employee Signature</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Employer Declaration */}
+                  <div className="border rounded-lg p-4 space-y-4">
+                    <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
+                    
+                    <div className="space-y-2">
+                      <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
                     </div>
 
-                    <div className="space-y-4">
-                      <h4 className="font-semibold">Employer Declaration</h4>
-                      <FormField label="Date">
+                    <div className="space-y-2">
+                      <Label>B. In case the person was earlier not a member of EPF Scheme, 1952 and EPS, 1995: ((Post allotment of UAN) The UAN allotted or the member is) Please Tick the Appropriate Option :</Label>
+                      <div className="space-y-2 mt-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={epfFormData.kycStatus === "not_uploaded"}
+                            onChange={() => handleEPFFormChange('kycStatus', 'not_uploaded')}
+                          />
+                          <Label>The KYC details of the above member in the JAN database have not been uploaded</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={epfFormData.kycStatus === "uploaded_not_approved"}
+                            onChange={() => handleEPFFormChange('kycStatus', 'uploaded_not_approved')}
+                          />
+                          <Label>Have been uploaded but not approved</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={epfFormData.kycStatus === "uploaded_approved"}
+                            onChange={() => handleEPFFormChange('kycStatus', 'uploaded_approved')}
+                          />
+                          <Label>Have been uploaded and approved with DSC</Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>C. In case the person was earlier a member of EPF Scheme, 1952 and EPS 1995;</Label>
+                      <div className="space-y-2 mt-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={epfFormData.transferRequestGenerated}
+                            onChange={(e) => handleEPFFormChange('transferRequestGenerated', e.target.checked)}
+                          />
+                          <Label>The KYC details of the above member in the UAN database have been approved with Digital Signature Certificate and transfer request has been generated on portal</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={epfFormData.physicalClaimFiled}
+                            onChange={(e) => handleEPFFormChange('physicalClaimFiled', e.target.checked)}
+                          />
+                          <Label>As the DSC of establishment are not registered with EPFO, the member has been informed to file physical claim (Form-13) for transfer of funds from his previous establishment.</Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="employerDeclarationDate">Date</Label>
                         <Input
+                          id="employerDeclarationDate"
                           type="date"
                           value={epfFormData.employerDeclarationDate}
                           onChange={(e) => handleEPFFormChange('employerDeclarationDate', e.target.value)}
                         />
-                      </FormField>
-                      <FormField label="Signature of Employer with Seal">
-                        <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
-                          <span className="text-muted-foreground">Employer Signature & Seal</span>
-                        </div>
-                      </FormField>
-                    </div> 
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Signature of Employer with Seal of Establishment</Label>
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
+                        <span className="text-muted-foreground">Employer Signature & Seal</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex gap-4 justify-between pt-4 border-t">
-                    <div className="flex gap-4">
-                      <Button onClick={handleSaveEPFForm} className="flex items-center gap-2">
+                  {/* Action Buttons */}
+                  <div className="flex gap-4 justify-end pt-4 border-t">
+                    <Button onClick={handleSaveEPFForm} className="flex items-center gap-2" disabled={isSavingEPF}>
+                      {isSavingEPF ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
                         <Save className="h-4 w-4" />
-                        Save EPF Form
-                      </Button>
-                      <Button onClick={handlePrintEPFForm} variant="outline" className="flex items-center gap-2">
-                        <Download className="h-4 w-4" />
-                        Print Form
-                      </Button>
-                    </div>
-                    <Button variant="outline" onClick={() => setActiveTab("onboarding")}>
-                      Back to Onboarding
+                      )}
+                      {isSavingEPF ? "Saving..." : "Save Form"}
+                    </Button>
+                    <Button onClick={handlePrintEPFForm} variant="outline" className="flex items-center gap-2">
+                      <Download className="h-4 w-4" />
+                      Print Form
                     </Button>
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { DashboardSidebar } from "@/components/shared/DashboardSidebar"; // Add this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -965,9 +966,21 @@ const StatsCards = ({ refreshTrigger }: { refreshTrigger: number }) => {
 const UsersRolesManagement = () => {
   const [activeTab, setActiveTab] = useState("admins");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // Add state for mobile sidebar
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const refreshData = () => {
     setRefreshTrigger(prev => prev + 1);
+  };
+
+  // Handler for menu button click
+  const handleMenuClick = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
+  // Close sidebar when clicking outside or on navigation
+  const handleMobileClose = () => {
+    setMobileSidebarOpen(false);
   };
 
   return (
@@ -995,8 +1008,17 @@ const UsersRolesManagement = () => {
             </div>
           }
           subtitle="Manage your team with precision and elegance"
+          onMenuClick={handleMenuClick} // Pass the handler to DashboardHeader
         />
       </motion.div>
+      
+      {/* Mobile Sidebar - Only shown when open */}
+      {mobileSidebarOpen && (
+        <DashboardSidebar 
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={handleMobileClose}
+        />
+      )}
       
       <motion.div 
         initial={{ opacity: 0 }}

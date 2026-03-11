@@ -24,13 +24,77 @@ import {
   Settings,
   AlertTriangle,
   Loader2,
-  Save
+  Save,
+  ChevronDown,
+  ChevronUp,
+  MoreVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import userService from "@/services/userService";
 import { useRole } from "@/context/RoleContext";
 import { User as UserType } from "@/types/user";
+
+// Mobile responsive profile card
+const MobileProfileCard = ({
+  title,
+  icon: Icon,
+  children,
+  defaultExpanded = false
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  return (
+    <Card className="mb-4 overflow-hidden">
+      <CardHeader 
+        className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Icon className="h-5 w-5 text-primary" />
+            </div>
+            <CardTitle className="text-base">{title}</CardTitle>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="p-4 pt-0 border-t">
+          {children}
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+// Mobile responsive info row
+const InfoRow = ({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) => (
+  <div className="flex items-start gap-3 py-2 border-b last:border-0">
+    <div className="p-2 bg-muted rounded-lg">
+      <Icon className="h-4 w-4 text-muted-foreground" />
+    </div>
+    <div className="flex-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium">{value || 'Not provided'}</p>
+    </div>
+  </div>
+);
 
 // Create a type for the user from the service
 type ServiceUser = ReturnType<typeof userService.getAllUsers> extends Promise<infer R> 
@@ -40,10 +104,15 @@ type ServiceUser = ReturnType<typeof userService.getAllUsers> extends Promise<in
   : never;
 
 const ManagerProfile = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const { user: authUser, isAuthenticated } = useRole();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState('profile');
   
   const [formData, setFormData] = useState({
     name: "",
@@ -53,6 +122,18 @@ const ManagerProfile = () => {
     site: "",
   });
 
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   useEffect(() => {
     if (authUser && isAuthenticated) {
       fetchCurrentUser();
@@ -61,87 +142,87 @@ const ManagerProfile = () => {
     }
   }, [authUser, isAuthenticated]);
 
-const fetchCurrentUser = async () => {
-  try {
-    setLoading(true);
-    
-    const userId = authUser?._id || authUser?.id;
-    
-    if (!userId) {
-      throw new Error("No user ID found in auth context");
-    }
-    
-    // Use getAllUsers and find the current user
-    const allUsersResponse = await userService.getAllUsers();
-    const foundUser = allUsersResponse.allUsers.find(user => 
-      user._id === userId || user.id === userId
-    ) as ServiceUser | undefined;
-    
-    if (foundUser) {
-      // Convert service user type to app user type
-      const userData: UserType = {
-        _id: foundUser._id,
-        id: foundUser.id,
-        username: foundUser.username,
-        email: foundUser.email,
-        name: foundUser.name,
-        firstName: foundUser.firstName,
-        lastName: foundUser.lastName,
-        // Map role from service to app type
-        role: (foundUser.role === "superadmin" ? "super_admin" : foundUser.role) as any,
-        department: foundUser.department,
-        site: foundUser.site,
-        phone: foundUser.phone,
-        isActive: foundUser.isActive,
-        joinDate: foundUser.joinDate,
-        createdAt: foundUser.createdAt,
-        updatedAt: foundUser.updatedAt,
-        status: "active"
-      };
+  const fetchCurrentUser = async () => {
+    try {
+      setLoading(true);
       
-      setCurrentUser(userData);
-      setFormData({
-        name: foundUser.name || "",
-        email: foundUser.email || "",
-        phone: foundUser.phone || "",
-        department: foundUser.department || "",
-        site: foundUser.site || "",
-      });
-    } else {
-      // Fallback to localStorage
-      const storedUser = localStorage.getItem('sk_user');
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser) as UserType;
-        setCurrentUser(parsedUser);
-        setFormData({
-          name: parsedUser.name || "",
-          email: parsedUser.email || "",
-          phone: parsedUser.phone || "",
-          department: parsedUser.department || "",
-          site: parsedUser.site || "",
-        });
-        toast.warning("Using cached user data");
-      } else {
-        throw new Error("User not found");
+      const userId = authUser?._id || authUser?.id;
+      
+      if (!userId) {
+        throw new Error("No user ID found in auth context");
       }
+      
+      // Use getAllUsers and find the current user
+      const allUsersResponse = await userService.getAllUsers();
+      const foundUser = allUsersResponse.allUsers.find(user => 
+        user._id === userId || user.id === userId
+      ) as ServiceUser | undefined;
+      
+      if (foundUser) {
+        // Convert service user type to app user type
+        const userData: UserType = {
+          _id: foundUser._id,
+          id: foundUser.id,
+          username: foundUser.username,
+          email: foundUser.email,
+          name: foundUser.name,
+          firstName: foundUser.firstName,
+          lastName: foundUser.lastName,
+          // Map role from service to app type
+          role: (foundUser.role === "superadmin" ? "super_admin" : foundUser.role) as any,
+          department: foundUser.department,
+          site: foundUser.site,
+          phone: foundUser.phone,
+          isActive: foundUser.isActive,
+          joinDate: foundUser.joinDate,
+          createdAt: foundUser.createdAt,
+          updatedAt: foundUser.updatedAt,
+          status: "active"
+        };
+        
+        setCurrentUser(userData);
+        setFormData({
+          name: foundUser.name || "",
+          email: foundUser.email || "",
+          phone: foundUser.phone || "",
+          department: foundUser.department || "",
+          site: foundUser.site || "",
+        });
+      } else {
+        // Fallback to localStorage
+        const storedUser = localStorage.getItem('sk_user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser) as UserType;
+          setCurrentUser(parsedUser);
+          setFormData({
+            name: parsedUser.name || "",
+            email: parsedUser.email || "",
+            phone: parsedUser.phone || "",
+            department: parsedUser.department || "",
+            site: parsedUser.site || "",
+          });
+          toast.warning("Using cached user data");
+        } else {
+          throw new Error("User not found");
+        }
+      }
+      
+    } catch (error: any) {
+      console.error("Error fetching user:", error);
+      toast.error("Failed to load user data");
+      
+      // Set default values if fetch fails
+      setFormData({
+        name: "Manager User",
+        email: "manager@sk.com",
+        phone: "+1 234 567 8901",
+        department: "Operations",
+        site: "Main Office",
+      });
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (error: any) {
-    console.error("Error fetching user:", error);
-    toast.error("Failed to load user data");
-    
-    // Set default values if fetch fails
-    setFormData({
-      name: "Manager User",
-      email: "manager@sk.com",
-      phone: "+1 234 567 8901",
-      department: "Operations",
-      site: "Main Office",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,16 +341,20 @@ const fetchCurrentUser = async () => {
   if (!isAuthenticated && !loading) {
     return (
       <div className="min-h-screen bg-background">
-        <DashboardHeader title="My Profile" subtitle="Manage your account settings" />
-        <div className="p-6 max-w-4xl mx-auto">
+        <DashboardHeader 
+          title="My Profile" 
+          subtitle="Manage your account settings"
+          onMenuClick={onMenuClick}
+        />
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
           <Card>
-            <CardContent className="p-8 text-center">
-              <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
+            <CardContent className="p-6 md:p-8 text-center">
+              <AlertTriangle className="h-12 w-12 md:h-16 md:w-16 mx-auto text-yellow-500 mb-4" />
               <h2 className="text-xl font-bold mb-2">Authentication Required</h2>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-sm md:text-base text-muted-foreground mb-4">
                 Please log in to view your profile.
               </p>
-              <Button onClick={() => window.location.href = '/login'}>
+              <Button onClick={() => window.location.href = '/login'} className="w-full md:w-auto">
                 Go to Login
               </Button>
             </CardContent>
@@ -282,11 +367,15 @@ const fetchCurrentUser = async () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <DashboardHeader title="My Profile" subtitle="Manage your account settings" />
-        <div className="p-6 max-w-4xl mx-auto">
+        <DashboardHeader 
+          title="My Profile" 
+          subtitle="Manage your account settings"
+          onMenuClick={onMenuClick}
+        />
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-3 text-muted-foreground">Loading profile...</p>
+            <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+            <p className="ml-3 text-sm md:text-base text-muted-foreground">Loading profile...</p>
           </div>
         </div>
       </div>
@@ -297,51 +386,54 @@ const fetchCurrentUser = async () => {
     <div className="min-h-screen bg-background">
       <DashboardHeader 
         title="My Profile" 
-        subtitle="Manage your account settings and preferences" 
+        subtitle="Manage your account settings and preferences"
+        onMenuClick={onMenuClick}
       />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="p-6 max-w-6xl mx-auto space-y-6"
+        className="p-4 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6"
       >
-        {/* User Header Card */}
+        {/* User Header Card - Mobile Optimized */}
         <Card className="border shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
-                <AvatarFallback className="text-2xl bg-gradient-to-br from-primary to-primary/70 text-white">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Avatar className="h-16 w-16 md:h-20 md:w-20 border-4 border-background shadow-lg mx-auto sm:mx-0">
+                <AvatarFallback className="text-xl md:text-2xl bg-gradient-to-br from-primary to-primary/70 text-white">
                   {getInitials(formData.name)}
                 </AvatarFallback>
               </Avatar>
               
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold">{formData.name}</h1>
+              <div className="text-center sm:text-left flex-1">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
+                  <h1 className="text-xl md:text-2xl font-bold">{formData.name}</h1>
                   <Badge variant={getRoleColor(currentUser?.role || '')}>
                     <Shield className="h-3 w-3 mr-1" />
                     {(currentUser?.role?.toUpperCase() || 'MANAGER').replace('_', ' ')}
                   </Badge>
                   <Badge variant={currentUser?.isActive ? 'default' : 'secondary'}>
                     {getStatusIcon(currentUser?.isActive || false)}
-                    <span className="ml-1 capitalize">
+                    <span className="ml-1 capitalize hidden sm:inline">
                       {currentUser?.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </Badge>
                 </div>
-                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    {formData.email}
+                
+                {/* Mobile Info Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-center sm:justify-start gap-1">
+                    <Mail className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{formData.email}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Building2 className="h-3 w-3" />
-                    {formData.department || 'No department'}
+                  <div className="flex items-center justify-center sm:justify-start gap-1">
+                    <Building2 className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{formData.department || 'No department'}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {formData.site || 'No site'}
+                  <div className="flex items-center justify-center sm:justify-start gap-1">
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{formData.site || 'No site'}</span>
                   </div>
                 </div>
               </div>
@@ -349,104 +441,117 @@ const fetchCurrentUser = async () => {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="profile" className="gap-2">
-              <UserIcon className="h-4 w-4" />
-              Profile Information
-            </TabsTrigger>
-            <TabsTrigger value="account" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Account Details
-            </TabsTrigger>
-          </TabsList>
+        {/* Mobile View - Collapsible Cards */}
+        {isMobileView ? (
+          <div className="space-y-4">
+            {/* Tab Selector for Mobile */}
+            <div className="flex items-center bg-muted rounded-lg p-1">
+              <Button
+                type="button"
+                variant={activeMobileTab === 'profile' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveMobileTab('profile')}
+                className="flex-1"
+              >
+                <UserIcon className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
+              <Button
+                type="button"
+                variant={activeMobileTab === 'account' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveMobileTab('account')}
+                className="flex-1"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Account
+              </Button>
+            </div>
 
-          {/* Profile Tab */}
-          <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
-                  Update your personal details and contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleProfileSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <Label htmlFor="name" className="flex items-center gap-2">
+            {/* Profile Information Card */}
+            {activeMobileTab === 'profile' && (
+              <MobileProfileCard title="Personal Information" icon={User} defaultExpanded={true}>
+                <form onSubmit={handleProfileSubmit} className="space-y-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name-mobile" className="flex items-center gap-2">
                         <User className="h-4 w-4" />
                         Full Name
                       </Label>
                       <Input 
-                        id="name" 
+                        id="name-mobile" 
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
                         placeholder="Enter your full name"
                         required
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="email" className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="email-mobile" className="flex items-center gap-2">
                         <Mail className="h-4 w-4" />
                         Email Address
                       </Label>
                       <Input 
-                        id="email" 
+                        id="email-mobile" 
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         placeholder="Enter your email"
                         required
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="phone" className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-mobile" className="flex items-center gap-2">
                         <Phone className="h-4 w-4" />
                         Phone Number
                       </Label>
                       <Input 
-                        id="phone" 
+                        id="phone-mobile" 
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         placeholder="Enter your phone number"
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="department" className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="department-mobile" className="flex items-center gap-2">
                         <Building2 className="h-4 w-4" />
                         Department
                       </Label>
                       <Input 
-                        id="department" 
+                        id="department-mobile" 
                         value={formData.department}
                         onChange={(e) => handleInputChange('department', e.target.value)}
                         placeholder="Enter your department"
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <Label htmlFor="site" className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="site-mobile" className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
                         Site/Location
                       </Label>
                       <Input 
-                        id="site" 
+                        id="site-mobile" 
                         value={formData.site}
                         onChange={(e) => handleInputChange('site', e.target.value)}
                         placeholder="Enter your site location"
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
                         Member Since
                       </Label>
-                      <div className="px-3 py-2 border rounded-md bg-muted/50">
+                      <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm">
                         {formatDate(currentUser?.joinDate || '')}
                       </div>
                     </div>
@@ -454,82 +559,254 @@ const fetchCurrentUser = async () => {
 
                   <Separator />
 
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={saving}>
-                      {saving ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <Button type="submit" disabled={saving} className="w-full h-10">
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
                 </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </MobileProfileCard>
+            )}
 
-          {/* Account Tab */}
-          <TabsContent value="account">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Details</CardTitle>
-                <CardDescription>
-                  Your account information and metadata
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">User ID</Label>
-                  <div className="font-mono text-sm bg-muted p-2 rounded">
-                    {currentUser?._id || 'N/A'}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+            {/* Account Details Card */}
+            {activeMobileTab === 'account' && (
+              <MobileProfileCard title="Account Details" icon={Settings} defaultExpanded={true}>
+                <div className="space-y-4">
                   <div>
-                    <Label className="text-muted-foreground">Role</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={getRoleColor(currentUser?.role || '')}>
-                        {(currentUser?.role?.toUpperCase() || 'MANAGER').replace('_', ' ')}
-                      </Badge>
+                    <Label className="text-xs text-muted-foreground">User ID</Label>
+                    <div className="font-mono text-xs bg-muted p-3 rounded mt-1 break-all">
+                      {currentUser?._id || 'N/A'}
                     </div>
                   </div>
                   
-                  <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      {getStatusIcon(currentUser?.isActive || false)}
-                      <span className="capitalize">
-                        {currentUser?.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Role</Label>
+                      <div className="mt-1">
+                        <Badge variant={getRoleColor(currentUser?.role || '')} className="text-xs">
+                          {(currentUser?.role?.toUpperCase() || 'MANAGER').replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Status</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        {getStatusIcon(currentUser?.isActive || false)}
+                        <span className="text-sm capitalize">
+                          {currentUser?.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  
+                  <InfoRow 
+                    label="Join Date" 
+                    value={formatDate(currentUser?.joinDate || '')}
+                    icon={Calendar}
+                  />
+                  
+                  <InfoRow 
+                    label="Last Updated" 
+                    value="Just now"
+                    icon={Clock}
+                  />
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">Join Date</Label>
-                    <p className="font-medium">{formatDate(currentUser?.joinDate || '')}</p>
+              </MobileProfileCard>
+            )}
+          </div>
+        ) : (
+          /* Desktop View - Tabs */
+          <Tabs defaultValue="profile" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="profile" className="gap-2">
+                <UserIcon className="h-4 w-4" />
+                Profile Information
+              </TabsTrigger>
+              <TabsTrigger value="account" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Account Details
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Profile Tab - Desktop */}
+            <TabsContent value="profile">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Personal Information</CardTitle>
+                  <CardDescription>
+                    Update your personal details and contact information
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleProfileSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="name-desktop" className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Full Name
+                        </Label>
+                        <Input 
+                          id="name-desktop" 
+                          value={formData.name}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
+                          placeholder="Enter your full name"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label htmlFor="email-desktop" className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          Email Address
+                        </Label>
+                        <Input 
+                          id="email-desktop" 
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          placeholder="Enter your email"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label htmlFor="phone-desktop" className="flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          Phone Number
+                        </Label>
+                        <Input 
+                          id="phone-desktop" 
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange('phone', e.target.value)}
+                          placeholder="Enter your phone number"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label htmlFor="department-desktop" className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          Department
+                        </Label>
+                        <Input 
+                          id="department-desktop" 
+                          value={formData.department}
+                          onChange={(e) => handleInputChange('department', e.target.value)}
+                          placeholder="Enter your department"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label htmlFor="site-desktop" className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          Site/Location
+                        </Label>
+                        <Input 
+                          id="site-desktop" 
+                          value={formData.site}
+                          onChange={(e) => handleInputChange('site', e.target.value)}
+                          placeholder="Enter your site location"
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Member Since
+                        </Label>
+                        <div className="px-3 py-2 border rounded-md bg-muted/50">
+                          {formatDate(currentUser?.joinDate || '')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={saving}>
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Account Tab - Desktop */}
+            <TabsContent value="account">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Details</CardTitle>
+                  <CardDescription>
+                    Your account information and metadata
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">User ID</Label>
+                    <div className="font-mono text-sm bg-muted p-2 rounded break-all">
+                      {currentUser?._id || 'N/A'}
+                    </div>
                   </div>
                   
-                  <div>
-                    <Label className="text-muted-foreground">Last Updated</Label>
-                    <p className="font-medium">
-                      <Clock className="inline h-3 w-3 mr-1" />
-                      Just now
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground">Role</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant={getRoleColor(currentUser?.role || '')}>
+                          {(currentUser?.role?.toUpperCase() || 'MANAGER').replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-muted-foreground">Status</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        {getStatusIcon(currentUser?.isActive || false)}
+                        <span className="capitalize">
+                          {currentUser?.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-muted-foreground">Join Date</Label>
+                      <p className="font-medium">{formatDate(currentUser?.joinDate || '')}</p>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-muted-foreground">Last Updated</Label>
+                      <p className="font-medium">
+                        <Clock className="inline h-3 w-3 mr-1" />
+                        Just now
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </motion.div>
     </div>
   );

@@ -55,7 +55,7 @@ import taskService, { Task } from "@/services/TaskService";
 import { siteService, Site } from "@/services/SiteService";
 
 // API Base URL
-const API_URL = import.meta.env.VITE_API_URL || `http://localhost:5001/api`;
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5001/api`;
 
 // Interface for Attendance Record (My Attendance)
 interface MyAttendanceRecord {

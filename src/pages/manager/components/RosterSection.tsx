@@ -160,72 +160,76 @@ const RosterSection = () => {
 
   // Daily Roster Table Component
   const DailyRosterTable = ({ roster, onDelete }: { roster: RosterEntry[], onDelete: (id: string) => void }) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Sr. No.</TableHead>
-          <TableHead>Employee Name</TableHead>
-          <TableHead>Employee ID</TableHead>
-          <TableHead>Department</TableHead>
-          <TableHead>Designation</TableHead>
-          <TableHead>Shift Timing</TableHead>
-          <TableHead>Assigned Task</TableHead>
-          <TableHead>Hours</TableHead>
-          <TableHead>Remarks</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {roster.length === 0 ? (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-              <div className="flex flex-col items-center gap-2">
-                <Calendar className="h-8 w-8" />
-                <div>No roster entries found for selected period</div>
-              </div>
-            </TableCell>
+            <TableHead className="whitespace-nowrap">Sr. No.</TableHead>
+            <TableHead className="whitespace-nowrap">Employee Name</TableHead>
+            <TableHead className="whitespace-nowrap">Employee ID</TableHead>
+            <TableHead className="whitespace-nowrap">Department</TableHead>
+            <TableHead className="whitespace-nowrap">Designation</TableHead>
+            <TableHead className="whitespace-nowrap">Shift Timing</TableHead>
+            <TableHead className="whitespace-nowrap">Assigned Task</TableHead>
+            <TableHead className="whitespace-nowrap">Hours</TableHead>
+            <TableHead className="whitespace-nowrap">Remarks</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
           </TableRow>
-        ) : (
-          roster.map((entry, index) => (
-            <TableRow key={entry.id}>
-              <TableCell className="font-medium">{index + 1}</TableCell>
-              <TableCell>{entry.employeeName}</TableCell>
-              <TableCell>{entry.employeeId}</TableCell>
-              <TableCell>{entry.department}</TableCell>
-              <TableCell>{entry.designation}</TableCell>
-              <TableCell>{entry.shiftTiming}</TableCell>
-              <TableCell>{entry.assignedTask}</TableCell>
-              <TableCell>
-                <Badge variant="outline" className="font-mono">
-                  {entry.hours}h
-                </Badge>
-              </TableCell>
-              <TableCell className="max-w-[200px] truncate" title={entry.remark}>
-                {entry.remark}
-              </TableCell>
-              <TableCell>
-                <div className="flex justify-end gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => toast.info("Edit functionality coming soon")}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    onClick={() => onDelete(entry.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+        </TableHeader>
+        <TableBody>
+          {roster.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <Calendar className="h-8 w-8" />
+                  <div>No roster entries found for selected period</div>
                 </div>
               </TableCell>
             </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+          ) : (
+            roster.map((entry, index) => (
+              <TableRow key={entry.id}>
+                <TableCell className="font-medium whitespace-nowrap">{index + 1}</TableCell>
+                <TableCell className="whitespace-nowrap">{entry.employeeName}</TableCell>
+                <TableCell className="whitespace-nowrap">{entry.employeeId}</TableCell>
+                <TableCell className="whitespace-nowrap">{entry.department}</TableCell>
+                <TableCell className="whitespace-nowrap">{entry.designation}</TableCell>
+                <TableCell className="whitespace-nowrap">{entry.shiftTiming}</TableCell>
+                <TableCell className="whitespace-nowrap max-w-[200px] truncate" title={entry.assignedTask}>
+                  {entry.assignedTask}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <Badge variant="outline" className="font-mono">
+                    {entry.hours}h
+                  </Badge>
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate whitespace-nowrap" title={entry.remark}>
+                  {entry.remark || "-"}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-2 whitespace-nowrap">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => toast.info("Edit functionality coming soon")}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => onDelete(entry.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 
   // Calendar View for Monthly Roster
@@ -256,53 +260,105 @@ const RosterSection = () => {
 
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-7 gap-1 text-center text-sm font-medium">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
-            <div key={day} className="py-2 bg-muted rounded-t">{day}</div>
-          ))}
+        {/* Desktop Calendar Grid */}
+        <div className="hidden md:block">
+          <div className="grid grid-cols-7 gap-1 text-center text-sm font-medium">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+              <div key={day} className="py-2 bg-muted rounded-t">{day}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {allDays.map((day, index) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const dayEntries = groupedRoster[dateStr] || [];
+              const totalHours = totalHoursByDate[dateStr] || 0;
+              const isCurrentMonth = isSameMonth(day, startDate);
+              
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "min-h-[120px] border rounded p-2 text-sm transition-colors",
+                    isCurrentMonth ? "bg-background" : "bg-muted/50",
+                    isSameDay(day, new Date()) && "border-primary border-2"
+                  )}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <span className={cn(
+                      "font-semibold",
+                      !isCurrentMonth && "text-muted-foreground",
+                      isSameDay(day, new Date()) && "text-primary"
+                    )}>
+                      {format(day, "d")}
+                    </span>
+                    {totalHours > 0 && (
+                      <Badge variant="secondary" className="h-5">
+                        {totalHours}h
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1 max-h-[70px] overflow-y-auto">
+                    {dayEntries.slice(0, 3).map(entry => (
+                      <div key={entry.id} className="text-xs p-1 bg-secondary rounded truncate">
+                        {entry.employeeName.split(' ')[0]}: {entry.shift}
+                      </div>
+                    ))}
+                    {dayEntries.length > 3 && (
+                      <div className="text-xs text-muted-foreground text-center">
+                        +{dayEntries.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {allDays.map((day, index) => {
+
+        {/* Mobile Calendar List View */}
+        <div className="md:hidden space-y-2">
+          {monthDays.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const dayEntries = groupedRoster[dateStr] || [];
             const totalHours = totalHoursByDate[dateStr] || 0;
-            const isCurrentMonth = isSameMonth(day, startDate);
             
             return (
               <div
-                key={index}
+                key={dateStr}
                 className={cn(
-                  "min-h-32 border rounded p-2 text-sm transition-colors",
-                  isCurrentMonth ? "bg-background" : "bg-muted/50",
-                  isSameDay(day, new Date()) && "border-primary border-2"
+                  "border rounded-lg p-3",
+                  isSameDay(day, new Date()) && "border-primary"
                 )}
               >
-                <div className="flex justify-between items-center mb-1">
-                  <span className={cn(
-                    "font-semibold",
-                    !isCurrentMonth && "text-muted-foreground",
-                    isSameDay(day, new Date()) && "text-primary"
-                  )}>
-                    {format(day, "d")}
-                  </span>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="font-semibold">
+                    {format(day, "EEEE, MMM d")}
+                  </div>
                   {totalHours > 0 && (
-                    <Badge variant="secondary" className="h-5">
-                      {totalHours}h
-                    </Badge>
+                    <Badge variant="secondary">{totalHours} hours</Badge>
                   )}
                 </div>
-                <div className="space-y-1 max-h-20 overflow-y-auto">
-                  {dayEntries.slice(0, 3).map(entry => (
-                    <div key={entry.id} className="text-xs p-1 bg-secondary rounded truncate">
-                      {entry.employeeName.split(' ')[0]}: {entry.shift}
-                    </div>
-                  ))}
-                  {dayEntries.length > 3 && (
-                    <div className="text-xs text-muted-foreground text-center">
-                      +{dayEntries.length - 3} more
-                    </div>
-                  )}
-                </div>
+                {dayEntries.length > 0 ? (
+                  <div className="space-y-2">
+                    {dayEntries.map(entry => (
+                      <div key={entry.id} className="text-sm p-2 bg-secondary rounded">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium">{entry.employeeName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {entry.shiftTiming} • {entry.assignedTask}
+                            </div>
+                          </div>
+                          <Badge variant="outline">{entry.hours}h</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-2">
+                    No entries
+                  </div>
+                )}
               </div>
             );
           })}
@@ -312,44 +368,48 @@ const RosterSection = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Calendar className="h-6 w-6" />
-              Roster Management
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="text-lg sm:text-xl">Roster Management</span>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportReport}>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={handleExportReport} className="flex-1 sm:flex-initial">
                 <Download className="mr-2 h-4 w-4" />
-                Export Report
+                <span className="hidden sm:inline">Export Report</span>
+                <span className="sm:hidden">Export</span>
               </Button>
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           {/* Roster Type Selection */}
-          <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
             {rosterTypes.map((type) => (
               <Button
                 key={type}
                 variant={selectedRoster === type ? "default" : "outline"}
                 onClick={() => setSelectedRoster(type)}
-                className="capitalize"
+                className="capitalize text-xs sm:text-sm flex-1 sm:flex-initial"
+                size="sm"
               >
-                {type} Roster
+                <span className="hidden xs:inline">{type}</span>
+                <span className="xs:hidden">{type.slice(0,3)}</span>
               </Button>
             ))}
           </div>
 
           {/* Date Navigation */}
-          <div className="flex items-center justify-between mb-6 p-4 bg-muted rounded-lg">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-muted rounded-lg">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => navigateDate("prev")}
+                className="h-8 w-8 sm:h-9 sm:w-9"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -358,36 +418,38 @@ const RosterSection = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[240px] justify-start text-left font-normal"
+                    className="flex-1 sm:w-[240px] justify-start text-left font-normal text-sm"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.label}
+                    <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{dateRange.label}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto p-0" align="start">
                   <div className="p-3">
                     <div className="flex justify-between items-center mb-4">
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => setSelectedDate(subMonths(selectedDate, 1))}
+                        className="h-7 w-7"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <div className="font-semibold">
+                      <div className="font-semibold text-sm">
                         {format(selectedDate, "MMMM yyyy")}
                       </div>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => setSelectedDate(addMonths(selectedDate, 1))}
+                        className="h-7 w-7"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
                     <div className="grid grid-cols-7 gap-1">
                       {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
-                        <div key={i} className="text-center text-xs font-medium">
+                        <div key={i} className="text-center text-xs font-medium w-7">
                           {day}
                         </div>
                       ))}
@@ -404,7 +466,7 @@ const RosterSection = () => {
                             variant={isSelected ? "default" : "ghost"}
                             size="sm"
                             className={cn(
-                              "h-8 w-8 p-0",
+                              "h-7 w-7 p-0 text-xs",
                               !isCurrentMonth && "text-muted-foreground opacity-50"
                             )}
                             onClick={() => setSelectedDate(day)}
@@ -422,12 +484,13 @@ const RosterSection = () => {
                 variant="outline"
                 size="icon"
                 onClick={() => navigateDate("next")}
+                className="h-8 w-8 sm:h-9 sm:w-9"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
             
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground w-full sm:w-auto text-left sm:text-right">
               {selectedRoster === "daily" && "Daily View"}
               {selectedRoster === "weekly" && "Weekly View"}
               {selectedRoster === "fortnightly" && "15 Days View"}
@@ -436,31 +499,31 @@ const RosterSection = () => {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Entries</CardTitle>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Total Entries</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{filteredRoster.length}</div>
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="text-xl sm:text-2xl font-bold">{filteredRoster.length}</div>
               </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Total Hours</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="text-xl sm:text-2xl font-bold text-primary">
                   {filteredRoster.reduce((sum, entry) => sum + entry.hours, 0)}h
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Unique Employees</CardTitle>
+              <CardHeader className="p-3 sm:p-4 pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Unique Employees</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="text-xl sm:text-2xl font-bold text-green-600">
                   {new Set(filteredRoster.map(entry => entry.employeeId)).size}
                 </div>
               </CardContent>
@@ -468,20 +531,20 @@ const RosterSection = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-4 mb-6">
+          <div className="flex flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6">
             <Dialog open={addEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Entry
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="w-[95vw] sm:w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle>Add Roster Entry - {selectedRoster.toUpperCase()} ROSTER</DialogTitle>
+                  <DialogTitle className="text-base sm:text-lg">Add Roster Entry - {selectedRoster.toUpperCase()} ROSTER</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleAddRosterEntry} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <FormField label="Date" id="date" required>
                       <Input 
                         id="date" 
@@ -489,11 +552,12 @@ const RosterSection = () => {
                         type="date" 
                         defaultValue={format(selectedDate, "yyyy-MM-dd")}
                         required 
+                        className="w-full"
                       />
                     </FormField>
                     <FormField label="Site / Client" id="siteClient" required>
                       <Select name="siteClient" required>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select site/client" />
                         </SelectTrigger>
                         <SelectContent>
@@ -507,7 +571,7 @@ const RosterSection = () => {
                     </FormField>
                     <FormField label="Supervisor" id="supervisor" required>
                       <Select name="supervisor" required>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select supervisor" />
                         </SelectTrigger>
                         <SelectContent>
@@ -521,7 +585,7 @@ const RosterSection = () => {
                     </FormField>
                     <FormField label="Employee" id="employee" required>
                       <Select name="employee" required>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select employee" />
                         </SelectTrigger>
                         <SelectContent>
@@ -535,7 +599,7 @@ const RosterSection = () => {
                     </FormField>
                     <FormField label="Department" id="department" required>
                       <Select name="department" required>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -555,11 +619,12 @@ const RosterSection = () => {
                         name="designation" 
                         placeholder="Enter designation"
                         required 
+                        className="w-full"
                       />
                     </FormField>
                     <FormField label="Shift" id="shift" required>
                       <Select name="shift" required>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select shift" />
                         </SelectTrigger>
                         <SelectContent>
@@ -576,6 +641,7 @@ const RosterSection = () => {
                         name="shiftTiming" 
                         placeholder="e.g., 09:00-17:00" 
                         required 
+                        className="w-full"
                       />
                     </FormField>
                     <FormField label="Assigned Task" id="assignedTask" required>
@@ -584,6 +650,7 @@ const RosterSection = () => {
                         name="assignedTask" 
                         placeholder="Enter assigned task" 
                         required 
+                        className="w-full"
                       />
                     </FormField>
                     <FormField label="Hours" id="hours" required>
@@ -596,11 +663,12 @@ const RosterSection = () => {
                         max="24"
                         step="0.5"
                         required 
+                        className="w-full"
                       />
                     </FormField>
                   </div>
                   <FormField label="Remark" id="remark">
-                    <Textarea id="remark" name="remark" placeholder="Enter any remarks or notes" />
+                    <Textarea id="remark" name="remark" placeholder="Enter any remarks or notes" className="w-full" />
                   </FormField>
                   <Button type="submit" className="w-full">Add Entry</Button>
                 </form>

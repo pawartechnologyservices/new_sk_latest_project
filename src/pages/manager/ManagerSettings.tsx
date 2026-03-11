@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { Save, User, Lock, Shield, Loader2, LogIn, Key, AlertCircle, Eye, EyeOff, Bug, Database } from "lucide-react";
+import { Save, User, Lock, Shield, Loader2, LogIn, Key, AlertCircle, Eye, EyeOff, Bug, Database, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -73,7 +74,15 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
   return response;
 };
 
+// Define the context type
+type LayoutContext = {
+  onMenuClick: () => void;
+};
+
 const Settings = () => {
+  // Get the onMenuClick function from layout context
+  const { onMenuClick } = useOutletContext<LayoutContext>();
+  
   const [loading, setLoading] = useState({
     profile: false,
     password: false,
@@ -110,6 +119,7 @@ const Settings = () => {
   const [requestLogs, setRequestLogs] = useState<string[]>([]);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [passwordInfo, setPasswordInfo] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("profile");
 
   const addLog = (message: string) => {
     setRequestLogs(prev => [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev.slice(0, 9)]);
@@ -567,59 +577,91 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader title="Settings" />
-      
+      {/* Mobile Header with Menu Button */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b">
+        <div className="flex items-center justify-between p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMenuClick}
+            className="h-9 w-9"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold">Settings</h1>
+          <div className="w-9" /> {/* Spacer for alignment */}
+        </div>
+      </div>
+
+      {/* Main Content with responsive padding */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 sm:p-6 lg:p-6 space-y-4 sm:space-y-6 pt-20 lg:pt-6"
       >
         {/* Settings Tabs */}
         {isAuthenticated && (
-          <Tabs defaultValue="profile">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="security">Security</TabsTrigger>
-              <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          <Tabs 
+            defaultValue="profile" 
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
+              <TabsTrigger value="profile" className="text-xs sm:text-sm px-2 sm:px-3">
+                Profile
+              </TabsTrigger>
+              <TabsTrigger value="security" className="text-xs sm:text-sm px-2 sm:px-3">
+                Security
+              </TabsTrigger>
+              <TabsTrigger value="permissions" className="text-xs sm:text-sm px-2 sm:px-3">
+                Permissions
+              </TabsTrigger>
             </TabsList>
 
             {/* Profile Tab */}
             <TabsContent value="profile">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="border-0 sm:border shadow-none sm:shadow">
+                <CardHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                     <User className="h-5 w-5" /> Profile Settings
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleProfileUpdate} className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>Full Name</Label>
+                <CardContent className="px-4 sm:px-6 pb-6">
+                  <form onSubmit={handleProfileUpdate} className="space-y-4 sm:space-y-6">
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label className="text-sm sm:text-base">Full Name</Label>
                       <Input 
                         value={profileData.name}
                         onChange={(e) => setProfileData({...profileData, name: e.target.value})}
                         disabled={loading.profile}
                         placeholder="Enter your full name"
+                        className="h-9 sm:h-10 text-sm sm:text-base"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label className="text-sm sm:text-base">Email</Label>
                       <Input 
                         value={profileData.email}
                         disabled
-                        className="bg-muted"
+                        className="bg-muted h-9 sm:h-10 text-sm sm:text-base"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Phone</Label>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label className="text-sm sm:text-base">Phone</Label>
                       <Input 
                         value={profileData.phone}
                         onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
                         disabled={loading.profile}
                         placeholder="Enter phone number"
+                        className="h-9 sm:h-10 text-sm sm:text-base"
                       />
                     </div>
-                    <Button type="submit" disabled={loading.profile} className="w-full">
+                    <Button 
+                      type="submit" 
+                      disabled={loading.profile} 
+                      className="w-full h-9 sm:h-10 text-sm sm:text-base"
+                    >
                       {loading.profile ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
@@ -637,16 +679,16 @@ const Settings = () => {
 
             {/* Security Tab */}
             <TabsContent value="security">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="border-0 sm:border shadow-none sm:shadow">
+                <CardHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                     <Lock className="h-5 w-5" /> Change Password
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <form onSubmit={handlePasswordUpdate} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Current Password</Label>
+                <CardContent className="px-4 sm:px-6 pb-6">
+                  <form onSubmit={handlePasswordUpdate} className="space-y-3 sm:space-y-4">
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label className="text-sm sm:text-base">Current Password</Label>
                       <div className="relative">
                         <Input 
                           name="currentPassword" 
@@ -656,21 +698,22 @@ const Settings = () => {
                           disabled={loading.password}
                           placeholder="Enter current password"
                           required
+                          className="h-9 sm:h-10 text-sm sm:text-base pr-9"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 sm:h-8 sm:w-8"
                           onClick={() => setShowPassword({...showPassword, current: !showPassword.current})}
                         >
-                          {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showPassword.current ? <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                         </Button>
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label>New Password</Label>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label className="text-sm sm:text-base">New Password</Label>
                       <div className="relative">
                         <Input 
                           name="newPassword" 
@@ -680,21 +723,22 @@ const Settings = () => {
                           disabled={loading.password}
                           placeholder="Enter new password"
                           required
+                          className="h-9 sm:h-10 text-sm sm:text-base pr-9"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 sm:h-8 sm:w-8"
                           onClick={() => setShowPassword({...showPassword, new: !showPassword.new})}
                         >
-                          {showPassword.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showPassword.new ? <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                         </Button>
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label>Confirm Password</Label>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label className="text-sm sm:text-base">Confirm Password</Label>
                       <div className="relative">
                         <Input 
                           name="confirmPassword" 
@@ -704,21 +748,26 @@ const Settings = () => {
                           disabled={loading.password}
                           placeholder="Confirm new password"
                           required
+                          className="h-9 sm:h-10 text-sm sm:text-base pr-9"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                          className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 sm:h-8 sm:w-8"
                           onClick={() => setShowPassword({...showPassword, confirm: !showPassword.confirm})}
                         >
-                          {showPassword.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showPassword.confirm ? <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                         </Button>
                       </div>
                     </div>
                     
-                    <div className="flex space-x-2">
-                      <Button type="submit" disabled={loading.password} className="flex-1">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
+                      <Button 
+                        type="submit" 
+                        disabled={loading.password} 
+                        className="flex-1 h-9 sm:h-10 text-sm sm:text-base"
+                      >
                         {loading.password ? (
                           <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</>
                         ) : 'Update Password'}
@@ -739,6 +788,7 @@ const Settings = () => {
                           });
                           toast.info('Password fields cleared');
                         }}
+                        className="h-9 sm:h-10 text-sm sm:text-base"
                       >
                         Clear
                       </Button>
@@ -746,20 +796,20 @@ const Settings = () => {
                     
                     {/* Debug Info */}
                     {(debugInfo || passwordInfo) && (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                        <div className="text-xs">
+                      <div className="p-2 sm:p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                        <div className="text-xs sm:text-sm">
                           <p className="font-semibold mb-1">💡 Debug Information:</p>
                           {debugInfo && debugInfo.testResults.some((r: any) => r.matches) ? (
-                            <p className="text-green-600">
+                            <p className="text-green-600 text-xs sm:text-sm">
                               Matching password found! Current Password field has been auto-filled.
                             </p>
                           ) : (
-                            <p className="text-yellow-600">
+                            <p className="text-yellow-600 text-xs sm:text-sm">
                               No matching password found. Try "Reset Password" or check backend logs.
                             </p>
                           )}
                           {passwordInfo && (
-                            <p className="text-xs mt-1">
+                            <p className="text-xs sm:text-sm mt-1">
                               Hash length: {passwordInfo.passwordHashLength} chars
                             </p>
                           )}
@@ -773,17 +823,17 @@ const Settings = () => {
 
             {/* Permissions Tab */}
             <TabsContent value="permissions">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="border-0 sm:border shadow-none sm:shadow">
+                <CardHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                     <Shield className="h-5 w-5" /> Permissions
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="px-4 sm:px-6 pb-6 space-y-3 sm:space-y-4">
                   {Object.entries(permissions).map(([key, value]) => (
-                    <div key={key} className="flex justify-between items-center">
+                    <div key={key} className="flex justify-between items-center py-1">
                       <div>
-                        <Label className="capitalize">
+                        <Label className="capitalize text-sm sm:text-base">
                           {key.replace(/([A-Z])/g, ' $1').trim()}
                         </Label>
                       </div>
@@ -793,10 +843,15 @@ const Settings = () => {
                           setPermissions({...permissions, [key]: checked})
                         }
                         disabled={loading.permissions}
+                        className="scale-90 sm:scale-100"
                       />
                     </div>
                   ))}
-                  <Button onClick={handlePermissionsUpdate} disabled={loading.permissions} className="w-full">
+                  <Button 
+                    onClick={handlePermissionsUpdate} 
+                    disabled={loading.permissions} 
+                    className="w-full h-9 sm:h-10 text-sm sm:text-base mt-4"
+                  >
                     {loading.permissions ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
                     ) : 'Save Permissions'}

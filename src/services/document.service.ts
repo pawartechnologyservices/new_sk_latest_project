@@ -64,7 +64,7 @@ class DocumentService {
   async testConnection(): Promise<boolean> {
     try {
       console.log('🧪 Testing backend connection...');
-      const response = await axios.get('http://localhost:5001/health', { 
+      const response = await axios.get(`http://${window.location.hostname}:5001/health`, { 
         timeout: 5000,
         headers: {
           'Accept': 'application/json'

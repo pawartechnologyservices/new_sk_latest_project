@@ -7,6 +7,8 @@ export const createEPFForm = async (req: Request, res: Response) => {
   try {
     const formData = req.body;
     
+    console.log('Creating EPF Form with data:', formData);
+    
     if (!formData.employeeId || !formData.memberName || !formData.aadharNumber) {
       return res.status(400).json({
         success: false,
@@ -14,16 +16,42 @@ export const createEPFForm = async (req: Request, res: Response) => {
       });
     }
     
-    const employee = await Employee.findOne({ employeeId: formData.employeeId });
+    // Try to find employee by MongoDB _id first
+    let employee = null;
+    
+    // Check if employeeId is a valid MongoDB ObjectId
+    if (formData.employeeId.match(/^[0-9a-fA-F]{24}$/)) {
+      employee = await Employee.findById(formData.employeeId);
+    }
+    
+    // If not found by _id, try by employeeId field
+    if (!employee) {
+      employee = await Employee.findOne({ employeeId: formData.employeeId });
+    }
+    
+    // If still not found, try by employeeNumber
+    if (!employee && formData.employeeNumber) {
+      employee = await Employee.findOne({ employeeId: formData.employeeNumber });
+    }
     
     if (!employee) {
+      console.error('Employee not found with ID:', formData.employeeId);
       return res.status(404).json({
         success: false,
-        message: 'Employee not found'
+        message: 'Employee not found. Please check the employee ID.'
       });
     }
     
-    const existingForm = await EPFForm.findOne({ employeeId: employee.employeeId });
+    console.log('Found employee:', employee._id, employee.employeeId);
+    
+    // Check if form already exists
+    const existingForm = await EPFForm.findOne({ 
+      $or: [
+        { employeeId: employee.employeeId },
+        { employee: employee._id }
+      ]
+    });
+    
     if (existingForm) {
       return res.status(400).json({
         success: false,
@@ -31,6 +59,7 @@ export const createEPFForm = async (req: Request, res: Response) => {
       });
     }
     
+    // Create EPF Form with proper employee reference
     const epfForm = new EPFForm({
       ...formData,
       employee: employee._id,
@@ -38,6 +67,9 @@ export const createEPFForm = async (req: Request, res: Response) => {
     });
     
     await epfForm.save();
+    
+    // Populate employee details before returning
+    await epfForm.populate('employee', 'name employeeId email phone department position');
     
     res.status(201).json({
       success: true,
@@ -59,11 +91,18 @@ export const getEPFForms = async (req: Request, res: Response) => {
     const { employeeId, status } = req.query;
     
     const query: any = {};
-    if (employeeId) query.employeeId = employeeId;
+    if (employeeId) {
+      // Check if employeeId is MongoDB ObjectId
+      if (typeof employeeId === 'string' && employeeId.match(/^[0-9a-fA-F]{24}$/)) {
+        query.employee = employeeId;
+      } else {
+        query.employeeId = employeeId;
+      }
+    }
     if (status) query.status = status;
     
     const forms = await EPFForm.find(query)
-      .populate('employee', 'name employeeId email phone')
+      .populate('employee', 'name employeeId email phone department position')
       .sort({ createdAt: -1 });
     
     res.status(200).json({
@@ -129,7 +168,7 @@ export const updateEPFFormStatus = async (req: Request, res: Response) => {
       req.params.id,
       updateData,
       { new: true }
-    );
+    ).populate('employee', 'name employeeId email phone department position');
     
     if (!form) {
       return res.status(404).json({

@@ -8,15 +8,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Plus, Calendar, Download, Edit, Trash2, ChevronLeft, ChevronRight, Loader2, RefreshCw, User, UserCog, Clock, X, Check } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Calendar, Download, Edit, Trash2, ChevronLeft, ChevronRight, Loader2, RefreshCw, User, UserCog, Clock, X, Check, ChevronDown, ChevronUp, MoreVertical, Filter } from "lucide-react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addWeeks, subWeeks, addDays, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FormField } from "./sharedA";
 import { cn } from "@/lib/utils";
 import { siteService, Site } from "@/services/SiteService";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5001/api`;
 
 // Define interfaces
 interface RosterEntry {
@@ -87,6 +93,273 @@ interface Manager {
   assignedSites?: string[];
 }
 
+// Mobile responsive stat card
+const MobileStatCard = ({ title, value, icon: Icon, color = "primary" }: { 
+  title: string; 
+  value: string; 
+  icon: any; 
+  color?: string;
+}) => {
+  const colorClasses = {
+    primary: "text-primary bg-primary/10",
+    success: "text-green-600 bg-green-100",
+    warning: "text-yellow-600 bg-yellow-100",
+    danger: "text-red-600 bg-red-100"
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">{title}</p>
+            <p className="text-lg font-bold mt-1">{value}</p>
+          </div>
+          <div className={`p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
+            <Icon className="h-4 w-4" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive employee selection card
+const MobileEmployeeCard = ({ 
+  employee, 
+  selected, 
+  onToggle 
+}: { 
+  employee: Employee; 
+  selected: boolean; 
+  onToggle: (id: string) => void;
+}) => {
+  return (
+    <div
+      onClick={() => onToggle(employee._id)}
+      className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${
+        selected ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`flex items-center justify-center h-5 w-5 rounded border ${
+          selected ? 'bg-primary border-primary' : 'border-gray-300'
+        }`}>
+          {selected && <Check className="h-3 w-3 text-primary-foreground" />}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-sm">{employee.name}</h4>
+            <Badge variant="outline" className="text-xs">
+              {employee.employeeId}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{employee.position}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Mobile responsive roster entry card
+const MobileRosterCard = ({ 
+  entry, 
+  onEdit, 
+  onDelete,
+  tasks,
+  sites,
+  supervisors,
+  managers,
+  index
+}: { 
+  entry: RosterEntry; 
+  onEdit: (entry: RosterEntry) => void;
+  onDelete: (id: string) => void;
+  tasks: Task[];
+  sites: Site[];
+  supervisors: Supervisor[];
+  managers: Manager[];
+  index: number;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-primary/10">
+              #{index + 1}
+            </Badge>
+            <h3 className="font-semibold text-base">{entry.employeeName}</h3>
+          </div>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(entry)}>
+                  <Edit className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(entry.id || entry._id)} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Employee ID</p>
+            <p className="text-sm font-medium">{entry.employeeId}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Shift</p>
+            <p className="text-sm font-medium">{entry.shift}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{entry.date}</span>
+          </div>
+          <Badge variant="outline" className="bg-green-50">
+            {entry.hours}h
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="truncate max-w-[150px]">{entry.siteClient}</span>
+          <span>•</span>
+          <span>{entry.shiftTiming}</span>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Department</p>
+                <p className="text-sm">{entry.department}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Designation</p>
+                <p className="text-sm">{entry.designation}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Supervisor</p>
+                <p className="text-sm">{entry.supervisor}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Manager</p>
+                <p className="text-sm">{entry.manager}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground">Assigned Task</p>
+                <p className="text-sm">{entry.assignedTask}</p>
+              </div>
+              {entry.remark && (
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Remarks</p>
+                  <p className="text-sm">{entry.remark}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive calendar day
+const MobileCalendarDay = ({ 
+  day, 
+  dateStr, 
+  entries, 
+  totalHours, 
+  isCurrentMonth, 
+  isToday,
+  onDayClick 
+}: { 
+  day: Date; 
+  dateStr: string; 
+  entries: RosterEntry[]; 
+  totalHours: number; 
+  isCurrentMonth: boolean; 
+  isToday: boolean;
+  onDayClick: (date: Date) => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      onClick={() => onDayClick(day)}
+      className={cn(
+        "border rounded p-2 text-sm transition-colors cursor-pointer",
+        isCurrentMonth ? "bg-background" : "bg-muted/50",
+        isToday && "border-primary border-2"
+      )}
+    >
+      <div className="flex justify-between items-center mb-1">
+        <span className={cn(
+          "font-semibold",
+          !isCurrentMonth && "text-muted-foreground",
+          isToday && "text-primary"
+        )}>
+          {format(day, "d")}
+        </span>
+        {totalHours > 0 && (
+          <Badge variant="secondary" className="h-5 text-xs">
+            {totalHours}h
+          </Badge>
+        )}
+      </div>
+      <div className="space-y-1 max-h-16 overflow-y-auto">
+        {entries.slice(0, expanded ? undefined : 2).map(entry => (
+          <div key={entry.id || entry._id} className="text-xs p-1 bg-secondary rounded truncate">
+            {entry.employeeName.split(' ')[0]}: {entry.shift}
+          </div>
+        ))}
+        {entries.length > 2 && !expanded && (
+          <div 
+            className="text-xs text-primary text-center cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(true);
+            }}
+          >
+            +{entries.length - 2} more
+          </div>
+        )}
+        {expanded && entries.length > 2 && (
+          <div 
+            className="text-xs text-primary text-center cursor-pointer mt-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(false);
+            }}
+          >
+            Show less
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const RosterSection = () => {
   const [selectedRoster, setSelectedRoster] = useState<"daily" | "weekly" | "fortnightly" | "monthly">("daily");
   const [roster, setRoster] = useState<RosterEntry[]>([]);
@@ -100,6 +373,11 @@ const RosterSection = () => {
     roster: true,
     tasks: true
   });
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showMobileStats, setShowMobileStats] = useState(false);
   
   // Date states for different roster types
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -143,6 +421,18 @@ const RosterSection = () => {
     supervisor: "",
     manager: ""
   });
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Helper to create unique values for Select
   const createUniqueValue = (type: string, item: any) => {
@@ -969,237 +1259,268 @@ const RosterSection = () => {
           </div>
         </div>
         
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Sr. No.</TableHead>
-              <TableHead>Employee Name</TableHead>
-              <TableHead>Employee ID</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Designation</TableHead>
-              <TableHead>Shift Timing</TableHead>
-              <TableHead>Assigned Task</TableHead>
-              <TableHead>Hours</TableHead>
-              <TableHead>Site/Client</TableHead>
-              <TableHead>Supervisor</TableHead>
-              <TableHead>Manager</TableHead>
-              <TableHead>Remarks</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        {isMobileView ? (
+          <div className="space-y-3">
             {loadingData.roster ? (
-              <TableRow>
-                <TableCell colSpan={13} className="text-center py-8">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading roster entries...
-                  </div>
-                </TableCell>
-              </TableRow>
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                <p className="text-sm text-muted-foreground mt-2">Loading roster entries...</p>
+              </div>
             ) : roster.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <Calendar className="h-8 w-8" />
-                    <div>No roster entries found for selected period</div>
-                    <div className="text-sm">Try changing the date or roster type</div>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No roster entries found for selected period</p>
+                <p className="text-sm text-muted-foreground mt-2">Try changing the date or roster type</p>
+              </div>
             ) : (
               roster.map((entry, index) => (
-                <TableRow key={entry.id || entry._id}>
-                  <TableCell className="font-medium">{index + 1}</TableCell>
-                  <TableCell>{entry.employeeName}</TableCell>
-                  <TableCell>{entry.employeeId}</TableCell>
-                  <TableCell>{entry.department}</TableCell>
-                  <TableCell>{entry.designation}</TableCell>
-                  <TableCell>
-                    {editingId === entry.id ? (
-                      <div className="flex gap-1 items-center">
-                        <Input
-                          value={editForm.shiftTiming || ""}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, shiftTiming: e.target.value }))}
-                          placeholder="HH:MM-HH:MM"
-                          className="w-32"
-                        />
-                      </div>
-                    ) : (
-                      entry.shiftTiming
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === entry.id ? (
-                      <Select
-                        value={editForm.assignedTask || ""}
-                        onValueChange={(value) => setEditForm(prev => ({ ...prev, assignedTask: value }))}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="Select task" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tasks
-                            .filter(task => task.siteName === entry.siteClient)
-                            .map(task => (
-                              <SelectItem key={task._id} value={task.title}>
-                                {task.title}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      entry.assignedTask
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === entry.id ? (
-                      <Input
-                        type="number"
-                        value={editForm.hours || 0}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, hours: parseFloat(e.target.value) }))}
-                        min="0"
-                        max="24"
-                        step="0.5"
-                        className="w-20"
-                      />
-                    ) : (
-                      <Badge variant="outline" className="font-mono">
-                        {entry.hours}h
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === entry.id ? (
-                      <Select
-                        value={editForm.siteClient || ""}
-                        onValueChange={(value) => setEditForm(prev => ({ ...prev, siteClient: value }))}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="Select site/client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sites.map(site => (
-                            <SelectItem 
-                              key={site._id} 
-                              value={site.name}
-                            >
-                              {site.name} - {site.clientName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      entry.siteClient
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === entry.id ? (
-                      <Select
-                        value={editForm.supervisor || ""}
-                        onValueChange={(value) => setEditForm(prev => ({ ...prev, supervisor: value }))}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="Select supervisor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {supervisors
-                            .filter(sup => 
-                              sup.assignedSites?.includes(sites.find(s => s.name === entry.siteClient)?._id || '') ||
-                              sup.site === entry.siteClient
-                            )
-                            .map(sup => (
-                              <SelectItem key={sup._id} value={sup.name}>
-                                {sup.name} - {sup.department}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      entry.supervisor
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingId === entry.id ? (
-                      <Select
-                        value={editForm.manager || ""}
-                        onValueChange={(value) => setEditForm(prev => ({ ...prev, manager: value }))}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="Select manager" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {managers
-                            .filter(mgr => 
-                              mgr.assignedSites?.includes(sites.find(s => s.name === entry.siteClient)?._id || '') ||
-                              mgr.site === entry.siteClient
-                            )
-                            .map(mgr => (
-                              <SelectItem key={mgr._id} value={mgr.name}>
-                                {mgr.name} - {mgr.department}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      entry.manager
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={entry.remark}>
-                    {editingId === entry.id ? (
-                      <Input
-                        value={editForm.remark || ""}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, remark: e.target.value }))}
-                        placeholder="Remarks"
-                      />
-                    ) : (
-                      entry.remark
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      {editingId === entry.id ? (
-                        <>
-                          <Button 
-                            variant="default" 
-                            size="sm"
-                            onClick={() => saveEdit(entry.id || entry._id)}
-                          >
-                            Save
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={cancelEdit}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => startEdit(entry)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            onClick={() => onDelete(entry.id || entry._id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <MobileRosterCard
+                  key={entry.id || entry._id}
+                  entry={entry}
+                  onEdit={startEdit}
+                  onDelete={onDelete}
+                  tasks={tasks}
+                  sites={sites}
+                  supervisors={supervisors}
+                  managers={managers}
+                  index={index}
+                />
               ))
             )}
-          </TableBody>
-        </Table>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">Sr. No.</TableHead>
+                  <TableHead className="whitespace-nowrap">Employee Name</TableHead>
+                  <TableHead className="whitespace-nowrap">Employee ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Department</TableHead>
+                  <TableHead className="whitespace-nowrap">Designation</TableHead>
+                  <TableHead className="whitespace-nowrap">Shift Timing</TableHead>
+                  <TableHead className="whitespace-nowrap">Assigned Task</TableHead>
+                  <TableHead className="whitespace-nowrap">Hours</TableHead>
+                  <TableHead className="whitespace-nowrap">Site/Client</TableHead>
+                  <TableHead className="whitespace-nowrap">Supervisor</TableHead>
+                  <TableHead className="whitespace-nowrap">Manager</TableHead>
+                  <TableHead className="whitespace-nowrap">Remarks</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingData.roster ? (
+                  <TableRow>
+                    <TableCell colSpan={13} className="text-center py-8">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading roster entries...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : roster.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <Calendar className="h-8 w-8" />
+                        <div>No roster entries found for selected period</div>
+                        <div className="text-sm">Try changing the date or roster type</div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  roster.map((entry, index) => (
+                    <TableRow key={entry.id || entry._id}>
+                      <TableCell className="font-medium whitespace-nowrap">{index + 1}</TableCell>
+                      <TableCell className="whitespace-nowrap">{entry.employeeName}</TableCell>
+                      <TableCell className="whitespace-nowrap">{entry.employeeId}</TableCell>
+                      <TableCell className="whitespace-nowrap">{entry.department}</TableCell>
+                      <TableCell className="whitespace-nowrap">{entry.designation}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingId === entry.id ? (
+                          <Input
+                            value={editForm.shiftTiming || ""}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, shiftTiming: e.target.value }))}
+                            placeholder="HH:MM-HH:MM"
+                            className="w-32"
+                          />
+                        ) : (
+                          entry.shiftTiming
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingId === entry.id ? (
+                          <Select
+                            value={editForm.assignedTask || ""}
+                            onValueChange={(value) => setEditForm(prev => ({ ...prev, assignedTask: value }))}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select task" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {tasks
+                                .filter(task => task.siteName === entry.siteClient)
+                                .map(task => (
+                                  <SelectItem key={task._id} value={task.title}>
+                                    {task.title}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          entry.assignedTask
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {editingId === entry.id ? (
+                          <Input
+                            type="number"
+                            value={editForm.hours || 0}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, hours: parseFloat(e.target.value) }))}
+                            min="0"
+                            max="24"
+                            step="0.5"
+                            className="w-20"
+                          />
+                        ) : (
+                          <Badge variant="outline" className="font-mono whitespace-nowrap">
+                            {entry.hours}h
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingId === entry.id ? (
+                          <Select
+                            value={editForm.siteClient || ""}
+                            onValueChange={(value) => setEditForm(prev => ({ ...prev, siteClient: value }))}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select site/client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sites.map(site => (
+                                <SelectItem 
+                                  key={site._id} 
+                                  value={site.name}
+                                >
+                                  {site.name} - {site.clientName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          entry.siteClient
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingId === entry.id ? (
+                          <Select
+                            value={editForm.supervisor || ""}
+                            onValueChange={(value) => setEditForm(prev => ({ ...prev, supervisor: value }))}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select supervisor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {supervisors
+                                .filter(sup => 
+                                  sup.assignedSites?.includes(sites.find(s => s.name === entry.siteClient)?._id || '') ||
+                                  sup.site === entry.siteClient
+                                )
+                                .map(sup => (
+                                  <SelectItem key={sup._id} value={sup.name}>
+                                    {sup.name} - {sup.department}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          entry.supervisor
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingId === entry.id ? (
+                          <Select
+                            value={editForm.manager || ""}
+                            onValueChange={(value) => setEditForm(prev => ({ ...prev, manager: value }))}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {managers
+                                .filter(mgr => 
+                                  mgr.assignedSites?.includes(sites.find(s => s.name === entry.siteClient)?._id || '') ||
+                                  mgr.site === entry.siteClient
+                                )
+                                .map(mgr => (
+                                  <SelectItem key={mgr._id} value={mgr.name}>
+                                    {mgr.name} - {mgr.department}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          entry.manager
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={entry.remark}>
+                        {editingId === entry.id ? (
+                          <Input
+                            value={editForm.remark || ""}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, remark: e.target.value }))}
+                            placeholder="Remarks"
+                          />
+                        ) : (
+                          entry.remark
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          {editingId === entry.id ? (
+                            <>
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => saveEdit(entry.id || entry._id)}
+                              >
+                                Save
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={cancelEdit}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => startEdit(entry)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="sm" 
+                                onClick={() => onDelete(entry.id || entry._id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     );
   };
@@ -1224,34 +1545,63 @@ const RosterSection = () => {
       return acc;
     }, {} as Record<string, number>);
 
+    const handleDayClick = (day: Date) => {
+      setSelectedDate(day);
+      setSelectedRoster("daily");
+    };
+
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-7 gap-1 text-center text-sm font-medium">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
-            <div key={day} className="py-2 bg-muted rounded-t">{day}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
+        {isMobileView ? (
+          <div className="grid grid-cols-7 gap-1">
+            {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
+              <div key={i} className="text-center text-xs font-medium py-1 bg-muted rounded">
+                {day}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1 text-center text-sm font-medium">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+              <div key={day} className="py-2 bg-muted rounded-t">{day}</div>
+            ))}
+          </div>
+        )}
+        
+        <div className={`grid grid-cols-7 gap-1 ${isMobileView ? 'text-xs' : ''}`}>
           {allDays.map((day, index) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const dayEntries = groupedRoster[dateStr] || [];
             const totalHours = totalHoursByDate[dateStr] || 0;
             const isCurrentMonth = isSameMonth(day, startDate);
+            const isToday = isSameDay(day, new Date());
             
-            return (
+            return isMobileView ? (
+              <MobileCalendarDay
+                key={index}
+                day={day}
+                dateStr={dateStr}
+                entries={dayEntries}
+                totalHours={totalHours}
+                isCurrentMonth={isCurrentMonth}
+                isToday={isToday}
+                onDayClick={handleDayClick}
+              />
+            ) : (
               <div
                 key={index}
+                onClick={() => handleDayClick(day)}
                 className={cn(
-                  "min-h-32 border rounded p-2 text-sm transition-colors",
+                  "min-h-32 border rounded p-2 text-sm transition-colors cursor-pointer",
                   isCurrentMonth ? "bg-background" : "bg-muted/50",
-                  isSameDay(day, new Date()) && "border-primary border-2"
+                  isToday && "border-primary border-2"
                 )}
               >
                 <div className="flex justify-between items-center mb-1">
                   <span className={cn(
                     "font-semibold",
                     !isCurrentMonth && "text-muted-foreground",
-                    isSameDay(day, new Date()) && "text-primary"
+                    isToday && "text-primary"
                   )}>
                     {format(day, "d")}
                   </span>
@@ -1286,45 +1636,80 @@ const RosterSection = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Calendar className="h-6 w-6" />
-              Roster Management
+              <Calendar className="h-5 w-5 md:h-6 md:w-6" />
+              <CardTitle className="text-lg md:text-xl">Roster Management</CardTitle>
             </div>
             <div className="flex gap-2">
+              {isMobileView && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowMobileStats(!showMobileStats)}
+                  className="md:hidden"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Stats
+                  {showMobileStats ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                </Button>
+              )}
               <Button 
                 variant="outline" 
+                size={isMobileView ? "sm" : "default"}
                 onClick={fetchAllData} 
                 disabled={loadingData.sites || loadingData.supervisors || loadingData.managers || loadingData.employees || loadingData.roster || loadingData.tasks}
               >
                 <RefreshCw className={`mr-2 h-4 w-4 ${(loadingData.sites || loadingData.supervisors || loadingData.managers || loadingData.employees || loadingData.roster || loadingData.tasks) ? 'animate-spin' : ''}`} />
-                Refresh Data
+                {!isMobileView && "Refresh Data"}
               </Button>
-              <Button variant="outline" onClick={handleExportReport} disabled={loadingData.roster}>
-                <Download className="mr-2 h-4 w-4" />
-                Export Report
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4 mb-6">
-            {rosterTypes.map((type) => (
-              <Button
-                key={type}
-                variant={selectedRoster === type ? "default" : "outline"}
-                onClick={() => setSelectedRoster(type as any)}
-                className="capitalize"
+              <Button 
+                variant="outline" 
+                size={isMobileView ? "sm" : "default"}
+                onClick={handleExportReport} 
                 disabled={loadingData.roster}
               >
-                {type} Roster
+                <Download className="mr-2 h-4 w-4" />
+                {!isMobileView && "Export Report"}
               </Button>
-            ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6">
+          {/* Roster Type Selector - Mobile Responsive */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {isMobileView ? (
+              <Select value={selectedRoster} onValueChange={(value: any) => setSelectedRoster(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select roster type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rosterTypes.map((type) => (
+                    <SelectItem key={type} value={type} className="capitalize">
+                      {type} Roster
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              rosterTypes.map((type) => (
+                <Button
+                  key={type}
+                  variant={selectedRoster === type ? "default" : "outline"}
+                  onClick={() => setSelectedRoster(type as any)}
+                  className="capitalize"
+                  disabled={loadingData.roster}
+                >
+                  {type} Roster
+                </Button>
+              ))
+            )}
           </div>
 
-          <div className="flex items-center justify-between mb-6 p-4 bg-muted rounded-lg">
-            <div className="flex items-center gap-4">
+          {/* Date Navigation - Mobile Responsive */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 p-4 bg-muted rounded-lg">
+            <div className="flex items-center justify-between sm:justify-start gap-4">
               <Button
                 variant="outline"
                 size="icon"
@@ -1338,11 +1723,11 @@ const RosterSection = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[240px] justify-start text-left font-normal"
+                    className="w-[180px] sm:w-[240px] justify-start text-left font-normal"
                     disabled={loadingData.roster}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.label}
+                    <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">{dateRange.label}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -1409,7 +1794,7 @@ const RosterSection = () => {
               </Button>
             </div>
             
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-right">
               {selectedRoster === "daily" && "Daily View"}
               {selectedRoster === "weekly" && "Weekly View"}
               {selectedRoster === "fortnightly" && "15 Days View"}
@@ -1417,46 +1802,75 @@ const RosterSection = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Entries</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{filteredRoster.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">
-                  {filteredRoster.reduce((sum, entry) => sum + entry.hours, 0)}h
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Unique Employees</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {new Set(filteredRoster.map(entry => entry.employeeId)).size}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Stats Cards - Mobile Responsive */}
+          {isMobileView && showMobileStats ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <MobileStatCard
+                title="Total Entries"
+                value={filteredRoster.length.toString()}
+                icon={Calendar}
+                color="primary"
+              />
+              <MobileStatCard
+                title="Total Hours"
+                value={`${filteredRoster.reduce((sum, entry) => sum + entry.hours, 0)}h`}
+                icon={Clock}
+                color="success"
+              />
+              <MobileStatCard
+                title="Unique Employees"
+                value={new Set(filteredRoster.map(entry => entry.employeeId)).size.toString()}
+                icon={User}
+                color="warning"
+              />
+            </div>
+          ) : !isMobileView ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Entries</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{filteredRoster.length}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">
+                    {filteredRoster.reduce((sum, entry) => sum + entry.hours, 0)}h
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Unique Employees</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {new Set(filteredRoster.map(entry => entry.employeeId)).size}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
 
+          {/* Add Entry Button */}
           <div className="flex flex-wrap gap-4 mb-6">
             <Dialog open={addEntryDialogOpen} onOpenChange={setAddEntryDialogOpen}>
               <DialogTrigger asChild>
-                <Button disabled={loadingData.sites || loadingData.supervisors || loadingData.managers || loadingData.employees || loadingData.tasks}>
+                <Button 
+                  disabled={loadingData.sites || loadingData.supervisors || loadingData.managers || loadingData.employees || loadingData.tasks}
+                  className="w-full sm:w-auto"
+                  size={isMobileView ? "default" : "default"}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Entry
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add Roster Entry - {selectedRoster.toUpperCase()} ROSTER</DialogTitle>
                 </DialogHeader>
@@ -1470,6 +1884,7 @@ const RosterSection = () => {
                         value={newRosterEntry.date}
                         onChange={(e) => setNewRosterEntry(prev => ({ ...prev, date: e.target.value }))}
                         required 
+                        className="h-10"
                       />
                     </FormField>
                     <FormField label="Site / Client" id="siteClient" required>
@@ -1484,7 +1899,7 @@ const RosterSection = () => {
                           onValueChange={handleSiteSelect}
                           required
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder="Select site/client" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1493,7 +1908,10 @@ const RosterSection = () => {
                                 key={createUniqueValue('site', site)}
                                 value={createUniqueValue('site', site)}
                               >
-                                {site.name} - {site.clientName}
+                                <div className="flex flex-col py-1">
+                                  <span>{site.name}</span>
+                                  <span className="text-xs text-muted-foreground">{site.clientName}</span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1513,7 +1931,7 @@ const RosterSection = () => {
                           disabled={!newRosterEntry.siteClient || filteredSupervisors.length === 0}
                           required
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder={
                               !newRosterEntry.siteClient 
                                 ? "Select a site first" 
@@ -1531,7 +1949,10 @@ const RosterSection = () => {
                                 >
                                   <div className="flex items-center gap-2">
                                     <User className="h-4 w-4" />
-                                    {sup.name} - {sup.department}
+                                    <div className="flex flex-col">
+                                      <span>{sup.name}</span>
+                                      <span className="text-xs text-muted-foreground">{sup.department}</span>
+                                    </div>
                                   </div>
                                 </SelectItem>
                               ))
@@ -1557,7 +1978,7 @@ const RosterSection = () => {
                           disabled={!newRosterEntry.siteClient || filteredManagers.length === 0}
                           required
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder={
                               !newRosterEntry.siteClient 
                                 ? "Select a site first" 
@@ -1575,7 +1996,10 @@ const RosterSection = () => {
                                 >
                                   <div className="flex items-center gap-2">
                                     <UserCog className="h-4 w-4" />
-                                    {mgr.name} - {mgr.department}
+                                    <div className="flex flex-col">
+                                      <span>{mgr.name}</span>
+                                      <span className="text-xs text-muted-foreground">{mgr.department}</span>
+                                    </div>
                                   </div>
                                 </SelectItem>
                               ))
@@ -1602,7 +2026,7 @@ const RosterSection = () => {
                             placeholder="Search employees..."
                             value={employeeSearchQuery}
                             onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-                            className="mb-2"
+                            className="h-10"
                           />
                           <div className="border rounded-lg max-h-40 overflow-y-auto p-2">
                             {filteredEmployees.length > 0 ? (
@@ -1610,29 +2034,12 @@ const RosterSection = () => {
                                 filteredEmployeesBySearch
                                   .filter(emp => emp.status === "active")
                                   .map(emp => (
-                                    <div
+                                    <MobileEmployeeCard
                                       key={emp._id}
-                                      className={`flex items-center space-x-2 p-2 hover:bg-primary/5 rounded-lg cursor-pointer ${
-                                        selectedEmployees.includes(emp._id) ? 'bg-primary/10' : ''
-                                      }`}
-                                      onClick={() => handleEmployeeToggle(emp._id)}
-                                    >
-                                      <div className={`flex items-center justify-center h-4 w-4 rounded border ${
-                                        selectedEmployees.includes(emp._id) 
-                                          ? 'bg-primary border-primary' 
-                                          : 'border-gray-300'
-                                      }`}>
-                                        {selectedEmployees.includes(emp._id) && (
-                                          <Check className="h-3 w-3 text-primary-foreground" />
-                                        )}
-                                      </div>
-                                      <div className="flex-1">
-                                        <div className="font-medium">{emp.name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {emp.employeeId} - {emp.position}
-                                        </div>
-                                      </div>
-                                    </div>
+                                      employee={emp}
+                                      selected={selectedEmployees.includes(emp._id)}
+                                      onToggle={handleEmployeeToggle}
+                                    />
                                   ))
                               ) : (
                                 <div className="text-center py-4 text-muted-foreground">
@@ -1650,7 +2057,7 @@ const RosterSection = () => {
                               {selectedEmployees.map(id => {
                                 const emp = employees.find(e => e._id === id);
                                 return emp ? (
-                                  <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                                  <Badge key={id} variant="secondary" className="flex items-center gap-1 text-xs">
                                     {emp.name}
                                     <X 
                                       className="h-3 w-3 cursor-pointer" 
@@ -1676,7 +2083,7 @@ const RosterSection = () => {
                         placeholder="Enter department"
                         required 
                         readOnly={selectedEmployees.length === 1}
-                        className={selectedEmployees.length === 1 ? "bg-muted" : ""}
+                        className={cn("h-10", selectedEmployees.length === 1 ? "bg-muted" : "")}
                       />
                     </FormField>
                     <FormField label="Designation" id="designation" required>
@@ -1687,7 +2094,7 @@ const RosterSection = () => {
                         placeholder="Enter designation"
                         required 
                         readOnly={selectedEmployees.length === 1}
-                        className={selectedEmployees.length === 1 ? "bg-muted" : ""}
+                        className={cn("h-10", selectedEmployees.length === 1 ? "bg-muted" : "")}
                       />
                     </FormField>
                     <FormField label="Shift" id="shift" required>
@@ -1696,7 +2103,7 @@ const RosterSection = () => {
                         onValueChange={(value) => setNewRosterEntry(prev => ({ ...prev, shift: value }))}
                         required
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Select shift" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1708,24 +2115,24 @@ const RosterSection = () => {
                       </Select>
                     </FormField>
                     <FormField label="Shift Timing" id="shiftTiming" required>
-                      <div className="flex gap-2 items-center">
-                        <div className="flex-1">
-                          <label className="text-xs text-muted-foreground">Start Time</label>
+                      <div className="flex flex-col sm:flex-row gap-2 items-center">
+                        <div className="flex-1 w-full">
+                          <label className="text-xs text-muted-foreground">Start</label>
                           <Input
                             type="time"
                             value={startTime}
                             onChange={(e) => setStartTime(e.target.value)}
-                            className="w-full"
+                            className="h-10 w-full"
                           />
                         </div>
-                        <span className="text-lg">-</span>
-                        <div className="flex-1">
-                          <label className="text-xs text-muted-foreground">End Time</label>
+                        <span className="text-lg hidden sm:block">-</span>
+                        <div className="flex-1 w-full">
+                          <label className="text-xs text-muted-foreground">End</label>
                           <Input
                             type="time"
                             value={endTime}
                             onChange={(e) => setEndTime(e.target.value)}
-                            className="w-full"
+                            className="h-10 w-full"
                           />
                         </div>
                       </div>
@@ -1749,7 +2156,7 @@ const RosterSection = () => {
                           disabled={!newRosterEntry.siteClient || filteredTasks.length === 0}
                           required
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-10">
                             <SelectValue placeholder={
                               !newRosterEntry.siteClient 
                                 ? "Select a site first" 
@@ -1789,6 +2196,7 @@ const RosterSection = () => {
                         max="24"
                         step="0.5"
                         required 
+                        className="h-10"
                       />
                     </FormField>
                   </div>
@@ -1798,9 +2206,10 @@ const RosterSection = () => {
                       value={newRosterEntry.remark}
                       onChange={(e) => setNewRosterEntry(prev => ({ ...prev, remark: e.target.value }))}
                       placeholder="Enter any remarks or notes" 
+                      rows={3}
                     />
                   </FormField>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full h-10" disabled={loading}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

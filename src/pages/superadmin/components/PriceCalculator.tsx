@@ -35,6 +35,12 @@ import {
   TabsList,
   TabsTrigger
 } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { 
   Calendar, 
@@ -66,7 +72,11 @@ import {
   ChevronLeft,
   CheckSquare,
   Square,
-  RefreshCw
+  RefreshCw,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
+  X
 } from "lucide-react";
 import { format } from 'date-fns';
 
@@ -148,57 +158,373 @@ interface ActionItem {
   priority: 'low' | 'medium' | 'high';
 }
 
-// Sample data (fallback)
-const sampleTrainingSessions: TrainingSession[] = [
-  {
-    _id: 'TRN001',
-    id: 'TRN001',
-    title: 'Fire Safety Training',
-    description: 'Comprehensive fire safety training covering evacuation procedures, fire extinguifier usage, and emergency response protocols.',
-    type: 'safety',
-    date: '2024-12-15',
-    time: '10:00 AM',
-    duration: '3 hours',
-    trainer: 'John Safety Officer',
-    supervisor: 'Manager Smith',
-    site: 'Main Building',
-    department: 'All Departments',
-    attendees: ['EMP001', 'EMP002', 'EMP003', 'EMP004', 'EMP005'],
-    maxAttendees: 20,
-    status: 'scheduled',
-    attachments: [
-      { id: 'ATT001', name: 'fire_safety_manual.pdf', type: 'document', url: '#', size: '2.4 MB', uploadedAt: '2024-12-01' },
-      { id: 'ATT002', name: 'evacuation_plan.jpg', type: 'image', url: '#', size: '1.2 MB', uploadedAt: '2024-12-01' }
-    ],
-    feedback: [],
-    location: 'Main Conference Room',
-    objectives: ['Understand fire safety protocols', 'Learn evacuation procedures', 'Practice fire extinguifier usage']
-  },
-];
+// Mobile responsive training card
+const MobileTrainingCard = ({ 
+  session, 
+  onView, 
+  onUpdateStatus, 
+  onDelete,
+  getTypeColor,
+  getStatusBadge,
+  formatDate,
+  trainingTypes,
+  loading 
+}: { 
+  session: TrainingSession; 
+  onView: (session: TrainingSession) => void;
+  onUpdateStatus: (id: string, status: TrainingSession['status']) => void;
+  onDelete: (id: string) => void;
+  getTypeColor: (type: string) => string;
+  getStatusBadge: (status: string) => string;
+  formatDate: (date: string) => string;
+  trainingTypes: { value: string; label: string; color: string }[];
+  loading: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
 
-const sampleStaffBriefings: StaffBriefing[] = [
-  {
-    _id: 'BRI001',
-    id: 'BRI001',
-    date: '2024-12-12',
-    time: '08:00 AM',
-    conductedBy: 'Manager Smith',
-    site: 'Main Building',
-    department: 'Housekeeping',
-    attendeesCount: 25,
-    topics: ['Daily tasks allocation', 'Safety reminders', 'Quality standards'],
-    keyPoints: ['Focus on common areas', 'Check equipment before use', 'Report any issues immediately'],
-    actionItems: [
-      { id: 'ACT001', description: 'Clean lobby area', assignedTo: 'Team A', dueDate: '2024-12-12', status: 'completed', priority: 'high' },
-      { id: 'ACT002', description: 'Inspect cleaning equipment', assignedTo: 'Team B', dueDate: '2024-12-13', status: 'pending', priority: 'medium' }
-    ],
-    attachments: [
-      { id: 'ATT006', name: 'briefing_notes.pdf', type: 'document', url: '#', size: '0.8 MB', uploadedAt: '2024-12-12' }
-    ],
-    notes: 'All team members present. Emphasized on maintaining hygiene standards.',
-    shift: 'morning'
-  },
-];
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <h3 className="font-semibold text-base">{session.title}</h3>
+            <p className="text-xs text-muted-foreground mt-1">Trainer: {session.trainer}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onView(session)}>
+                  <Eye className="h-4 w-4 mr-2" /> View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(session._id, 'scheduled')}>
+                  <Calendar className="h-4 w-4 mr-2" /> Scheduled
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(session._id, 'ongoing')}>
+                  <Clock className="h-4 w-4 mr-2" /> Ongoing
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(session._id, 'completed')}>
+                  <CheckCircle className="h-4 w-4 mr-2" /> Completed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(session._id, 'cancelled')}>
+                  <XCircle className="h-4 w-4 mr-2" /> Cancelled
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(session._id)} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <Badge className={getTypeColor(session.type)}>
+            {trainingTypes.find(t => t.value === session.type)?.label || session.type}
+          </Badge>
+          <Badge className={getStatusBadge(session.status)}>
+            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{formatDate(session.date)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{session.time} ({session.duration})</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Building className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs truncate">{session.site}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Users className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{session.attendees?.length || 0}/{session.maxAttendees}</span>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Description</p>
+              <p className="text-sm">{session.description}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Location</p>
+              <p className="text-sm">{session.location}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Department</p>
+              <p className="text-sm">{session.department}</p>
+            </div>
+            {session.objectives && session.objectives.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Objectives</p>
+                <ul className="list-disc pl-4 text-sm">
+                  {session.objectives.slice(0, 3).map((obj, idx) => (
+                    <li key={idx} className="text-xs">{obj}</li>
+                  ))}
+                  {session.objectives.length > 3 && (
+                    <li className="text-xs text-muted-foreground">+{session.objectives.length - 3} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {session.attachments && session.attachments.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Attachments</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {session.attachments.slice(0, 3).map(att => (
+                    <Badge key={att._id || att.id} variant="outline" className="text-xs">
+                      {att.type === 'image' ? <ImageIcon className="h-3 w-3 mr-1" /> :
+                       att.type === 'video' ? <Video className="h-3 w-3 mr-1" /> :
+                       <File className="h-3 w-3 mr-1" />}
+                      <span className="truncate max-w-[80px]">{att.name}</span>
+                    </Badge>
+                  ))}
+                  {session.attachments.length > 3 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{session.attachments.length - 3}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive briefing card
+const MobileBriefingCard = ({ 
+  briefing, 
+  onView, 
+  onDelete,
+  onUpdateAction,
+  getShiftBadge,
+  getPriorityBadge,
+  formatDate,
+  loading 
+}: { 
+  briefing: StaffBriefing; 
+  onView: (briefing: StaffBriefing) => void;
+  onDelete: (id: string) => void;
+  onUpdateAction: (briefingId: string, itemId: string, status: ActionItem['status']) => void;
+  getShiftBadge: (shift: string) => string;
+  getPriorityBadge: (priority: string) => string;
+  formatDate: (date: string) => string;
+  loading: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <h3 className="font-semibold text-base">{briefing.site}</h3>
+            <p className="text-xs text-muted-foreground">Conducted by: {briefing.conductedBy}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onView(briefing)}>
+                  <Eye className="h-4 w-4 mr-2" /> View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(briefing._id)} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          <Badge className={getShiftBadge(briefing.shift)}>
+            {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
+          </Badge>
+          <Badge variant="outline" className="bg-blue-50">
+            {briefing.department}
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{formatDate(briefing.date)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{briefing.time}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Users className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{briefing.attendeesCount} attendees</span>
+          </div>
+        </div>
+
+        {briefing.topics && briefing.topics.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {briefing.topics.slice(0, 2).map((topic, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {topic}
+              </Badge>
+            ))}
+            {briefing.topics.length > 2 && (
+              <Badge variant="outline" className="text-xs">
+                +{briefing.topics.length - 2}
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            {briefing.keyPoints && briefing.keyPoints.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Key Points</p>
+                <ul className="list-disc pl-4 text-sm">
+                  {briefing.keyPoints.map((point, idx) => (
+                    <li key={idx} className="text-xs">{point}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {briefing.actionItems && briefing.actionItems.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Action Items</p>
+                <div className="space-y-2">
+                  {briefing.actionItems.slice(0, 3).map(item => (
+                    <div key={item._id || item.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => onUpdateAction(
+                          briefing._id,
+                          item._id || item.id || '',
+                          item.status === 'completed' ? 'pending' : 'completed'
+                        )}
+                      >
+                        {item.status === 'completed' ? (
+                          <CheckSquare className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Square className="h-4 w-4 text-gray-400" />
+                        )}
+                      </Button>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium">{item.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{item.assignedTo}</span>
+                          <span>•</span>
+                          <span>Due: {formatDate(item.dueDate)}</span>
+                        </div>
+                      </div>
+                      <Badge className={getPriorityBadge(item.priority)}>
+                        {item.priority}
+                      </Badge>
+                    </div>
+                  ))}
+                  {briefing.actionItems.length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{briefing.actionItems.length - 3} more items
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {briefing.notes && (
+              <div>
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-sm bg-gray-50 p-2 rounded">{briefing.notes}</p>
+              </div>
+            )}
+            
+            {briefing.attachments && briefing.attachments.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Attachments</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {briefing.attachments.map(att => (
+                    <Badge key={att._id || att.id} variant="outline" className="text-xs">
+                      {att.type === 'image' ? <ImageIcon className="h-3 w-3 mr-1" /> :
+                       att.type === 'video' ? <Video className="h-3 w-3 mr-1" /> :
+                       <File className="h-3 w-3 mr-1" />}
+                      <span className="truncate max-w-[80px]">{att.name}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive stat card
+const MobileStatCard = ({ title, value, subValue, icon: Icon, color = "blue" }: { 
+  title: string; 
+  value: string | number; 
+  subValue?: string;
+  icon: any; 
+  color?: string;
+}) => {
+  const colorClasses = {
+    blue: "bg-blue-100 text-blue-600",
+    green: "bg-green-100 text-green-600",
+    purple: "bg-purple-100 text-purple-600",
+    red: "bg-red-100 text-red-600"
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">{title}</p>
+            <p className="text-xl font-bold mt-1">{value}</p>
+            {subValue && <p className="text-xs text-muted-foreground mt-1">{subValue}</p>}
+          </div>
+          <div className={`p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const departments = ['All Departments', 'Housekeeping', 'Security', 'Maintenance', 'Operations', 'Front Desk', 'Administration', 'IT Support'];
 const trainingTypes = [
@@ -234,6 +560,22 @@ const PriceCalculator: React.FC = () => {
     completedTraining: 0,
     pendingActions: 0
   });
+
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Form states for training
   const [trainingForm, setTrainingForm] = useState({
@@ -697,6 +1039,12 @@ const handleAddBriefing = async () => {
     }
   };
 
+  // Get type color
+  const getTypeColor = (type: string) => {
+    const found = trainingTypes.find(t => t.value === type);
+    return found?.color || 'bg-gray-100 text-gray-800';
+  };
+
   // Format date
   const formatDate = (dateString: string) => {
     try {
@@ -778,56 +1126,61 @@ const handleAddBriefing = async () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-6 md:mb-8"
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 md:mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Training & Staff Briefing</h1>
-            <p className="text-gray-600 mt-2">Manage training sessions and daily staff briefings</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Training & Staff Briefing</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">Manage training sessions and daily staff briefings</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2">
             <Button 
               variant="outline" 
+              size={isMobileView ? "sm" : "default"}
               onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
               disabled={loading}
             >
               {viewMode === 'list' ? (
                 <>
                   <CalendarDays className="h-4 w-4 mr-2" />
-                  Calendar View
+                  {!isMobileView && "Calendar View"}
+                  {isMobileView && "Calendar"}
                 </>
               ) : (
                 <>
                   <List className="h-4 w-4 mr-2" />
-                  List View
+                  {!isMobileView && "List View"}
+                  {isMobileView && "List"}
                 </>
               )}
             </Button>
             <Button 
               variant="outline" 
+              size={isMobileView ? "sm" : "default"}
               onClick={handleRefresh}
               disabled={loading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              {!isMobileView && "Refresh"}
             </Button>
             <Dialog open={showAddTraining} onOpenChange={setShowAddTraining}>
               <DialogTrigger asChild>
-                <Button disabled={loading}>
+                <Button size={isMobileView ? "sm" : "default"} disabled={loading}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Training
+                  {!isMobileView && "Add Training"}
+                  {isMobileView && "Training"}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Training Session</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg md:text-xl">Add New Training Session</DialogTitle>
+                  <DialogDescription className="text-sm">
                     Schedule a new training session for your team.
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                  <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 py-4">
+                  <div className="space-y-3 md:space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Training Title *</label>
                       <Input
@@ -835,6 +1188,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.title}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, title: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -845,7 +1199,7 @@ const handleAddBriefing = async () => {
                         onValueChange={(value: any) => setTrainingForm(prev => ({ ...prev, type: value }))}
                         disabled={loading}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 md:h-10">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -865,6 +1219,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.date}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, date: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -875,6 +1230,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.time}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, time: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -885,6 +1241,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.duration}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, duration: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -895,11 +1252,12 @@ const handleAddBriefing = async () => {
                         value={trainingForm.trainer}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, trainer: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-3 md:space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Site</label>
                       <Input
@@ -907,6 +1265,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.site}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, site: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -917,7 +1276,7 @@ const handleAddBriefing = async () => {
                         onValueChange={(value) => setTrainingForm(prev => ({ ...prev, department: value }))}
                         disabled={loading}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 md:h-10">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -938,6 +1297,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.maxAttendees}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, maxAttendees: parseInt(e.target.value) || 1 }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -948,6 +1308,7 @@ const handleAddBriefing = async () => {
                         value={trainingForm.location}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, location: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -961,6 +1322,7 @@ const handleAddBriefing = async () => {
                               value={objective}
                               onChange={(e) => updateObjective(index, e.target.value)}
                               disabled={loading}
+                              className="h-9 md:h-10"
                             />
                             {trainingForm.objectives.length > 1 && (
                               <Button
@@ -969,8 +1331,9 @@ const handleAddBriefing = async () => {
                                 size="sm"
                                 onClick={() => removeObjective(index)}
                                 disabled={loading}
+                                className="h-9 w-9 p-0"
                               >
-                                <XCircle className="h-4 w-4 text-red-500" />
+                                <X className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
                           </div>
@@ -981,6 +1344,7 @@ const handleAddBriefing = async () => {
                           size="sm"
                           onClick={addObjective}
                           disabled={loading}
+                          className="w-full h-9"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Objective
@@ -994,7 +1358,7 @@ const handleAddBriefing = async () => {
                         placeholder="Enter training description"
                         value={trainingForm.description}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
+                        rows={isMobileView ? 3 : 4}
                         disabled={loading}
                       />
                     </div>
@@ -1003,10 +1367,10 @@ const handleAddBriefing = async () => {
                 
                 {/* Attachments Section */}
                 <div className="py-4">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">Attachments</h3>
-                      <p className="text-sm text-gray-500">Upload training materials, photos, or videos</p>
+                      <p className="text-xs md:text-sm text-gray-500">Upload training materials, photos, or videos</p>
                     </div>
                     <div>
                       <input
@@ -1023,6 +1387,7 @@ const handleAddBriefing = async () => {
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={loading}
+                        className="w-full sm:w-auto h-9"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         Upload Files
@@ -1034,16 +1399,16 @@ const handleAddBriefing = async () => {
                     <div className="space-y-2">
                       {attachments.map((file, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-1">
                             {file.type.startsWith('image/') ? (
-                              <ImageIcon className="h-5 w-5 text-blue-500" />
+                              <ImageIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
                             ) : file.type.startsWith('video/') ? (
-                              <Video className="h-5 w-5 text-red-500" />
+                              <Video className="h-5 w-5 text-red-500 flex-shrink-0" />
                             ) : (
-                              <File className="h-5 w-5 text-gray-500" />
+                              <File className="h-5 w-5 text-gray-500 flex-shrink-0" />
                             )}
-                            <div>
-                              <p className="text-sm font-medium">{file.name}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{file.name}</p>
                               <p className="text-xs text-gray-500">
                                 {(file.size / (1024 * 1024)).toFixed(1)} MB
                               </p>
@@ -1054,6 +1419,7 @@ const handleAddBriefing = async () => {
                             size="sm"
                             onClick={() => removeAttachment(index)}
                             disabled={loading}
+                            className="h-8 w-8 p-0"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -1063,11 +1429,13 @@ const handleAddBriefing = async () => {
                   )}
                 </div>
                 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <DialogClose asChild>
-                    <Button variant="outline" disabled={loading}>Cancel</Button>
+                    <Button variant="outline" disabled={loading} className="w-full sm:w-auto h-9">
+                      Cancel
+                    </Button>
                   </DialogClose>
-                  <Button onClick={handleAddTraining} disabled={loading}>
+                  <Button onClick={handleAddTraining} disabled={loading} className="w-full sm:w-auto h-9">
                     {loading ? 'Adding...' : 'Add Training Session'}
                   </Button>
                 </DialogFooter>
@@ -1076,21 +1444,22 @@ const handleAddBriefing = async () => {
             
             <Dialog open={showAddBriefing} onOpenChange={setShowAddBriefing}>
               <DialogTrigger asChild>
-                <Button variant="secondary" disabled={loading}>
+                <Button variant="secondary" size={isMobileView ? "sm" : "default"} disabled={loading}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Briefing
+                  {!isMobileView && "Add Briefing"}
+                  {isMobileView && "Briefing"}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Staff Briefing</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg md:text-xl">Add New Staff Briefing</DialogTitle>
+                  <DialogDescription className="text-sm">
                     Record daily staff briefing details and action items.
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                  <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 py-4">
+                  <div className="space-y-3 md:space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Date *</label>
                       <Input
@@ -1098,6 +1467,7 @@ const handleAddBriefing = async () => {
                         value={briefingForm.date}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, date: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -1108,6 +1478,7 @@ const handleAddBriefing = async () => {
                         value={briefingForm.time}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, time: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -1118,7 +1489,7 @@ const handleAddBriefing = async () => {
                         onValueChange={(value: any) => setBriefingForm(prev => ({ ...prev, shift: value }))}
                         disabled={loading}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 md:h-10">
                           <SelectValue placeholder="Select shift" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1138,6 +1509,7 @@ const handleAddBriefing = async () => {
                         value={briefingForm.conductedBy}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, conductedBy: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -1148,6 +1520,7 @@ const handleAddBriefing = async () => {
                         value={briefingForm.site}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, site: e.target.value }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                     
@@ -1158,7 +1531,7 @@ const handleAddBriefing = async () => {
                         onValueChange={(value) => setBriefingForm(prev => ({ ...prev, department: value }))}
                         disabled={loading}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 md:h-10">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1179,11 +1552,12 @@ const handleAddBriefing = async () => {
                         value={briefingForm.attendeesCount}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, attendeesCount: parseInt(e.target.value) || 0 }))}
                         disabled={loading}
+                        className="h-9 md:h-10"
                       />
                     </div>
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-3 md:space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Topics Discussed</label>
                       <div className="space-y-2">
@@ -1194,6 +1568,7 @@ const handleAddBriefing = async () => {
                               value={topic}
                               onChange={(e) => updateTopic(index, e.target.value)}
                               disabled={loading}
+                              className="h-9 md:h-10"
                             />
                             {briefingForm.topics.length > 1 && (
                               <Button
@@ -1202,8 +1577,9 @@ const handleAddBriefing = async () => {
                                 size="sm"
                                 onClick={() => removeTopic(index)}
                                 disabled={loading}
+                                className="h-9 w-9 p-0"
                               >
-                                <XCircle className="h-4 w-4 text-red-500" />
+                                <X className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
                           </div>
@@ -1214,6 +1590,7 @@ const handleAddBriefing = async () => {
                           size="sm"
                           onClick={addTopic}
                           disabled={loading}
+                          className="w-full h-9"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Topic
@@ -1231,6 +1608,7 @@ const handleAddBriefing = async () => {
                               value={point}
                               onChange={(e) => updateKeyPoint(index, e.target.value)}
                               disabled={loading}
+                              className="h-9 md:h-10"
                             />
                             {briefingForm.keyPoints.length > 1 && (
                               <Button
@@ -1239,8 +1617,9 @@ const handleAddBriefing = async () => {
                                 size="sm"
                                 onClick={() => removeKeyPoint(index)}
                                 disabled={loading}
+                                className="h-9 w-9 p-0"
                               >
-                                <XCircle className="h-4 w-4 text-red-500" />
+                                <X className="h-4 w-4 text-red-500" />
                               </Button>
                             )}
                           </div>
@@ -1251,6 +1630,7 @@ const handleAddBriefing = async () => {
                           size="sm"
                           onClick={addKeyPoint}
                           disabled={loading}
+                          className="w-full h-9"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Key Point
@@ -1264,7 +1644,7 @@ const handleAddBriefing = async () => {
                         placeholder="Enter additional notes"
                         value={briefingForm.notes}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, notes: e.target.value }))}
-                        rows={3}
+                        rows={isMobileView ? 3 : 4}
                         disabled={loading}
                       />
                     </div>
@@ -1273,16 +1653,17 @@ const handleAddBriefing = async () => {
                 
                 {/* Action Items Section */}
                 <div className="py-4">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">Action Items</h3>
-                      <p className="text-sm text-gray-500">Add tasks assigned during the briefing</p>
+                      <p className="text-xs md:text-sm text-gray-500">Add tasks assigned during the briefing</p>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={addActionItem}
                       disabled={loading}
+                      className="w-full sm:w-auto h-9"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Action Item
@@ -1290,7 +1671,7 @@ const handleAddBriefing = async () => {
                   </div>
                   
                   {briefingForm.actionItems.map((item, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg mb-3">
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-lg mb-3">
                       <div>
                         <label className="text-xs font-medium mb-1 block">Description</label>
                         <Input
@@ -1298,6 +1679,7 @@ const handleAddBriefing = async () => {
                           value={item.description}
                           onChange={(e) => updateActionItem(index, 'description', e.target.value)}
                           disabled={loading}
+                          className="h-9"
                         />
                       </div>
                       <div>
@@ -1307,6 +1689,7 @@ const handleAddBriefing = async () => {
                           value={item.assignedTo}
                           onChange={(e) => updateActionItem(index, 'assignedTo', e.target.value)}
                           disabled={loading}
+                          className="h-9"
                         />
                       </div>
                       <div>
@@ -1316,6 +1699,7 @@ const handleAddBriefing = async () => {
                           value={item.dueDate}
                           onChange={(e) => updateActionItem(index, 'dueDate', e.target.value)}
                           disabled={loading}
+                          className="h-9"
                         />
                       </div>
                       <div className="flex items-end gap-2">
@@ -1326,7 +1710,7 @@ const handleAddBriefing = async () => {
                             onValueChange={(value: any) => updateActionItem(index, 'priority', value)}
                             disabled={loading}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="h-9">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1344,6 +1728,7 @@ const handleAddBriefing = async () => {
                           size="sm"
                           onClick={() => removeActionItem(index)}
                           disabled={loading}
+                          className="h-9 w-9 p-0"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
@@ -1354,10 +1739,10 @@ const handleAddBriefing = async () => {
                 
                 {/* Attachments Section */}
                 <div className="py-4">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                       <h3 className="text-lg font-semibold">Attachments</h3>
-                      <p className="text-sm text-gray-500">Upload photos, documents, or other files</p>
+                      <p className="text-xs md:text-sm text-gray-500">Upload photos, documents, or other files</p>
                     </div>
                     <div>
                       <input
@@ -1374,6 +1759,7 @@ const handleAddBriefing = async () => {
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={loading}
+                        className="w-full sm:w-auto h-9"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         Upload Files
@@ -1385,16 +1771,16 @@ const handleAddBriefing = async () => {
                     <div className="space-y-2">
                       {attachments.map((file, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-1">
                             {file.type.startsWith('image/') ? (
-                              <ImageIcon className="h-5 w-5 text-blue-500" />
+                              <ImageIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
                             ) : file.type.startsWith('video/') ? (
-                              <Video className="h-5 w-5 text-red-500" />
+                              <Video className="h-5 w-5 text-red-500 flex-shrink-0" />
                             ) : (
-                              <File className="h-5 w-5 text-gray-500" />
+                              <File className="h-5 w-5 text-gray-500 flex-shrink-0" />
                             )}
-                            <div>
-                              <p className="text-sm font-medium">{file.name}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{file.name}</p>
                               <p className="text-xs text-gray-500">
                                 {(file.size / (1024 * 1024)).toFixed(1)} MB
                               </p>
@@ -1405,6 +1791,7 @@ const handleAddBriefing = async () => {
                             size="sm"
                             onClick={() => removeAttachment(index)}
                             disabled={loading}
+                            className="h-8 w-8 p-0"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -1414,11 +1801,13 @@ const handleAddBriefing = async () => {
                   )}
                 </div>
                 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <DialogClose asChild>
-                    <Button variant="outline" disabled={loading}>Cancel</Button>
+                    <Button variant="outline" disabled={loading} className="w-full sm:w-auto h-9">
+                      Cancel
+                    </Button>
                   </DialogClose>
-                  <Button onClick={handleAddBriefing} disabled={loading}>
+                  <Button onClick={handleAddBriefing} disabled={loading} className="w-full sm:w-auto h-9">
                     {loading ? 'Adding...' : 'Add Staff Briefing'}
                   </Button>
                 </DialogFooter>
@@ -1428,86 +1817,120 @@ const handleAddBriefing = async () => {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Training Sessions</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalTrainings}</p>
-                  <p className="text-xs text-green-600 mt-1">
-                    +2 this week
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Calendar className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Staff Briefings</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.staffBriefings}</p>
-                  <p className="text-xs text-green-600 mt-1">
-                    Daily average: 3
-                  </p>
-                </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <Users className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Completed Training</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.completedTraining}</p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {stats.totalTrainings > 0 
-                      ? `${Math.round((stats.completedTraining / stats.totalTrainings) * 100)}% completion rate`
-                      : '0% completion rate'
-                    }
-                  </p>
-                </div>
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <CheckCircle className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Actions</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.pendingActions}</p>
-                  <p className="text-xs text-red-600 mt-1">
-                    Requires attention
-                  </p>
-                </div>
-                <div className="p-3 bg-red-100 rounded-full">
-                  <AlertCircle className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+          {isMobileView ? (
+            <>
+              <MobileStatCard
+                title="Total Trainings"
+                value={stats.totalTrainings}
+                subValue="+2 this week"
+                icon={Calendar}
+                color="blue"
+              />
+              <MobileStatCard
+                title="Staff Briefings"
+                value={stats.staffBriefings}
+                subValue="Daily avg: 3"
+                icon={Users}
+                color="green"
+              />
+              <MobileStatCard
+                title="Completed"
+                value={stats.completedTraining}
+                subValue={`${stats.totalTrainings > 0 ? Math.round((stats.completedTraining / stats.totalTrainings) * 100) : 0}% rate`}
+                icon={CheckCircle}
+                color="purple"
+              />
+              <MobileStatCard
+                title="Pending Actions"
+                value={stats.pendingActions}
+                subValue="Requires attention"
+                icon={AlertCircle}
+                color="red"
+              />
+            </>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Total Training Sessions</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.totalTrainings}</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        +2 this week
+                      </p>
+                    </div>
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <Calendar className="h-6 w-6 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Staff Briefings</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.staffBriefings}</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Daily average: 3
+                      </p>
+                    </div>
+                    <div className="p-3 bg-green-100 rounded-full">
+                      <Users className="h-6 w-6 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Completed Training</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.completedTraining}</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {stats.totalTrainings > 0 
+                          ? `${Math.round((stats.completedTraining / stats.totalTrainings) * 100)}% completion rate`
+                          : '0% completion rate'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-purple-100 rounded-full">
+                      <CheckCircle className="h-6 w-6 text-purple-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Pending Actions</p>
+                      <p className="text-2xl font-bold text-gray-900">{stats.pendingActions}</p>
+                      <p className="text-xs text-red-600 mt-1">
+                        Requires attention
+                      </p>
+                    </div>
+                    <div className="p-3 bg-red-100 rounded-full">
+                      <AlertCircle className="h-6 w-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </motion.div>
 
       {/* Main Content */}
       {loading && viewMode === 'list' ? (
-        <div className="flex justify-center items-center py-20">
+        <div className="flex justify-center items-center py-16 md:py-20">
           <div className="text-center">
-            <RefreshCw className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Loading data...</p>
+            <RefreshCw className="h-8 w-8 md:h-12 md:w-12 text-blue-500 animate-spin mx-auto mb-4" />
+            <p className="text-sm md:text-base text-gray-600">Loading data...</p>
           </div>
         </div>
       ) : viewMode === 'list' ? (
@@ -1515,13 +1938,15 @@ const handleAddBriefing = async () => {
           {/* Tabs */}
           <Tabs defaultValue="training" className="mb-6" onValueChange={(value: any) => setActiveTab(value)}>
             <TabsList className="grid w-full md:w-auto grid-cols-2">
-              <TabsTrigger value="training" className="flex items-center gap-2" disabled={loading}>
+              <TabsTrigger value="training" className="flex items-center gap-2 text-sm" disabled={loading}>
                 <Calendar className="h-4 w-4" />
-                Training Sessions
+                <span className="hidden sm:inline">Training Sessions</span>
+                <span className="sm:hidden">Training</span>
               </TabsTrigger>
-              <TabsTrigger value="briefing" className="flex items-center gap-2" disabled={loading}>
+              <TabsTrigger value="briefing" className="flex items-center gap-2 text-sm" disabled={loading}>
                 <MessageSquare className="h-4 w-4" />
-                Staff Briefings
+                <span className="hidden sm:inline">Staff Briefings</span>
+                <span className="sm:hidden">Briefings</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1542,46 +1967,63 @@ const handleAddBriefing = async () => {
                       placeholder={activeTab === 'training' ? "Search training sessions..." : "Search staff briefings..."}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full md:w-64"
+                      className="w-full md:w-64 h-9"
                       disabled={loading}
                     />
                   </div>
                   
                   <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4 text-gray-400" />
-                      <Select value={filterDepartment} onValueChange={setFilterDepartment} disabled={loading}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="All Departments" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Departments</SelectItem>
-                          {departments.map(dept => (
-                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {activeTab === 'training' && (
-                      <Select value={filterStatus} onValueChange={setFilterStatus} disabled={loading}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="All Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Status</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                          <SelectItem value="ongoing">Ongoing</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    {isMobileView && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMobileFilters(!showMobileFilters)}
+                        className="w-full"
+                      >
+                        <Filter className="h-4 w-4 mr-2" />
+                        Filters
+                        {showMobileFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                      </Button>
                     )}
                     
-                    <Button variant="outline" size="sm" disabled={loading}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
+                    {(!isMobileView || showMobileFilters) && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4 text-gray-400" />
+                          <Select value={filterDepartment} onValueChange={setFilterDepartment} disabled={loading}>
+                            <SelectTrigger className="w-32 md:w-40 h-9">
+                              <SelectValue placeholder="All Depts" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Departments</SelectItem>
+                              {departments.map(dept => (
+                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {activeTab === 'training' && (
+                          <Select value={filterStatus} onValueChange={setFilterStatus} disabled={loading}>
+                            <SelectTrigger className="w-32 md:w-40 h-9">
+                              <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="scheduled">Scheduled</SelectItem>
+                              <SelectItem value="ongoing">Ongoing</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        
+                        <Button variant="outline" size="sm" disabled={loading} className="h-9">
+                          <Download className="h-4 w-4 mr-2" />
+                          Export
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1600,21 +2042,41 @@ const handleAddBriefing = async () => {
               >
                 <Card>
                   <CardHeader>
-                    <CardTitle>Training Sessions</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg md:text-xl">Training Sessions</CardTitle>
+                    <CardDescription className="text-sm">
                       Manage weekly training sessions and track attendance
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {filteredTrainingSessions.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No training sessions found</h3>
-                        <p className="text-gray-500 mb-4">Try adjusting your filters or add a new training session.</p>
-                        <Button onClick={() => setShowAddTraining(true)} disabled={loading}>
+                      <div className="text-center py-8 md:py-12">
+                        <Calendar className="h-10 w-10 md:h-12 md:w-12 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-base md:text-lg font-medium text-gray-900 mb-2">No training sessions found</h3>
+                        <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or add a new training session.</p>
+                        <Button onClick={() => setShowAddTraining(true)} disabled={loading} size={isMobileView ? "sm" : "default"}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add Training Session
                         </Button>
+                      </div>
+                    ) : isMobileView ? (
+                      <div className="space-y-3">
+                        {filteredTrainingSessions.map(session => (
+                          <MobileTrainingCard
+                            key={session._id}
+                            session={session}
+                            onView={(s) => {
+                              setSelectedTraining(s);
+                              // Handle view dialog
+                            }}
+                            onUpdateStatus={updateTrainingStatus}
+                            onDelete={deleteTraining}
+                            getTypeColor={getTypeColor}
+                            getStatusBadge={getStatusBadge}
+                            formatDate={formatDate}
+                            trainingTypes={trainingTypes}
+                            loading={loading}
+                          />
+                        ))}
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -1629,7 +2091,7 @@ const handleAddBriefing = async () => {
                                       <p className="text-sm text-gray-600 mt-1">{session.description}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <Badge className={trainingTypes.find(t => t.value === session.type)?.color}>
+                                      <Badge className={getTypeColor(session.type)}>
                                         {trainingTypes.find(t => t.value === session.type)?.label}
                                       </Badge>
                                       <Badge className={getStatusBadge(session.status)}>
@@ -1695,7 +2157,7 @@ const handleAddBriefing = async () => {
                                             ) : (
                                               <File className="h-3 w-3" />
                                             )}
-                                            {attachment.name}
+                                            <span className="truncate max-w-[100px]">{attachment.name}</span>
                                           </Badge>
                                         ))}
                                       </div>
@@ -1711,7 +2173,7 @@ const handleAddBriefing = async () => {
                                         View Details
                                       </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="max-w-3xl">
+                                    <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
                                       <DialogHeader>
                                         <DialogTitle>Training Session Details</DialogTitle>
                                       </DialogHeader>
@@ -1784,7 +2246,7 @@ const handleAddBriefing = async () => {
                                       onValueChange={(value: any) => updateTrainingStatus(session._id, value)}
                                       disabled={loading}
                                     >
-                                      <SelectTrigger className="w-full">
+                                      <SelectTrigger className="w-full h-9">
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -1800,6 +2262,7 @@ const handleAddBriefing = async () => {
                                       size="sm"
                                       onClick={() => deleteTraining(session._id)}
                                       disabled={loading}
+                                      className="h-9 w-9 p-0"
                                     >
                                       <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
@@ -1824,21 +2287,40 @@ const handleAddBriefing = async () => {
               >
                 <Card>
                   <CardHeader>
-                    <CardTitle>Staff Briefings</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg md:text-xl">Staff Briefings</CardTitle>
+                    <CardDescription className="text-sm">
                       Daily staff briefings and action items
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {filteredStaffBriefings.length === 0 ? (
-                      <div className="text-center py-12">
-                        <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No staff briefings found</h3>
-                        <p className="text-gray-500 mb-4">Try adjusting your filters or add a new staff briefing.</p>
-                        <Button onClick={() => setShowAddBriefing(true)} disabled={loading}>
+                      <div className="text-center py-8 md:py-12">
+                        <MessageSquare className="h-10 w-10 md:h-12 md:w-12 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-base md:text-lg font-medium text-gray-900 mb-2">No staff briefings found</h3>
+                        <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or add a new staff briefing.</p>
+                        <Button onClick={() => setShowAddBriefing(true)} disabled={loading} size={isMobileView ? "sm" : "default"}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add Staff Briefing
                         </Button>
+                      </div>
+                    ) : isMobileView ? (
+                      <div className="space-y-3">
+                        {filteredStaffBriefings.map(briefing => (
+                          <MobileBriefingCard
+                            key={briefing._id}
+                            briefing={briefing}
+                            onView={(b) => {
+                              setSelectedBriefing(b);
+                              // Handle view dialog
+                            }}
+                            onDelete={deleteBriefing}
+                            onUpdateAction={updateActionItemStatus}
+                            getShiftBadge={getShiftBadge}
+                            getPriorityBadge={getPriorityBadge}
+                            formatDate={formatDate}
+                            loading={loading}
+                          />
+                        ))}
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -1906,7 +2388,7 @@ const handleAddBriefing = async () => {
                                       <div className="space-y-2">
                                         {briefing.actionItems.map(item => (
                                           <div key={item._id || item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-3 flex-1">
                                               <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -1916,6 +2398,7 @@ const handleAddBriefing = async () => {
                                                   item.status === 'completed' ? 'pending' : 'completed'
                                                 )}
                                                 disabled={loading}
+                                                className="h-8 w-8 p-0"
                                               >
                                                 {item.status === 'completed' ? (
                                                   <CheckSquare className="h-4 w-4 text-green-500" />
@@ -1923,7 +2406,7 @@ const handleAddBriefing = async () => {
                                                   <Square className="h-4 w-4 text-gray-400" />
                                                 )}
                                               </Button>
-                                              <div>
+                                              <div className="flex-1">
                                                 <p className="font-medium">{item.description}</p>
                                                 <div className="flex items-center gap-3 text-xs text-gray-500">
                                                   <span>Assigned to: {item.assignedTo}</span>
@@ -1953,7 +2436,7 @@ const handleAddBriefing = async () => {
                                             ) : (
                                               <File className="h-3 w-3" />
                                             )}
-                                            {attachment.name}
+                                            <span className="truncate max-w-[100px]">{attachment.name}</span>
                                           </Badge>
                                         ))}
                                       </div>
@@ -1976,7 +2459,7 @@ const handleAddBriefing = async () => {
                                         View Details
                                       </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="max-w-3xl">
+                                    <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
                                       <DialogHeader>
                                         <DialogTitle>Staff Briefing Details</DialogTitle>
                                       </DialogHeader>
@@ -2027,6 +2510,7 @@ const handleAddBriefing = async () => {
                                     size="sm"
                                     onClick={() => deleteBriefing(briefing._id)}
                                     disabled={loading}
+                                    className="h-9 w-9 p-0"
                                   >
                                     <Trash2 className="h-4 w-4 text-red-500" />
                                   </Button>
@@ -2054,42 +2538,49 @@ const handleAddBriefing = async () => {
             <CardHeader>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <CardTitle>Training & Briefing Calendar</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-lg md:text-xl">Training & Briefing Calendar</CardTitle>
+                  <CardDescription className="text-sm">
                     View all scheduled training sessions and staff briefings
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={prevMonth} disabled={loading}>
+                  <Button variant="outline" size="sm" onClick={prevMonth} disabled={loading} className="h-8 w-8 p-0">
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <h3 className="text-lg font-semibold">
+                  <h3 className="text-base md:text-lg font-semibold">
                     {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </h3>
-                  <Button variant="outline" size="sm" onClick={nextMonth} disabled={loading}>
+                  <Button variant="outline" size="sm" onClick={nextMonth} disabled={loading} className="h-8 w-8 p-0">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center font-medium text-gray-500 py-2">
-                    {day}
-                  </div>
-                ))}
+              <div className="grid grid-cols-7 gap-1 md:gap-2 mb-4">
+                {isMobileView 
+                  ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+                      <div key={day} className="text-center font-medium text-gray-500 py-2 text-xs">
+                        {day}
+                      </div>
+                    ))
+                  : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="text-center font-medium text-gray-500 py-2">
+                        {day}
+                      </div>
+                    ))
+                }
                 
                 {/* Calendar days would be rendered here */}
                 {/* This is a simplified version - you would implement full calendar logic */}
                 
-                <div className="text-center text-gray-400 py-8">
+                <div className="col-span-7 text-center text-gray-400 py-8 text-sm">
                   Calendar view would show training sessions and briefings on their respective dates
                 </div>
               </div>
               
               <div className="space-y-4 mt-8">
-                <h4 className="font-semibold">Upcoming Events</h4>
+                <h4 className="font-semibold text-base md:text-lg">Upcoming Events</h4>
                 {calendarEvents
                   .filter(event => new Date(event.date) >= new Date())
                   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -2097,13 +2588,13 @@ const handleAddBriefing = async () => {
                   .map(event => (
                     <div key={event.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                       <div className={`h-3 w-3 rounded-full ${event.color}`}></div>
-                      <div className="flex-1">
-                        <p className="font-medium">{event.title}</p>
-                        <p className="text-sm text-gray-600">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{event.title}</p>
+                        <p className="text-xs text-gray-600">
                           {formatDate(event.date)} • {event.type === 'training' ? 'Training' : 'Briefing'}
                         </p>
                       </div>
-                      <Button variant="ghost" size="sm" disabled={loading}>
+                      <Button variant="ghost" size="sm" disabled={loading} className="h-8">
                         View
                       </Button>
                     </div>

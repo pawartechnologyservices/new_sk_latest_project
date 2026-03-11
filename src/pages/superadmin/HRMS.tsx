@@ -1,6 +1,7 @@
 // src/components/hrms/HRMS.tsx
 import { useState } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { DashboardSidebar } from "@/components/shared/DashboardSidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import EmployeesTab from "./EmployeesTab";
@@ -968,14 +969,36 @@ const HRMS = () => {
   const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>(initialSalaryStructures);
   const [salarySlips, setSalarySlips] = useState<SalarySlip[]>(initialSalarySlips);
   const [activeTab, setActiveTab] = useState("employees");
-    const [deductions, setDeductions] = useState<Deduction[]>([]);
+  const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
+  
+  // Mobile sidebar state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const handleMenuClick = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
+  const handleMobileClose = () => {
+    setMobileSidebarOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader title="HRMS - Human Resource Management" />
+      <DashboardHeader 
+        title="HRMS - Human Resource Management" 
+        onMenuClick={handleMenuClick}
+      />
+      
+      {/* Mobile Sidebar */}
+      {mobileSidebarOpen && (
+        <DashboardSidebar 
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={handleMobileClose}
+        />
+      )}
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -1051,7 +1074,7 @@ const HRMS = () => {
           <TabsContent value="performance">
             <PerformanceTab
               performance={performance}
-               setDeductions={setDeductions} 
+              setDeductions={setDeductions} 
               setPerformance={setPerformance}
             />
           </TabsContent>

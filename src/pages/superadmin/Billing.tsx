@@ -10,9 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, FileText, DollarSign, TrendingUp, Eye, Download, Upload, IndianRupee, Calendar, Clock, CreditCard, Banknote, Receipt, Edit, Users, Filter, FileDown, Building, Home, Shield, Car, Trash2, Droplets, Package, List, Grid, ChevronLeft, ChevronRight, Search, AlertTriangle, BarChart3, PieChart } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, FileText, DollarSign, TrendingUp, Eye, Download, Upload, IndianRupee, Calendar, Clock, CreditCard, Banknote, Receipt, Edit, Users, Filter, FileDown, Building, Home, Shield, Car, Trash2, Droplets, Package, List, Grid, ChevronLeft, ChevronRight, Search, AlertTriangle, BarChart3, PieChart, ChevronDown, MoreVertical, Menu, X, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
 
 // Import components - Removed RevenueAnalyticsTab import
 import InvoicesTab from "./billing/InvoicesTab";
@@ -167,6 +174,329 @@ export interface SiteProfit {
   netProfit: number;
   profitMargin: number;
 }
+
+// Mobile responsive stat card
+const MobileStatCard = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  color = "primary",
+  subtitle 
+}: { 
+  title: string; 
+  value: string; 
+  icon: any;
+  color?: string;
+  subtitle?: string;
+}) => {
+  const colorClasses = {
+    primary: "text-primary bg-primary/10",
+    success: "text-green-600 bg-green-100",
+    warning: "text-yellow-600 bg-yellow-100",
+    danger: "text-red-600 bg-red-100",
+    purple: "text-purple-600 bg-purple-100"
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">{title}</p>
+            <p className="text-xl font-bold mt-1">{value}</p>
+            {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+          </div>
+          <div className={`p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive invoice card
+const MobileInvoiceCard = ({ 
+  invoice, 
+  onView, 
+  onDownload, 
+  onMarkPaid,
+  formatCurrency,
+  getStatusColor 
+}: { 
+  invoice: Invoice; 
+  onView: (invoice: Invoice) => void;
+  onDownload: (invoice: Invoice) => void;
+  onMarkPaid: (id: string) => void;
+  formatCurrency: (amount: number) => string;
+  getStatusColor: (status: string) => "default" | "secondary" | "destructive" | "outline";
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">{invoice.invoiceNumber}</h3>
+              <Badge variant={getStatusColor(invoice.status)} className="text-xs">
+                {invoice.status}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{invoice.client}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onView(invoice)}>
+                  <Eye className="h-4 w-4 mr-2" /> View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDownload(invoice)}>
+                  <Download className="h-4 w-4 mr-2" /> Download
+                </DropdownMenuItem>
+                {invoice.status !== 'paid' && (
+                  <DropdownMenuItem onClick={() => onMarkPaid(invoice.id)}>
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" /> Mark as Paid
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span>{invoice.date}</span>
+          </div>
+          <span className="font-bold text-primary">{formatCurrency(invoice.amount)}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {invoice.site && (
+            <Badge variant="outline" className="text-xs">
+              <Building className="h-3 w-3 mr-1" />
+              {invoice.site}
+            </Badge>
+          )}
+          {invoice.serviceType && (
+            <Badge variant="outline" className="text-xs">
+              {invoice.serviceType}
+            </Badge>
+          )}
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Client Email</p>
+              <p className="text-sm">{invoice.clientEmail || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Due Date</p>
+              <p className="text-sm">{invoice.dueDate || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Payment Method</p>
+              <p className="text-sm">{invoice.paymentMethod || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Items</p>
+              <div className="space-y-2 mt-1">
+                {invoice.items.slice(0, 2).map((item, idx) => (
+                  <div key={idx} className="text-xs flex justify-between">
+                    <span className="truncate max-w-[150px]">{item.description}</span>
+                    <span>{formatCurrency(item.amount)}</span>
+                  </div>
+                ))}
+                {invoice.items.length > 2 && (
+                  <p className="text-xs text-muted-foreground">+{invoice.items.length - 2} more items</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive expense card
+const MobileExpenseCard = ({ 
+  expense, 
+  onEdit,
+  formatCurrency,
+  getStatusColor,
+  getExpenseTypeColor 
+}: { 
+  expense: Expense; 
+  onEdit: (expense: Expense) => void;
+  formatCurrency: (amount: number) => string;
+  getStatusColor: (status: string) => "default" | "secondary" | "destructive" | "outline";
+  getExpenseTypeColor: (type: string) => string;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">{expense.id}</h3>
+              <Badge variant={getStatusColor(expense.status)} className="text-xs">
+                {expense.status}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{expense.description}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onEdit(expense)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <Badge className={getExpenseTypeColor(expense.expenseType)}>
+            {expense.expenseType}
+          </Badge>
+          <span className="font-bold text-red-600">{formatCurrency(expense.amount)}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          <span>{expense.date}</span>
+          {expense.site && (
+            <>
+              <span>•</span>
+              <Building className="h-3 w-3" />
+              <span>{expense.site}</span>
+            </>
+          )}
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Category</p>
+              <p className="text-sm">{expense.category}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Vendor</p>
+              <p className="text-sm">{expense.vendor}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Payment Method</p>
+              <p className="text-sm">{expense.paymentMethod}</p>
+            </div>
+            {expense.gst && (
+              <div>
+                <p className="text-xs text-muted-foreground">GST</p>
+                <p className="text-sm">{formatCurrency(expense.gst)}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive payment card
+const MobilePaymentCard = ({ 
+  payment, 
+  formatCurrency,
+  getStatusColor 
+}: { 
+  payment: Payment; 
+  formatCurrency: (amount: number) => string;
+  getStatusColor: (status: string) => "default" | "secondary" | "destructive" | "outline";
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">{payment.id}</h3>
+              <Badge variant={getStatusColor(payment.status)} className="text-xs">
+                {payment.status}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{payment.client}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span>{payment.date}</span>
+          </div>
+          <span className="font-bold text-green-600">{formatCurrency(payment.amount)}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <CreditCard className="h-3 w-3" />
+          <span>{payment.method}</span>
+          <span>•</span>
+          <span>Invoice: {payment.invoiceId}</span>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t">
+            <div>
+              <p className="text-xs text-muted-foreground">Transaction Details</p>
+              <p className="text-sm mt-1">Invoice ID: {payment.invoiceId}</p>
+              <p className="text-sm">Client: {payment.client}</p>
+              <p className="text-sm">Amount: {formatCurrency(payment.amount)}</p>
+              <p className="text-sm">Method: {payment.method}</p>
+              <p className="text-sm">Date: {payment.date}</p>
+              <p className="text-sm">Status: {payment.status}</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 // Constants
 export const sites = [
@@ -707,6 +1037,11 @@ export const formatCurrency = (amount: number) => {
 
 // Main Component
 const Billing = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  
   // State
   const [activeTab, setActiveTab] = useState("invoices");
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
@@ -715,6 +1050,18 @@ const Billing = () => {
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [partyBalances, setPartyBalances] = useState<PartyBalance[]>([]);
   const [siteProfits, setSiteProfits] = useState<SiteProfit[]>([]);
+  
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Calculations
   const totalRevenue = invoices
@@ -1076,76 +1423,147 @@ const Billing = () => {
     invoice.status === "pending" || invoice.status === "overdue"
   );
 
+  // Tab options for mobile dropdown
+  const tabOptions = [
+    { value: "invoices", label: "Invoices", icon: <FileText className="h-4 w-4 mr-2" /> },
+    { value: "expenses", label: "Expenses", icon: <Receipt className="h-4 w-4 mr-2" /> },
+    { value: "payments", label: "Payment Summary", icon: <CreditCard className="h-4 w-4 mr-2" /> },
+    { value: "ledger", label: "Ledger & Balance", icon: <DollarSign className="h-4 w-4 mr-2" /> }
+  ];
+
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader title="Billing & Finance" />
+      <DashboardHeader 
+        title="Billing & Finance" 
+        onMenuClick={onMenuClick}
+      />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Enhanced Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <IndianRupee className="h-4 w-4" />
-                Total Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{formatCurrency(totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground">From {invoices.filter(i => i.status === "paid").length} paid invoices</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                Pending Payments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{formatCurrency(pendingAmount)}</div>
-              <p className="text-xs text-muted-foreground">{invoices.filter(i => i.status === "pending").length} pending invoices</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                Overdue Payments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
-              <p className="text-xs text-muted-foreground">{invoices.filter(i => i.status === "overdue").length} overdue invoices</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(netProfit)}
-              </div>
-              <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
-            </CardContent>
-          </Card>
+        {/* Enhanced Stats Cards - Mobile Responsive */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {isMobileView ? (
+            <>
+              <MobileStatCard
+                title="Revenue"
+                value={formatCurrency(totalRevenue)}
+                icon={IndianRupee}
+                color="primary"
+                subtitle={`${invoices.filter(i => i.status === "paid").length} paid`}
+              />
+              <MobileStatCard
+                title="Pending"
+                value={formatCurrency(pendingAmount)}
+                icon={AlertTriangle}
+                color="warning"
+                subtitle={`${invoices.filter(i => i.status === "pending").length} pending`}
+              />
+              <MobileStatCard
+                title="Overdue"
+                value={formatCurrency(overdueAmount)}
+                icon={AlertTriangle}
+                color="danger"
+                subtitle={`${invoices.filter(i => i.status === "overdue").length} overdue`}
+              />
+              <MobileStatCard
+                title="Net Profit"
+                value={formatCurrency(netProfit)}
+                icon={TrendingUp}
+                color={netProfit >= 0 ? "success" : "danger"}
+                subtitle="Revenue - Expenses"
+              />
+            </>
+          ) : (
+            <>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <IndianRupee className="h-4 w-4" />
+                    Total Revenue
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">{formatCurrency(totalRevenue)}</div>
+                  <p className="text-xs text-muted-foreground">From {invoices.filter(i => i.status === "paid").length} paid invoices</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    Pending Payments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-600">{formatCurrency(pendingAmount)}</div>
+                  <p className="text-xs text-muted-foreground">{invoices.filter(i => i.status === "pending").length} pending invoices</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Overdue Payments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">{formatCurrency(overdueAmount)}</div>
+                  <p className="text-xs text-muted-foreground">{invoices.filter(i => i.status === "overdue").length} overdue invoices</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(netProfit)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
-
-        {/* Main Tabs - Reduced from 5 to 4 tabs ..*/}
+        {/* Main Tabs - Mobile Responsive */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4"> {/* Changed from grid-cols-5 to grid-cols-4 */}
-            <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-            <TabsTrigger value="payments">Payment Summary</TabsTrigger>
-            <TabsTrigger value="ledger">Ledger & Balance</TabsTrigger>
-            {/* Removed: <TabsTrigger value="analytics">Revenue Analytics</TabsTrigger> */}
-          </TabsList>
+          {/* Desktop Tabs - Hidden on mobile */}
+          <div className="hidden sm:block">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="expenses">Expenses</TabsTrigger>
+              <TabsTrigger value="payments">Payment Summary</TabsTrigger>
+              <TabsTrigger value="ledger">Ledger & Balance</TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Mobile Dropdown - Visible only on mobile */}
+          <div className="sm:hidden mb-4">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue>
+                  <div className="flex items-center">
+                    {tabOptions.find(option => option.value === activeTab)?.icon}
+                    <span>{tabOptions.find(option => option.value === activeTab)?.label}</span>
+                  </div>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {tabOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center">
+                      {option.icon}
+                      <span>{option.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <TabsContent value="invoices">
             {/* Note: InvoicesTab component fetches its own data, so we don't pass invoices prop */}
@@ -1181,8 +1599,6 @@ const Billing = () => {
               onExportData={handleExportData}
             />
           </TabsContent>
-
-          {/* Removed Revenue Analytics tab content */}
         </Tabs>
       </motion.div>
     </div>

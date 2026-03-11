@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Trash2, Plus, Download, Sheet, User, Edit, Camera, FileText, ArrowUpDown, Calendar, Files, AlertCircle, Loader2, Save, Upload, Database, Cloud, CheckCircle, XCircle, Users, Building, Shield, ShieldCheck } from "lucide-react";
+import { Eye, Trash2, Plus, Download, Sheet, User, Edit, Camera, FileText, ArrowUpDown, Calendar, Files, AlertCircle, Loader2, Save, Upload, Database, Cloud, CheckCircle, XCircle, Users, Building, Shield, ShieldCheck, History, Clock, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Employee } from "./types";
 import StatCard from "./StatCard";
@@ -16,14 +16,32 @@ import Pagination from "./Pagination";
 import ExcelImportDialog from "./ExcelImportDialog";
 import axios from "axios";
 import * as XLSX from 'xlsx';
+import { format, differenceInDays } from 'date-fns';
 
 interface EmployeesTabProps {
   setActiveTab: (tab: string) => void;
+  employees?: Employee[];
+  setEmployees?: React.Dispatch<React.SetStateAction<Employee[]>>;
+  onEmployeeUpdate?: (updatedEmployee: Employee) => void;
+  onEmployeesBulkUpdate?: (updatedEmployees: Employee[]) => void;
 }
 
 const API_URL = process.env.NODE_ENV === 'development' 
-  ? `http://localhost:5001/api` 
+  ? `http://${window.location.hostname}:5001/api` 
   : '/api';
+
+// Site Assignment History Interface
+interface SiteAssignmentHistory {
+  siteName: string;
+  assignedDate: string;
+  leftDate?: string;
+  daysWorked?: number;
+}
+
+// Extended Employee interface with history
+interface ExtendedEmployee extends Employee {
+  siteHistory?: SiteAssignmentHistory[];
+}
 
 // EPF Form 11 Type
 interface EPFForm11Data {
@@ -68,7 +86,6 @@ interface EPFForm11Data {
   declarationPlace: string;
   employerDeclarationDate: string;
   
-  // Additional fields for employer declaration
   employerName: string;
   pfNumber: string;
   kycStatus: "not_uploaded" | "uploaded_not_approved" | "uploaded_approved";
@@ -111,8 +128,55 @@ interface SiteDeploymentStatus {
   };
 }
 
+// Edit Employee Form Interface
+interface EditEmployeeForm {
+  name: string;
+  email: string;
+  phone: string;
+  aadharNumber: string;
+  panNumber: string;
+  esicNumber: string;
+  uanNumber: string;
+  dateOfBirth: string;
+  bloodGroup: string;
+  gender: string;
+  maritalStatus: string;
+  permanentAddress: string;
+  permanentPincode: string;
+  localAddress: string;
+  localPincode: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string;
+  fatherName: string;
+  motherName: string;
+  spouseName: string;
+  numberOfChildren: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  emergencyContactRelation: string;
+  nomineeName: string;
+  nomineeRelation: string;
+  pantSize: string;
+  shirtSize: string;
+  capSize: string;
+  idCardIssued: boolean;
+  westcoatIssued: boolean;
+  apronIssued: boolean;
+  department: string;
+  position: string;
+  salary: number | string;
+  siteName: string;
+  status: "active" | "inactive" | "left";
+}
+
 const EmployeesTab = ({ 
-  setActiveTab
+  setActiveTab,
+  employees: propEmployees,
+  setEmployees: propSetEmployees,
+  onEmployeeUpdate,
+  onEmployeesBulkUpdate
 }: EmployeesTabProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -128,7 +192,14 @@ const EmployeesTab = ({
   const [selectedEmployeeForEPF, setSelectedEmployeeForEPF] = useState<Employee | null>(null);
   const [isSavingEPF, setIsSavingEPF] = useState(false);
   
-  // New state for bulk operations
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedEmployeeForEdit, setSelectedEmployeeForEdit] = useState<ExtendedEmployee | null>(null);
+  const [editFormData, setEditFormData] = useState<EditEmployeeForm | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState<ExtendedEmployee | null>(null);
+  
   const [bulkSiteDialogOpen, setBulkSiteDialogOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
@@ -137,16 +208,13 @@ const EmployeesTab = ({
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   
-  // Sites data from API
   const [sitesFromAPI, setSitesFromAPI] = useState<Site[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
   
-  // Site deployment status
   const [siteDeploymentStatus, setSiteDeploymentStatus] = useState<Map<string, SiteDeploymentStatus>>(new Map());
   const [loadingDeploymentStatus, setLoadingDeploymentStatus] = useState(false);
   
-  // Employees data from API
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [localEmployees, setLocalEmployees] = useState<ExtendedEmployee[]>([]);
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +222,9 @@ const EmployeesTab = ({
   const [isImporting, setIsImporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  
+  const employees = propEmployees || localEmployees;
+  const setEmployees = propSetEmployees || setLocalEmployees;
   
   const [epfFormData, setEpfFormData] = useState<EPFForm11Data>({
     memberName: "",
@@ -257,6 +328,7 @@ const EmployeesTab = ({
         
         const transformedEmployees = apiData.map((emp: any, index: number) => {
           const employee = {
+            _id: emp._id || emp.id || `emp_${index}`,
             id: emp._id || emp.id || `emp_${index}`,
             employeeId: emp.employeeId || emp.employeeID || `EMP${String(index + 1).padStart(4, '0')}`,
             name: emp.name || emp.employeeName || "Unknown",
@@ -266,8 +338,10 @@ const EmployeesTab = ({
             panNumber: emp.panNumber || emp.pan || "",
             esicNumber: emp.esicNumber || emp.esic || "",
             uan: emp.uanNumber || emp.uan || "",
+            uanNumber: emp.uanNumber || emp.uan || "",
             dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth).toISOString().split('T')[0] : "",
             joinDate: emp.dateOfJoining ? new Date(emp.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            dateOfJoining: emp.dateOfJoining ? new Date(emp.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             exitDate: emp.dateOfExit ? new Date(emp.dateOfExit).toISOString().split('T')[0] : "",
             bloodGroup: emp.bloodGroup || "",
             gender: emp.gender || "",
@@ -294,11 +368,11 @@ const EmployeesTab = ({
             emergencyContactName: emp.emergencyContactName || "",
             emergencyContactPhone: emp.emergencyContactPhone || "",
             emergencyContactRelation: emp.emergencyContactRelation || "",
+            siteHistory: emp.siteHistory || [],
             isManager: false,
             isSupervisor: false
           };
           
-          // Set manager/supervisor flags
           const position = employee.position?.toLowerCase() || '';
           const department = employee.department?.toLowerCase() || '';
           
@@ -307,7 +381,6 @@ const EmployeesTab = ({
           
           return employee;
         });
-        
         setEmployees(transformedEmployees);
         
         const totalFromAPI = response.data.pagination?.total || response.data.total || response.data.count || 0;
@@ -339,16 +412,12 @@ const EmployeesTab = ({
       
       console.log("Sites API Response:", response.data);
       
-      // Handle different API response structures
       if (response.data) {
         if (response.data.success && Array.isArray(response.data.data)) {
-          // If API returns { success: true, data: [...] }
           setSitesFromAPI(response.data.data);
         } else if (Array.isArray(response.data)) {
-          // If API returns array directly
           setSitesFromAPI(response.data);
         } else if (response.data.sites && Array.isArray(response.data.sites)) {
-          // If API returns { sites: [...] }
           setSitesFromAPI(response.data.sites);
         } else {
           console.warn("Unexpected sites API response format:", response.data);
@@ -357,7 +426,6 @@ const EmployeesTab = ({
       }
     } catch (err: any) {
       console.error("Error fetching sites:", err);
-      // Don't show error toast for sites, just log it
       setSitesFromAPI([]);
     } finally {
       setLoadingSites(false);
@@ -370,9 +438,7 @@ const EmployeesTab = ({
     
     const statusMap = new Map<string, SiteDeploymentStatus>();
     
-    // Initialize with sites from API
     sitesFromAPI.forEach(site => {
-      // Calculate staff requirement from staffDeployment (excluding managers and supervisors)
       const staffRequirement = Array.isArray(site.staffDeployment) 
         ? site.staffDeployment.reduce((total, item) => {
             const role = item.role?.toLowerCase() || '';
@@ -406,13 +472,11 @@ const EmployeesTab = ({
       });
     });
     
-    // Count employees per site
     employees.forEach(emp => {
       if (!emp.siteName) return;
       
       const siteName = emp.siteName;
       if (!statusMap.has(siteName) && siteName !== "Not specified" && siteName !== "") {
-        // If site not in API, create entry with default requirements
         statusMap.set(siteName, {
           siteName,
           managerCount: 0,
@@ -439,7 +503,6 @@ const EmployeesTab = ({
       const siteStatus = statusMap.get(siteName);
       if (!siteStatus) return;
       
-      // Categorize by role
       if (emp.isManager) {
         siteStatus.managerCount++;
         siteStatus.details.managers.push(emp);
@@ -453,7 +516,6 @@ const EmployeesTab = ({
       
       siteStatus.totalStaff++;
       
-      // Calculate remaining and full status
       siteStatus.remainingManagers = Math.max(0, siteStatus.managerRequirement - siteStatus.managerCount);
       siteStatus.remainingSupervisors = Math.max(0, siteStatus.supervisorRequirement - siteStatus.supervisorCount);
       siteStatus.remainingStaff = Math.max(0, siteStatus.staffRequirement - siteStatus.staffCount);
@@ -478,18 +540,15 @@ const EmployeesTab = ({
   } => {
     const status = siteDeploymentStatus.get(siteName);
     if (!status) {
-      // If site not in deployment status, allow assignment
       return { allowed: true, violations: [] };
     }
     
     const violations: Array<{ employee: Employee; reason: string }> = [];
     
-    // Count how many of each role are being assigned
     const managersToAdd = employeesToAssign.filter(emp => emp.isManager).length;
     const supervisorsToAdd = employeesToAssign.filter(emp => emp.isSupervisor).length;
     const staffToAdd = employeesToAssign.filter(emp => !emp.isManager && !emp.isSupervisor).length;
     
-    // Check manager capacity
     if (managersToAdd > status.remainingManagers) {
       const overLimit = managersToAdd - status.remainingManagers;
       employeesToAssign.filter(emp => emp.isManager).slice(0, overLimit).forEach(emp => {
@@ -500,7 +559,6 @@ const EmployeesTab = ({
       });
     }
     
-    // Check supervisor capacity
     if (supervisorsToAdd > status.remainingSupervisors) {
       const overLimit = supervisorsToAdd - status.remainingSupervisors;
       employeesToAssign.filter(emp => emp.isSupervisor).slice(0, overLimit).forEach(emp => {
@@ -511,7 +569,6 @@ const EmployeesTab = ({
       });
     }
     
-    // Check staff capacity
     if (staffToAdd > status.remainingStaff) {
       const overLimit = staffToAdd - status.remainingStaff;
       employeesToAssign.filter(emp => !emp.isManager && !emp.isSupervisor).slice(0, overLimit).forEach(emp => {
@@ -525,6 +582,52 @@ const EmployeesTab = ({
     return {
       allowed: violations.length === 0,
       violations
+    };
+  };
+
+  // FIXED: Update site history when employee is assigned to a new site - This was the issue
+  const updateSiteHistory = (employee: ExtendedEmployee, newSiteName: string): ExtendedEmployee => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Ensure siteHistory is an array
+    let history = employee.siteHistory || [];
+    
+    // If employee already has a current site (and it's different from the new site)
+    if (employee.siteName && employee.siteName !== newSiteName && employee.siteName !== "") {
+      // Find the last entry that doesn't have a leftDate (current assignment)
+      const lastEntryIndex = history.findIndex(entry => !entry.leftDate);
+      
+      if (lastEntryIndex !== -1) {
+        // Update the previous site entry with left date and days worked
+        const lastEntry = history[lastEntryIndex];
+        const assignedDate = new Date(lastEntry.assignedDate);
+        const leftDate = new Date(today);
+        const daysWorked = differenceInDays(leftDate, assignedDate);
+        
+        // Create updated history array
+        history = history.map((entry, index) => {
+          if (index === lastEntryIndex) {
+            return {
+              ...entry,
+              leftDate: today,
+              daysWorked: daysWorked > 0 ? daysWorked : 0
+            };
+          }
+          return entry;
+        });
+      }
+    }
+    
+    // Add new history entry for the new site
+    history.push({
+      siteName: newSiteName,
+      assignedDate: today
+    });
+    
+    return {
+      ...employee,
+      siteName: newSiteName,
+      siteHistory: history
     };
   };
 
@@ -592,7 +695,7 @@ const EmployeesTab = ({
     if (selectAll) {
       setSelectedEmployees([]);
     } else {
-      setSelectedEmployees(sortedEmployees.map(emp => emp.id));
+      setSelectedEmployees(sortedEmployees.map(emp => emp.id || emp._id || ''));
     }
     setSelectAll(!selectAll);
   };
@@ -606,6 +709,194 @@ const EmployeesTab = ({
     }
   }, [selectedEmployees, sortedEmployees]);
 
+  // Handle Edit Employee
+  const handleEditEmployee = (employee: ExtendedEmployee) => {
+    setSelectedEmployeeForEdit(employee);
+    setEditFormData({
+      name: employee.name || "",
+      email: employee.email || "",
+      phone: employee.phone || "",
+      aadharNumber: employee.aadharNumber || "",
+      panNumber: employee.panNumber || "",
+      esicNumber: employee.esicNumber || "",
+      uanNumber: employee.uanNumber || employee.uan || "",
+      dateOfBirth: employee.dateOfBirth || "",
+      bloodGroup: employee.bloodGroup || "",
+      gender: employee.gender || "",
+      maritalStatus: employee.maritalStatus || "",
+      permanentAddress: employee.permanentAddress || "",
+      permanentPincode: employee.permanentPincode || "",
+      localAddress: employee.localAddress || "",
+      localPincode: employee.localPincode || "",
+      bankName: employee.bankName || "",
+      accountNumber: employee.accountNumber || "",
+      ifscCode: employee.ifscCode || "",
+      branchName: employee.branchName || "",
+      fatherName: employee.fatherName || "",
+      motherName: employee.motherName || "",
+      spouseName: employee.spouseName || "",
+      numberOfChildren: employee.numberOfChildren?.toString() || "0",
+      emergencyContactName: employee.emergencyContactName || "",
+      emergencyContactPhone: employee.emergencyContactPhone || "",
+      emergencyContactRelation: employee.emergencyContactRelation || "",
+      nomineeName: employee.nomineeName || "",
+      nomineeRelation: employee.nomineeRelation || "",
+      pantSize: employee.pantSize || "",
+      shirtSize: employee.shirtSize || "",
+      capSize: employee.capSize || "",
+      idCardIssued: employee.idCardIssued || false,
+      westcoatIssued: employee.westcoatIssued || false,
+      apronIssued: employee.apronIssued || false,
+      department: employee.department || "",
+      position: employee.position || "",
+      salary: employee.salary || 0,
+      siteName: employee.siteName || "",
+      status: employee.status || "active"
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Handle Edit Form Change
+  const handleEditFormChange = (field: keyof EditEmployeeForm, value: any) => {
+    if (editFormData) {
+      setEditFormData({
+        ...editFormData,
+        [field]: value
+      });
+    }
+  };
+
+  // Handle Save Edit
+  const handleSaveEdit = async () => {
+    if (!selectedEmployeeForEdit || !editFormData) {
+      toast.error("No employee selected for editing");
+      return;
+    }
+
+    const requiredFields = [
+      { field: editFormData.name, name: 'Name' },
+      { field: editFormData.email, name: 'Email' },
+      { field: editFormData.aadharNumber, name: 'Aadhar Number' },
+      { field: editFormData.position, name: 'Position' },
+      { field: editFormData.department, name: 'Department' },
+      { field: editFormData.siteName, name: 'Site Name' },
+    ];
+
+    const missingFields = requiredFields
+      .filter(item => !item.field || item.field.toString().trim() === '')
+      .map(item => item.name);
+
+    if (missingFields.length > 0) {
+      toast.error(`Please fill all required fields: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editFormData.email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    if (editFormData.phone && !/^\d{10}$/.test(editFormData.phone)) {
+      toast.error("Please enter a valid 10-digit phone number");
+      return;
+    }
+
+    if (!/^\d{12}$/.test(editFormData.aadharNumber)) {
+      toast.error("Please enter a valid 12-digit Aadhar number");
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      
+      const employeeId = selectedEmployeeForEdit.id || selectedEmployeeForEdit._id;
+      
+      const apiData = {
+        ...editFormData,
+        panNumber: editFormData.panNumber?.trim() || null,
+        esicNumber: editFormData.esicNumber?.trim() || null,
+        uanNumber: editFormData.uanNumber?.trim() || null,
+        dateOfBirth: editFormData.dateOfBirth || null,
+        bloodGroup: editFormData.bloodGroup || null,
+        gender: editFormData.gender || null,
+        maritalStatus: editFormData.maritalStatus || null,
+        permanentAddress: editFormData.permanentAddress?.trim() || null,
+        permanentPincode: editFormData.permanentPincode?.trim() || null,
+        localAddress: editFormData.localAddress?.trim() || null,
+        localPincode: editFormData.localPincode?.trim() || null,
+        bankName: editFormData.bankName?.trim() || null,
+        accountNumber: editFormData.accountNumber?.trim() || null,
+        ifscCode: editFormData.ifscCode?.trim().toUpperCase() || null,
+        branchName: editFormData.branchName?.trim() || null,
+        fatherName: editFormData.fatherName?.trim() || null,
+        motherName: editFormData.motherName?.trim() || null,
+        spouseName: editFormData.spouseName?.trim() || null,
+        numberOfChildren: editFormData.numberOfChildren ? parseInt(editFormData.numberOfChildren.toString()) : 0,
+        emergencyContactName: editFormData.emergencyContactName?.trim() || null,
+        emergencyContactPhone: editFormData.emergencyContactPhone?.trim() || null,
+        emergencyContactRelation: editFormData.emergencyContactRelation?.trim() || null,
+        nomineeName: editFormData.nomineeName?.trim() || null,
+        nomineeRelation: editFormData.nomineeRelation?.trim() || null,
+        pantSize: editFormData.pantSize || null,
+        shirtSize: editFormData.shirtSize || null,
+        capSize: editFormData.capSize || null,
+        idCardIssued: editFormData.idCardIssued === true,
+        westcoatIssued: editFormData.westcoatIssued === true,
+        apronIssued: editFormData.apronIssued === true,
+        salary: typeof editFormData.salary === 'string' ? parseFloat(editFormData.salary) : editFormData.salary,
+      };
+
+      console.log('Sending update data:', apiData);
+      
+      const response = await axios.patch(`${API_URL}/employees/${employeeId}`, apiData);
+
+      if (response.data.success) {
+        setEmployees(prev => prev.map(emp => 
+          (emp.id === employeeId || emp._id === employeeId) 
+            ? { ...emp, ...apiData }
+            : emp
+        ));
+        
+        if (onEmployeeUpdate) {
+          const updatedEmployee = employees.find(emp => emp.id === employeeId || emp._id === employeeId);
+          if (updatedEmployee) {
+            onEmployeeUpdate({ ...updatedEmployee, ...apiData });
+          }
+        }
+        
+        toast.success("Employee updated successfully!");
+        setEditDialogOpen(false);
+        setSelectedEmployeeForEdit(null);
+        setEditFormData(null);
+        
+        calculateSiteDeploymentStatus();
+        fetchEmployees();
+      } else {
+        toast.error(response.data.message || "Failed to update employee");
+      }
+    } catch (err: any) {
+      console.error("Error updating employee:", err);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || "Error updating employee";
+      toast.error(errorMessage);
+      
+      console.error("Error details:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        config: err.config
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Handle View History
+  const handleViewHistory = (employee: ExtendedEmployee) => {
+    setSelectedEmployeeForHistory(employee);
+    setHistoryDialogOpen(true);
+  };
+
   // Bulk operations handlers
   const handleBulkSiteAssignment = async () => {
     if (!selectedSiteForBulk) {
@@ -618,14 +909,11 @@ const EmployeesTab = ({
       return;
     }
 
-    // Get the selected employees data
-    const employeesToAssign = employees.filter(emp => selectedEmployees.includes(emp.id));
+    const employeesToAssign = employees.filter(emp => selectedEmployees.includes(emp.id || emp._id || ''));
     
-    // Check site capacity based on roles
     const capacityCheck = canAssignToSite(selectedSiteForBulk, employeesToAssign);
     
     if (!capacityCheck.allowed) {
-      // Show detailed error message
       toast.error(
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -657,7 +945,6 @@ const EmployeesTab = ({
       });
 
       if (response.data.success) {
-        // Count by role for success message
         const managersCount = employeesToAssign.filter(emp => emp.isManager).length;
         const supervisorsCount = employeesToAssign.filter(emp => emp.isSupervisor).length;
         const staffCount = employeesToAssign.filter(emp => !emp.isManager && !emp.isSupervisor).length;
@@ -679,18 +966,25 @@ const EmployeesTab = ({
           </div>
         );
         
-        setEmployees(prev => prev.map(emp => 
-          selectedEmployees.includes(emp.id) 
-            ? { ...emp, siteName: selectedSiteForBulk }
-            : emp
-        ));
+        setEmployees(prev => prev.map(emp => {
+          if (selectedEmployees.includes(emp.id || emp._id || '')) {
+            return updateSiteHistory(emp as ExtendedEmployee, selectedSiteForBulk);
+          }
+          return emp;
+        }));
+        
+        if (onEmployeesBulkUpdate) {
+          const updatedEmployees = employees
+            .filter(emp => selectedEmployees.includes(emp.id || emp._id || ''))
+            .map(emp => updateSiteHistory(emp as ExtendedEmployee, selectedSiteForBulk));
+          onEmployeesBulkUpdate(updatedEmployees);
+        }
         
         setBulkSiteDialogOpen(false);
         setSelectedEmployees([]);
         setSelectAll(false);
         setSelectedSiteForBulk("");
         
-        // Recalculate deployment status
         calculateSiteDeploymentStatus();
         fetchEmployees();
       } else {
@@ -720,14 +1014,13 @@ const EmployeesTab = ({
       if (response.data.success) {
         toast.success(`Successfully deleted ${selectedEmployees.length} employees`);
         
-        setEmployees(prev => prev.filter(emp => !selectedEmployees.includes(emp.id)));
+        setEmployees(prev => prev.filter(emp => !selectedEmployees.includes(emp.id || emp._id || '')));
         setTotalEmployees(prev => prev - selectedEmployees.length);
         
         setBulkDeleteDialogOpen(false);
         setSelectedEmployees([]);
         setSelectAll(false);
         
-        // Recalculate deployment status
         calculateSiteDeploymentStatus();
         fetchEmployees();
       } else {
@@ -744,22 +1037,21 @@ const EmployeesTab = ({
   const handleDeleteEmployee = async (id: string) => {
     try {
       setIsDeleting(id);
-      const employee = employees.find(emp => emp.id === id);
+      const employee = employees.find(emp => (emp.id === id || emp._id === id));
       if (!employee) {
         toast.error("Employee not found");
         return;
       }
       
-      const employeeId = employee.id;
+      const employeeId = employee.id || employee._id;
       
       const response = await axios.delete(`${API_URL}/employees/${employeeId}`);
       
       if (response.data.success) {
-        setEmployees(prev => prev.filter(emp => emp.id !== id));
+        setEmployees(prev => prev.filter(emp => emp.id !== id && emp._id !== id));
         setTotalEmployees(prev => prev - 1);
         toast.success("Employee deleted successfully!");
         
-        // Recalculate deployment status
         calculateSiteDeploymentStatus();
       } else {
         toast.error(response.data.message || "Failed to delete employee");
@@ -775,20 +1067,20 @@ const EmployeesTab = ({
   const handleMarkAsLeft = async (employee: Employee) => {
     try {
       setLoading(true);
+      const employeeId = employee.id || employee._id;
       const response = await axios.patch(
-        `${API_URL}/employees/${employee.id}/status`,
+        `${API_URL}/employees/${employeeId}/status`,
         { status: "left" }
       );
       
       if (response.data.success) {
         setEmployees(prev => prev.map(emp => 
-          emp.id === employee.id 
+          (emp.id === employeeId || emp._id === employeeId)
             ? { ...emp, status: "left", exitDate: new Date().toISOString().split("T")[0] }
             : emp
         ));
         toast.success("Employee marked as left");
         
-        // Recalculate deployment status
         calculateSiteDeploymentStatus();
       } else {
         toast.error(response.data.message || "Failed to update status");
@@ -1129,7 +1421,8 @@ const EmployeesTab = ({
           employeeSignature: null,
           employeeSignaturePublicId: null,
           authorizedSignature: null,
-          authorizedSignaturePublicId: null
+          authorizedSignaturePublicId: null,
+          siteHistory: []
         };
         
         employeesToImport.push(employeeData);
@@ -1484,7 +1777,7 @@ const EmployeesTab = ({
 
     try {
       setIsSavingEPF(true);
-      const employeeId = selectedEmployeeForEPF.id;
+      const employeeId = selectedEmployeeForEPF.id || selectedEmployeeForEPF._id;
       
       const response = await fetch(`${API_URL}/epf-forms`, {
         method: "POST",
@@ -1964,16 +2257,26 @@ const EmployeesTab = ({
     }
     
     if (typeof employee.photo === 'string') {
-      if (employee.photo.includes('cloudinary.com')) {
-        return employee.photo.replace('/image/upload/', '/image/upload/w_200,h_200,c_fill,q_auto/');
-      }
-      
-      if (employee.photo.startsWith('/uploads/')) {
-        return `http://localhost:5001${employee.photo}`;
-      }
-      
       if (employee.photo.startsWith('data:image')) {
         return employee.photo;
+      }
+      
+      if (employee.photo.includes('cloudinary.com')) {
+        if (employee.photo.includes('/image/upload/')) {
+          if (!employee.photo.includes('w_') && !employee.photo.includes('h_')) {
+            return employee.photo.replace('/image/upload/', '/image/upload/w_200,h_200,c_fill,q_auto/');
+          }
+          return employee.photo;
+        }
+        return employee.photo;
+      }
+      
+      if (employee.photo.startsWith('http')) {
+        return employee.photo;
+      }
+      
+      if (employee.photo.startsWith('/')) {
+        return `http://${window.location.hostname}:5001${employee.photo}`;
       }
       
       return employee.photo;
@@ -2431,12 +2734,11 @@ const EmployeesTab = ({
 
   return (
     <div className="space-y-6">
-      {/* Import Progress Indicator */}
       {isImporting && importProgress.total > 0 && (
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Database className="h-5 w-5 text-primary" />
                   <div>
@@ -2446,7 +2748,7 @@ const EmployeesTab = ({
                     </p>
                   </div>
                 </div>
-                <Badge variant="secondary">
+                <Badge variant="secondary" className="sm:ml-0 w-fit">
                   {importProgress.current}/{importProgress.total}
                 </Badge>
               </div>
@@ -2467,22 +2769,20 @@ const EmployeesTab = ({
         </Card>
       )}
 
-      {/* Loading overlay */}
       {loading && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
+          <div className="bg-white p-6 rounded-lg shadow-lg mx-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
             <p className="mt-4 text-center">Loading employees...</p>
           </div>
         </div>
       )}
 
-      {/* Error message */}
       {error && !loading && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-            <span className="text-red-700 font-medium">{error}</span>
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+            <span className="text-red-700 font-medium break-words">{error}</span>
           </div>
           <button
             onClick={() => {
@@ -2496,7 +2796,7 @@ const EmployeesTab = ({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div className="relative w-full sm:w-64">
           <SearchBar
             value={searchTerm}
@@ -2505,76 +2805,80 @@ const EmployeesTab = ({
           />
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <div className="flex gap-2">
-            <Select value={sortBy} onValueChange={handleSortChange}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name (A-Z)</SelectItem>
-                <SelectItem value="department">Department</SelectItem>
-                <SelectItem value="site">Site</SelectItem>
-                <SelectItem value="joinDate">Join Date</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setBulkSiteDialogOpen(true)}
-              disabled={selectedEmployees.length === 0}
-              className={selectedEmployees.length > 0 ? "border-blue-500 text-blue-600" : ""}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Assign Site {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setBulkDeleteDialogOpen(true)}
-              disabled={selectedEmployees.length === 0}
-              className={selectedEmployees.length > 0 ? "border-red-500 text-red-600 hover:bg-red-50" : ""}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Bulk Delete {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setImportDialogOpen(true)}
-              className="flex-1 sm:flex-none"
-              disabled={isImporting}
-            >
-              {isImporting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="mr-2 h-4 w-4" />
-              )}
-              {isImporting ? "Importing..." : "Import Excel"}
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleExportEmployees} 
-              className="flex-1 sm:flex-none"
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              {isExporting ? "Exporting..." : "Export Excel"}
-            </Button>
-            <Button onClick={() => setActiveTab("onboarding")} className="flex-1 sm:flex-none">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Employee
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full">
+            <div className="flex gap-2 w-full">
+              <Select value={sortBy} onValueChange={handleSortChange}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name (A-Z)</SelectItem>
+                  <SelectItem value="department">Department</SelectItem>
+                  <SelectItem value="site">Site</SelectItem>
+                  <SelectItem value="joinDate">Join Date</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap gap-2 w-full sm:flex-nowrap">
+              <Button 
+                variant="outline" 
+                onClick={() => setBulkSiteDialogOpen(true)}
+                disabled={selectedEmployees.length === 0}
+                className={`flex-1 sm:flex-none ${selectedEmployees.length > 0 ? "border-blue-500 text-blue-600" : ""}`}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Assign Site </span>
+                {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setBulkDeleteDialogOpen(true)}
+                disabled={selectedEmployees.length === 0}
+                className={`flex-1 sm:flex-none ${selectedEmployees.length > 0 ? "border-red-500 text-red-600 hover:bg-red-50" : ""}`}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Bulk Delete </span>
+                {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setImportDialogOpen(true)}
+                className="flex-1 sm:flex-none"
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                {isImporting ? "Importing..." : "Import"}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleExportEmployees} 
+                className="flex-1 sm:flex-none"
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                {isExporting ? "Exporting..." : "Export"}
+              </Button>
+              <Button onClick={() => setActiveTab("onboarding")} className="flex-1 sm:flex-none">
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Add Employee</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filter Section */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Filter by Department" />
           </SelectTrigger>
           <SelectContent>
@@ -2586,7 +2890,7 @@ const EmployeesTab = ({
         </Select>
 
         <Select value={selectedSite} onValueChange={setSelectedSite}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Filter by Site" />
           </SelectTrigger>
           <SelectContent>
@@ -2603,9 +2907,9 @@ const EmployeesTab = ({
             value={selectedJoinDate}
             onChange={(e) => setSelectedJoinDate(e.target.value)}
             placeholder="Filter by Join Date"
-            className="w-full"
+            className="w-full pr-10"
           />
-          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         </div>
 
         <Button variant="outline" onClick={clearFilters} className="w-full">
@@ -2620,11 +2924,10 @@ const EmployeesTab = ({
         loading={isImporting}
       />
 
-      {/* EPF Form 11 Dialog */}
       <Dialog open={epfForm11DialogOpen} onOpenChange={setEpfForm11DialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <FileText className="h-5 w-5" />
               EPF Form 11 - Declaration Form
             </DialogTitle>
@@ -2644,13 +2947,13 @@ const EmployeesTab = ({
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center">
+              <div className="flex items-start sm:items-center gap-3">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 a1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <div className="ml-3">
+                <div>
                   <h3 className="text-sm font-medium text-blue-800">Auto-filled from Employee Record</h3>
                   <div className="mt-2 text-sm text-blue-700">
                     <p>Fields marked with <span className="font-semibold">(Auto-filled)</span> are automatically populated from the employee's onboarding data.</p>
@@ -2660,7 +2963,7 @@ const EmployeesTab = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="memberName">
                   1. Name of Member (Aadhar Name) <span className="text-red-500">*</span>
@@ -2671,7 +2974,7 @@ const EmployeesTab = ({
                     value={epfFormData.memberName}
                     onChange={(e) => handleEPFFormChange('memberName', e.target.value)}
                     placeholder="Enter full name as per Aadhar"
-                    className="bg-gray-50"
+                    className="bg-gray-50 pr-20"
                     required
                   />
                   <div className="absolute right-2 top-2">
@@ -2690,13 +2993,13 @@ const EmployeesTab = ({
                     value={epfFormData.fatherOrSpouseName}
                     onChange={(e) => handleEPFFormChange('fatherOrSpouseName', e.target.value)}
                     placeholder="Enter father or spouse name"
-                    className="bg-gray-50"
+                    className="bg-gray-50 pr-20"
                   />
                   <div className="absolute right-2 top-2">
                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-2">
+                <div className="flex flex-wrap gap-4 mt-2">
                   <div className="flex items-center gap-2">
                     <input
                       type="radio"
@@ -2728,7 +3031,7 @@ const EmployeesTab = ({
                     type="date"
                     value={epfFormData.dateOfBirth}
                     onChange={(e) => handleEPFFormChange('dateOfBirth', e.target.value)}
-                    className="bg-gray-50"
+                    className="bg-gray-50 pr-20"
                   />
                   <div className="absolute right-2 top-2">
                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -2740,7 +3043,7 @@ const EmployeesTab = ({
                 <Label htmlFor="gender">4. Gender (Male / Female / Transgender)</Label>
                 <div className="relative">
                   <Select value={epfFormData.gender} onValueChange={(value) => handleEPFFormChange('gender', value)}>
-                    <SelectTrigger className="bg-gray-50">
+                    <SelectTrigger className="bg-gray-50 pr-20">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2759,7 +3062,7 @@ const EmployeesTab = ({
                 <Label htmlFor="maritalStatus">5. Marital Status ? (Single/Married/Widow/Widower/Divorcee)</Label>
                 <div className="relative">
                   <Select value={epfFormData.maritalStatus} onValueChange={(value) => handleEPFFormChange('maritalStatus', value)}>
-                    <SelectTrigger className="bg-gray-50">
+                    <SelectTrigger className="bg-gray-50 pr-20">
                       <SelectValue placeholder="Select marital status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2785,7 +3088,7 @@ const EmployeesTab = ({
                     value={epfFormData.email}
                     onChange={(e) => handleEPFFormChange('email', e.target.value)}
                     placeholder="Enter email address"
-                    className="bg-gray-50"
+                    className="bg-gray-50 pr-20"
                   />
                   <div className="absolute right-2 top-2">
                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -2801,7 +3104,7 @@ const EmployeesTab = ({
                     value={epfFormData.mobileNumber}
                     onChange={(e) => handleEPFFormChange('mobileNumber', e.target.value)}
                     placeholder="Enter mobile number"
-                    className="bg-gray-50"
+                    className="bg-gray-50 pr-20"
                   />
                   <div className="absolute right-2 top-2">
                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -2810,14 +3113,13 @@ const EmployeesTab = ({
               </div>
             </div>
 
-            {/* Previous Membership Section */}
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">Previous Membership Details</h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>7. Whether earlier member of the Employee's Provident Fund Scheme, 1952 ?</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -2839,7 +3141,7 @@ const EmployeesTab = ({
 
                 <div className="space-y-2">
                   <Label>8. Whether earlier member of the Employee's Pension Scheme, 1995 ?</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -2863,7 +3165,7 @@ const EmployeesTab = ({
               {(epfFormData.previousEPFMember || epfFormData.previousPensionMember) && (
                 <div className="space-y-4 mt-4 p-4 border rounded-lg bg-gray-50">
                   <h5 className="font-medium">9. Previous Employment details ? (If Yes, 7 & 8 details above)</h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="previousUAN">a) Universal Account Number (UAN)</Label>
                       <Input
@@ -2914,13 +3216,12 @@ const EmployeesTab = ({
               )}
             </div>
 
-            {/* International Worker Section */}
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">10. International Worker Details</h4>
               
               <div className="space-y-2">
                 <Label>a) International Worker</Label>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -2941,7 +3242,7 @@ const EmployeesTab = ({
               </div>
 
               {epfFormData.internationalWorker && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div className="space-y-2">
                     <Label htmlFor="countryOfOrigin">b) Country of Origin</Label>
                     <Input
@@ -2982,11 +3283,10 @@ const EmployeesTab = ({
               )}
             </div>
 
-            {/* KYC Details Section */}
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">11. KYC Details : (attach self attested copies of following KYC's)</h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bankAccountNumber">a) Bank Account No. & IFS Code</Label>
                   <div className="relative">
@@ -2995,7 +3295,7 @@ const EmployeesTab = ({
                       value={epfFormData.bankAccountNumber}
                       onChange={(e) => handleEPFFormChange('bankAccountNumber', e.target.value)}
                       placeholder="Enter bank account number"
-                      className="bg-gray-50"
+                      className="bg-gray-50 pr-20"
                     />
                     <div className="absolute right-2 top-2">
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -3010,7 +3310,7 @@ const EmployeesTab = ({
                       value={epfFormData.ifscCode}
                       onChange={(e) => handleEPFFormChange('ifscCode', e.target.value)}
                       placeholder="Enter IFSC code"
-                      className="bg-gray-50"
+                      className="bg-gray-50 pr-20"
                     />
                     <div className="absolute right-2 top-2">
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -3027,7 +3327,7 @@ const EmployeesTab = ({
                       value={epfFormData.aadharNumber}
                       onChange={(e) => handleEPFFormChange('aadharNumber', e.target.value)}
                       placeholder="Enter Aadhar number"
-                      className="bg-gray-50"
+                      className="bg-gray-50 pr-20"
                       required
                     />
                     <div className="absolute right-2 top-2">
@@ -3043,7 +3343,7 @@ const EmployeesTab = ({
                       value={epfFormData.panNumber}
                       onChange={(e) => handleEPFFormChange('panNumber', e.target.value)}
                       placeholder="Enter PAN number"
-                      className="bg-gray-50"
+                      className="bg-gray-50 pr-20"
                     />
                     <div className="absolute right-2 top-2">
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -3053,14 +3353,13 @@ const EmployeesTab = ({
               </div>
             </div>
 
-            {/* Declaration Details Section */}
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">12. Declaration Details</h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>First EPF Member</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -3088,7 +3387,7 @@ const EmployeesTab = ({
                       type="date"
                       value={epfFormData.enrolledDate}
                       onChange={(e) => handleEPFFormChange('enrolledDate', e.target.value)}
-                      className="bg-gray-50"
+                      className="bg-gray-50 pr-20"
                     />
                     <div className="absolute right-2 top-2">
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -3104,7 +3403,7 @@ const EmployeesTab = ({
                       value={epfFormData.firstEmploymentWages}
                       onChange={(e) => handleEPFFormChange('firstEmploymentWages', e.target.value)}
                       placeholder="Enter wages"
-                      className="bg-gray-50"
+                      className="bg-gray-50 pr-20"
                     />
                     <div className="absolute right-2 top-2">
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Auto-filled</span>
@@ -3113,10 +3412,10 @@ const EmployeesTab = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                 <div className="space-y-2">
                   <Label className="text-sm">Are you EPF Member before 01/09/2014</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -3138,7 +3437,7 @@ const EmployeesTab = ({
 
                 <div className="space-y-2">
                   <Label className="text-sm">If Yes, EPF Amount Withdrawn?</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -3160,7 +3459,7 @@ const EmployeesTab = ({
 
                 <div className="space-y-2">
                   <Label className="text-sm">If Yes, EPS (Pension) Amount Withdrawn?</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -3182,7 +3481,7 @@ const EmployeesTab = ({
 
                 <div className="space-y-2">
                   <Label className="text-sm">After Sep 2014 earned EPS (Pension) Amount Withdrawn before Join current Employer?</Label>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -3204,7 +3503,6 @@ const EmployeesTab = ({
               </div>
             </div>
 
-            {/* Undertaking Section */}
             <div className="p-4 border rounded-lg bg-gray-50">
               <h4 className="font-semibold mb-2">UNDERTAKING</h4>
               <p className="text-sm">1) Certified that the particulars are true to the best of my knowledge</p>
@@ -3214,11 +3512,10 @@ const EmployeesTab = ({
               <p className="text-sm">4) In case of changes in above details, the same will be intimated to employer at the earliest.</p>
             </div>
 
-            {/* Employee Declaration */}
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold">Employee Declaration</h4>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="declarationDate">Date</Label>
                   <Input
@@ -3247,7 +3544,6 @@ const EmployeesTab = ({
               </div>
             </div>
 
-            {/* Employer Declaration */}
             <div className="border rounded-lg p-4 space-y-4">
               <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
               
@@ -3307,7 +3603,7 @@ const EmployeesTab = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="employerDeclarationDate">Date</Label>
                   <Input
@@ -3327,9 +3623,8 @@ const EmployeesTab = ({
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 justify-end pt-4 border-t">
-              <Button onClick={handleSaveEPFForm} className="flex items-center gap-2" disabled={isSavingEPF}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-end pt-4 border-t">
+              <Button onClick={handleSaveEPFForm} className="flex items-center gap-2 w-full sm:w-auto" disabled={isSavingEPF}>
                 {isSavingEPF ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -3337,7 +3632,7 @@ const EmployeesTab = ({
                 )}
                 {isSavingEPF ? "Saving..." : "Save Form"}
               </Button>
-              <Button onClick={handlePrintEPFForm} variant="outline" className="flex items-center gap-2">
+              <Button onClick={handlePrintEPFForm} variant="outline" className="flex items-center gap-2 w-full sm:w-auto">
                 <Download className="h-4 w-4" />
                 Print Form
               </Button>
@@ -3346,10 +3641,629 @@ const EmployeesTab = ({
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Edit className="h-5 w-5" />
+              Edit Employee - {selectedEmployeeForEdit?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Make changes to employee information below. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editFormData && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editFormData.name}
+                  onChange={(e) => handleEditFormChange('name', e.target.value)}
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email *</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => handleEditFormChange('email', e.target.value)}
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Phone *</Label>
+                <Input
+                  id="edit-phone"
+                  value={editFormData.phone}
+                  onChange={(e) => handleEditFormChange('phone', e.target.value)}
+                  placeholder="Enter 10-digit phone number"
+                  maxLength={10}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-aadhar">Aadhar Number *</Label>
+                <Input
+                  id="edit-aadhar"
+                  value={editFormData.aadharNumber}
+                  onChange={(e) => handleEditFormChange('aadharNumber', e.target.value)}
+                  placeholder="Enter 12-digit Aadhar number"
+                  maxLength={12}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-pan">PAN Number</Label>
+                <Input
+                  id="edit-pan"
+                  value={editFormData.panNumber}
+                  onChange={(e) => handleEditFormChange('panNumber', e.target.value.toUpperCase())}
+                  placeholder="Enter PAN number"
+                  className="uppercase"
+                  maxLength={10}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-esic">ESIC Number</Label>
+                <Input
+                  id="edit-esic"
+                  value={editFormData.esicNumber}
+                  onChange={(e) => handleEditFormChange('esicNumber', e.target.value)}
+                  placeholder="Enter ESIC number"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-uan">UAN Number</Label>
+                <Input
+                  id="edit-uan"
+                  value={editFormData.uanNumber}
+                  onChange={(e) => handleEditFormChange('uanNumber', e.target.value)}
+                  placeholder="Enter UAN number"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-dob">Date of Birth</Label>
+                <Input
+                  id="edit-dob"
+                  type="date"
+                  value={editFormData.dateOfBirth}
+                  onChange={(e) => handleEditFormChange('dateOfBirth', e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-bloodGroup">Blood Group</Label>
+                <Select 
+                  value={editFormData.bloodGroup} 
+                  onValueChange={(value) => handleEditFormChange('bloodGroup', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select blood group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A+">A +ve</SelectItem>
+                    <SelectItem value="A-">A -ve</SelectItem>
+                    <SelectItem value="B+">B +ve</SelectItem>
+                    <SelectItem value="B-">B -ve</SelectItem>
+                    <SelectItem value="O+">O +ve</SelectItem>
+                    <SelectItem value="O-">O -ve</SelectItem>
+                    <SelectItem value="AB+">AB +ve</SelectItem>
+                    <SelectItem value="AB-">AB -ve</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-gender">Gender</Label>
+                <Select 
+                  value={editFormData.gender} 
+                  onValueChange={(value) => handleEditFormChange('gender', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Transgender">Transgender</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-maritalStatus">Marital Status</Label>
+                <Select 
+                  value={editFormData.maritalStatus} 
+                  onValueChange={(value) => handleEditFormChange('maritalStatus', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select marital status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Single">Single</SelectItem>
+                    <SelectItem value="Married">Married</SelectItem>
+                    <SelectItem value="Widow">Widow</SelectItem>
+                    <SelectItem value="Widower">Widower</SelectItem>
+                    <SelectItem value="Divorcee">Divorcee</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-department">Department *</Label>
+                <Select 
+                  value={editFormData.department} 
+                  onValueChange={(value) => handleEditFormChange('department', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-position">Position *</Label>
+                <Input
+                  id="edit-position"
+                  value={editFormData.position}
+                  onChange={(e) => handleEditFormChange('position', e.target.value)}
+                  placeholder="Enter position"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-siteName">Site Name *</Label>
+                <Select 
+                  value={editFormData.siteName} 
+                  onValueChange={(value) => handleEditFormChange('siteName', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select site" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allSiteNames.map(site => (
+                      <SelectItem key={site} value={site}>{site}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-salary">Salary (₹) *</Label>
+                <Input
+                  id="edit-salary"
+                  type="number"
+                  value={editFormData.salary}
+                  onChange={(e) => handleEditFormChange('salary', e.target.value)}
+                  placeholder="Enter monthly salary"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select 
+                  value={editFormData.status} 
+                  onValueChange={(value: "active" | "inactive" | "left") => handleEditFormChange('status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="left">Left</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="edit-permanentAddress">Permanent Address</Label>
+                <Textarea
+                  id="edit-permanentAddress"
+                  value={editFormData.permanentAddress}
+                  onChange={(e) => handleEditFormChange('permanentAddress', e.target.value)}
+                  placeholder="Enter permanent address"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-permanentPincode">Permanent Pin Code</Label>
+                <Input
+                  id="edit-permanentPincode"
+                  value={editFormData.permanentPincode}
+                  onChange={(e) => handleEditFormChange('permanentPincode', e.target.value)}
+                  placeholder="Enter pin code"
+                  maxLength={6}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-localAddress">Local Address</Label>
+                <Textarea
+                  id="edit-localAddress"
+                  value={editFormData.localAddress}
+                  onChange={(e) => handleEditFormChange('localAddress', e.target.value)}
+                  placeholder="Enter local address"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-localPincode">Local Pin Code</Label>
+                <Input
+                  id="edit-localPincode"
+                  value={editFormData.localPincode}
+                  onChange={(e) => handleEditFormChange('localPincode', e.target.value)}
+                  placeholder="Enter pin code"
+                  maxLength={6}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-bankName">Bank Name</Label>
+                <Input
+                  id="edit-bankName"
+                  value={editFormData.bankName}
+                  onChange={(e) => handleEditFormChange('bankName', e.target.value)}
+                  placeholder="Enter bank name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-accountNumber">Account Number</Label>
+                <Input
+                  id="edit-accountNumber"
+                  value={editFormData.accountNumber}
+                  onChange={(e) => handleEditFormChange('accountNumber', e.target.value)}
+                  placeholder="Enter account number"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-ifscCode">IFSC Code</Label>
+                <Input
+                  id="edit-ifscCode"
+                  value={editFormData.ifscCode}
+                  onChange={(e) => handleEditFormChange('ifscCode', e.target.value.toUpperCase())}
+                  placeholder="Enter IFSC code"
+                  className="uppercase"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-branchName">Branch Name</Label>
+                <Input
+                  id="edit-branchName"
+                  value={editFormData.branchName}
+                  onChange={(e) => handleEditFormChange('branchName', e.target.value)}
+                  placeholder="Enter branch name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-fatherName">Father's Name</Label>
+                <Input
+                  id="edit-fatherName"
+                  value={editFormData.fatherName}
+                  onChange={(e) => handleEditFormChange('fatherName', e.target.value)}
+                  placeholder="Enter father's name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-motherName">Mother's Name</Label>
+                <Input
+                  id="edit-motherName"
+                  value={editFormData.motherName}
+                  onChange={(e) => handleEditFormChange('motherName', e.target.value)}
+                  placeholder="Enter mother's name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-spouseName">Spouse Name</Label>
+                <Input
+                  id="edit-spouseName"
+                  value={editFormData.spouseName}
+                  onChange={(e) => handleEditFormChange('spouseName', e.target.value)}
+                  placeholder="Enter spouse name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-numberOfChildren">Number of Children</Label>
+                <Input
+                  id="edit-numberOfChildren"
+                  type="number"
+                  value={editFormData.numberOfChildren}
+                  onChange={(e) => handleEditFormChange('numberOfChildren', e.target.value)}
+                  placeholder="Enter number of children"
+                  min="0"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-emergencyContactName">Emergency Contact Name</Label>
+                <Input
+                  id="edit-emergencyContactName"
+                  value={editFormData.emergencyContactName}
+                  onChange={(e) => handleEditFormChange('emergencyContactName', e.target.value)}
+                  placeholder="Enter emergency contact name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-emergencyContactPhone">Emergency Contact Phone</Label>
+                <Input
+                  id="edit-emergencyContactPhone"
+                  value={editFormData.emergencyContactPhone}
+                  onChange={(e) => handleEditFormChange('emergencyContactPhone', e.target.value)}
+                  placeholder="Enter emergency contact phone"
+                  maxLength={10}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-emergencyContactRelation">Relation</Label>
+                <Input
+                  id="edit-emergencyContactRelation"
+                  value={editFormData.emergencyContactRelation}
+                  onChange={(e) => handleEditFormChange('emergencyContactRelation', e.target.value)}
+                  placeholder="Enter relation"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-nomineeName">Nominee Name</Label>
+                <Input
+                  id="edit-nomineeName"
+                  value={editFormData.nomineeName}
+                  onChange={(e) => handleEditFormChange('nomineeName', e.target.value)}
+                  placeholder="Enter nominee name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-nomineeRelation">Nominee Relation</Label>
+                <Input
+                  id="edit-nomineeRelation"
+                  value={editFormData.nomineeRelation}
+                  onChange={(e) => handleEditFormChange('nomineeRelation', e.target.value)}
+                  placeholder="Enter nominee relation"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-pantSize">Pant Size</Label>
+                <Select 
+                  value={editFormData.pantSize} 
+                  onValueChange={(value) => handleEditFormChange('pantSize', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select pant size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="28">28</SelectItem>
+                    <SelectItem value="30">30</SelectItem>
+                    <SelectItem value="32">32</SelectItem>
+                    <SelectItem value="34">34</SelectItem>
+                    <SelectItem value="36">36</SelectItem>
+                    <SelectItem value="38">38</SelectItem>
+                    <SelectItem value="40">40</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-shirtSize">Shirt Size</Label>
+                <Select 
+                  value={editFormData.shirtSize} 
+                  onValueChange={(value) => handleEditFormChange('shirtSize', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shirt size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="S">S</SelectItem>
+                    <SelectItem value="M">M</SelectItem>
+                    <SelectItem value="L">L</SelectItem>
+                    <SelectItem value="XL">XL</SelectItem>
+                    <SelectItem value="XXL">XXL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-capSize">Cap Size</Label>
+                <Select 
+                  value={editFormData.capSize} 
+                  onValueChange={(value) => handleEditFormChange('capSize', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select cap size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="S">S</SelectItem>
+                    <SelectItem value="M">M</SelectItem>
+                    <SelectItem value="L">L</SelectItem>
+                    <SelectItem value="XL">XL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit-idCardIssued"
+                      checked={editFormData.idCardIssued}
+                      onChange={(e) => handleEditFormChange('idCardIssued', e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="edit-idCardIssued">ID Card Issued</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit-westcoatIssued"
+                      checked={editFormData.westcoatIssued}
+                      onChange={(e) => handleEditFormChange('westcoatIssued', e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="edit-westcoatIssued">Westcoat Issued</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit-apronIssued"
+                      checked={editFormData.apronIssued}
+                      onChange={(e) => handleEditFormChange('apronIssued', e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="edit-apronIssued">Apron Issued</Label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="w-full sm:w-auto">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isSavingEdit} className="w-full sm:w-auto">
+              {isSavingEdit ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Site History Dialog - FIXED to display all site history correctly */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <History className="h-5 w-5" />
+              Site Assignment History - {selectedEmployeeForHistory?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Employee ID: {selectedEmployeeForHistory?.employeeId}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+            {selectedEmployeeForHistory?.siteHistory && selectedEmployeeForHistory.siteHistory.length > 0 ? (
+              <div className="space-y-4">
+                <div className="relative">
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+                  <div className="space-y-6">
+                    {selectedEmployeeForHistory.siteHistory.map((history, index) => {
+                      const isLastEntry = index === selectedEmployeeForHistory.siteHistory.length - 1;
+                      const hasLeftDate = history.leftDate !== undefined && history.leftDate !== null && history.leftDate !== '';
+                      
+                      return (
+                        <div key={index} className="relative pl-10">
+                          <div className={`absolute left-2 top-1 w-4 h-4 rounded-full border-4 border-white ${
+                            !hasLeftDate && isLastEntry ? 'bg-green-500' : 'bg-blue-500'
+                          }`}></div>
+                          <div className="bg-white p-4 rounded-lg border shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MapPin className="h-4 w-4 text-blue-600" />
+                              <span className="font-semibold text-lg">{history.siteName}</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Assigned Date:</span>
+                                <div className="font-medium">{new Date(history.assignedDate).toLocaleDateString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })}</div>
+                              </div>
+                              {hasLeftDate && (
+                                <div>
+                                  <span className="text-muted-foreground">Left Date:</span>
+                                  <div className="font-medium">{new Date(history.leftDate).toLocaleDateString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })}</div>
+                                </div>
+                              )}
+                              {hasLeftDate && history.daysWorked !== undefined && (
+                                <div className="sm:col-span-2">
+                                  <span className="text-muted-foreground">Days Worked:</span>
+                                  <div className="font-medium text-green-600">
+                                    <Clock className="h-3 w-3 inline mr-1" />
+                                    {history.daysWorked} days
+                                  </div>
+                                </div>
+                              )}
+                              {!hasLeftDate && isLastEntry && (
+                                <div className="sm:col-span-2">
+                                  <Badge className="bg-green-100 text-green-800">Current Site</Badge>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <History className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>No site assignment history found for this employee.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t bg-gray-50">
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setHistoryDialogOpen(false)} className="w-full sm:w-auto">
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard title="Total Employees" value={totalEmployees} />
         <StatCard 
-          title="Active Employees/Page" 
+          title="Active Employees" 
           value={activeEmployees} 
           className="text-green-600" 
         />
@@ -3360,8 +4274,7 @@ const EmployeesTab = ({
         />
       </div>
 
-      {/* Selection Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <input
@@ -3376,42 +4289,40 @@ const EmployeesTab = ({
             </Label>
           </div>
           {selectedEmployees.length > 0 && (
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="text-xs">
               {selectedEmployees.length} employee{selectedEmployees.length !== 1 ? 's' : ''} selected
             </Badge>
           )}
         </div>
       </div>
 
-      {/* Documents Dialog */}
       <Dialog open={documentsDialogOpen} onOpenChange={setDocumentsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg">
               Documents - {selectedEmployeeForDocuments?.name} ({selectedEmployeeForDocuments?.employeeId})
             </DialogTitle>
           </DialogHeader>
           {selectedEmployeeForDocuments && (
             <div className="space-y-6">
-              {/* Uploaded Documents Section */}
               <div>
                 <h4 className="font-semibold text-lg mb-4">Uploaded Documents</h4>
                 {selectedEmployeeForDocuments.documents && selectedEmployeeForDocuments.documents.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {selectedEmployeeForDocuments.documents.map((doc, index) => (
                       <div key={index} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <FileText className="h-8 w-8 text-blue-500" />
-                            <div>
-                              <p className="font-medium">{doc.name}</p>
+                            <FileText className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium truncate">{doc.name}</p>
                               <p className="text-sm text-muted-foreground">{doc.type}</p>
                               <p className="text-xs text-muted-foreground">
                                 Uploaded: {doc.uploadDate} • Expires: {doc.expiryDate}
                               </p>
                             </div>
                           </div>
-                          <Badge variant={doc.status === "valid" ? "default" : "destructive"}>
+                          <Badge variant={doc.status === "valid" ? "default" : "destructive"} className="self-start sm:self-center">
                             {doc.status}
                           </Badge>
                         </div>
@@ -3426,11 +4337,9 @@ const EmployeesTab = ({
                 )}
               </div>
 
-              {/* Generated Forms Section */}
               <div>
                 <h4 className="font-semibold text-lg mb-4">Available Forms</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* ID Card */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="border rounded-lg p-4 text-center hover:bg-gray-50 cursor-pointer">
                     <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       <User className="h-6 w-6 text-blue-600" />
@@ -3444,13 +4353,13 @@ const EmployeesTab = ({
                         generateIDCard(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
                       }}
+                      className="w-full"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   </div>
 
-                  {/* Nominee Form */}
                   <div className="border rounded-lg p-4 text-center hover:bg-gray-50 cursor-pointer">
                     <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       <FileText className="h-6 w-6 text-green-600" />
@@ -3464,13 +4373,13 @@ const EmployeesTab = ({
                         downloadNomineeForm(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
                       }}
+                      className="w-full"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   </div>
 
-                  {/* PF Form */}
                   <div className="border rounded-lg p-4 text-center hover:bg-gray-50 cursor-pointer">
                     <div className="bg-purple-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       <FileText className="h-6 w-6 text-purple-600" />
@@ -3484,13 +4393,13 @@ const EmployeesTab = ({
                         downloadPFForm(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
                       }}
+                      className="w-full"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   </div>
 
-                  {/* ESIC Form */}
                   <div className="border rounded-lg p-4 text-center hover:bg-gray-50 cursor-pointer">
                     <div className="bg-orange-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       <FileText className="h-6 w-6 text-orange-600" />
@@ -3504,13 +4413,13 @@ const EmployeesTab = ({
                         downloadESICForm(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
                       }}
+                      className="w-full"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View
                     </Button>
                   </div>
 
-                  {/* EPF Form 11 */}
                   <div className="border rounded-lg p-4 text-center hover:bg-gray-50 cursor-pointer">
                     <div className="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       <FileText className="h-6 w-6 text-red-600" />
@@ -3524,6 +4433,7 @@ const EmployeesTab = ({
                         handleOpenEPFForm11(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
                       }}
+                      className="w-full"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View
@@ -3532,7 +4442,6 @@ const EmployeesTab = ({
                 </div>
               </div>
 
-              {/* Employee Photo */}
               {(selectedEmployeeForDocuments.photo || selectedEmployeeForDocuments.photoPublicId) && (
                 <div>
                   <h4 className="font-semibold text-lg mb-4">Employee Photo</h4>
@@ -3545,7 +4454,7 @@ const EmployeesTab = ({
                         e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
                       }}
                     />
-                    <p className="text-sm text-muted-foreground mt-2">Employee Photo (Stored in Cloudinary)</p>
+                    <p className="text-sm text-muted-foreground mt-2">Employee Photo</p>
                   </div>
                 </div>
               )}
@@ -3554,12 +4463,11 @@ const EmployeesTab = ({
         </DialogContent>
       </Dialog>
 
-      {/* Employee List Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span>Employee List</span>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               {selectedDepartment !== "all" && (
                 <Badge variant="secondary">Department: {selectedDepartment}</Badge>
               )}
@@ -3580,49 +4488,51 @@ const EmployeesTab = ({
         <CardContent>
           <div className="space-y-4">
             {sortedEmployees.map((employee) => (
-              <div key={employee.id} className="border rounded-lg p-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
+              <div key={employee.id || employee._id} className="border rounded-lg p-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
                     <input
                       type="checkbox"
-                      checked={selectedEmployees.includes(employee.id)}
-                      onChange={() => handleSelectEmployee(employee.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      checked={selectedEmployees.includes(employee.id || employee._id || '')}
+                      onChange={() => handleSelectEmployee(employee.id || employee._id || '')}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
                     />
                     
                     {employee.photo || employee.photoPublicId ? (
                       <img 
                         src={getPhotoUrl(employee)} 
                         alt={employee.name}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
                         onError={(e) => {
+                          console.log('Image failed to load:', employee.photo);
                           e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
                         }}
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300 flex-shrink-0">
                         <User className="h-6 w-6 text-gray-400" />
                       </div>
                     )}
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-semibold">{employee.name}</h4>
+                    
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h4 className="font-semibold truncate">{employee.name}</h4>
                         {employee.status === "left" && (
-                          <Badge variant="destructive">Left</Badge>
+                          <Badge variant="destructive" className="text-xs">Left</Badge>
                         )}
                         {employee.isManager && (
-                          <Badge className="bg-amber-100 text-amber-800 border-amber-200">Manager</Badge>
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Manager</Badge>
                         )}
                         {employee.isSupervisor && (
-                          <Badge className="bg-teal-100 text-teal-800 border-teal-200">Supervisor</Badge>
+                          <Badge className="bg-teal-100 text-teal-800 border-teal-200 text-xs">Supervisor</Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{employee.employeeId} • {employee.department}</p>
-                      <p className="text-sm text-muted-foreground">{employee.position}</p>
-                      <p className="text-sm text-muted-foreground">Site: {employee.siteName || "Not specified"}</p>
+                      <p className="text-sm text-muted-foreground truncate">{employee.employeeId} • {employee.department}</p>
+                      <p className="text-sm text-muted-foreground truncate">{employee.position}</p>
+                      <p className="text-sm text-muted-foreground truncate">Site: {employee.siteName || "Not specified"}</p>
                       <p className="text-sm text-muted-foreground">Join Date: {employee.joinDate}</p>
                       <p className="text-sm text-muted-foreground">Salary: ₹{employee.salary.toLocaleString()}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
                           Documents: {employee.documents?.length || 0}
                         </Badge>
@@ -3641,16 +4551,42 @@ const EmployeesTab = ({
                             Photo
                           </Badge>
                         )}
+                        {employee.siteHistory && employee.siteHistory.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            <History className="h-3 w-3 mr-1" />
+                            {employee.siteHistory.length} {employee.siteHistory.length === 1 ? 'Move' : 'Moves'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 lg:w-auto">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditEmployee(employee as ExtendedEmployee)}
+                      className="flex items-center gap-1 flex-1 sm:flex-none"
+                    >
+                      <Edit className="h-3 w-3" />
+                      Edit
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleViewHistory(employee as ExtendedEmployee)}
+                      className="flex items-center gap-1 flex-1 sm:flex-none"
+                    >
+                      <History className="h-3 w-3" />
+                      History
+                    </Button>
+                    
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleViewDocuments(employee)}
-                      className="flex items-center gap-1"
+                      className="flex items-center gap-1 flex-1 sm:flex-none"
                     >
                       <Files className="h-3 w-3" />
                       Documents
@@ -3658,17 +4594,17 @@ const EmployeesTab = ({
                     
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button size="sm" variant="outline">
+                        <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
                           <Eye className="h-3 w-3 mr-1" />
                           Details
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="max-w-2xl p-4 sm:p-6">
                         <DialogHeader>
                           <DialogTitle>Employee Details - {employee.name}</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div><strong>Employee ID:</strong> {employee.employeeId}</div>
                             <div><strong>Email:</strong> {employee.email}</div>
                             <div><strong>Phone:</strong> {employee.phone}</div>
@@ -3708,10 +4644,10 @@ const EmployeesTab = ({
                             <div className="mt-2 space-y-2">
                               {employee.documents && employee.documents.length > 0 ? (
                                 employee.documents.map(doc => (
-                                  <div key={doc.id} className="flex justify-between items-center p-2 border rounded">
+                                  <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 border rounded">
                                     <div className="flex items-center gap-2">
                                       <FileText className="h-4 w-4" />
-                                      <span>{doc.name}</span>
+                                      <span className="truncate">{doc.name}</span>
                                       <span className="text-sm text-muted-foreground">({doc.type})</span>
                                     </div>
                                     <Badge variant={getStatusColor(doc.status)}>
@@ -3734,6 +4670,7 @@ const EmployeesTab = ({
                       size="sm"
                       variant="outline"
                       onClick={() => generateIDCard(employee)}
+                      className="flex-1 sm:flex-none"
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       View ID
@@ -3743,6 +4680,7 @@ const EmployeesTab = ({
                       size="sm"
                       variant="outline"
                       onClick={() => downloadIDCard(employee)}
+                      className="flex-1 sm:flex-none"
                     >
                       <Download className="h-3 w-3 mr-1" />
                       ID Card
@@ -3752,6 +4690,7 @@ const EmployeesTab = ({
                       size="sm"
                       variant="outline"
                       onClick={() => handleOpenEPFForm11(employee)}
+                      className="flex-1 sm:flex-none"
                     >
                       <FileText className="h-3 w-3 mr-1" />
                       EPF Form 11
@@ -3762,6 +4701,7 @@ const EmployeesTab = ({
                         size="sm"
                         variant="outline"
                         onClick={() => handleMarkAsLeft(employee)}
+                        className="flex-1 sm:flex-none"
                       >
                         Mark as Left
                       </Button>
@@ -3770,10 +4710,11 @@ const EmployeesTab = ({
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleDeleteEmployee(employee.id)}
-                      disabled={isDeleting === employee.id}
+                      onClick={() => handleDeleteEmployee(employee.id || employee._id || '')}
+                      disabled={isDeleting === (employee.id || employee._id)}
+                      className="flex-1 sm:flex-none"
                     >
-                      {isDeleting === employee.id ? (
+                      {isDeleting === (employee.id || employee._id) ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
                         <Trash2 className="h-3 w-3" />
@@ -3806,11 +4747,10 @@ const EmployeesTab = ({
         </CardContent>
       </Card>
 
-      {/* Bulk Site Assignment Dialog */}
       <Dialog open={bulkSiteDialogOpen} onOpenChange={setBulkSiteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <Users className="h-5 w-5" />
               Assign Site to Multiple Employees
             </DialogTitle>
@@ -3821,18 +4761,18 @@ const EmployeesTab = ({
               <Label>Selected Employees</Label>
               <div className="max-h-32 overflow-y-auto border rounded-lg p-2">
                 {employees
-                  .filter(emp => selectedEmployees.includes(emp.id))
+                  .filter(emp => selectedEmployees.includes(emp.id || emp._id || ''))
                   .map(emp => (
-                    <div key={emp.id} className="text-sm py-1 flex items-center justify-between">
-                      <span>
+                    <div key={emp.id || emp._id} className="text-sm py-1 flex items-center justify-between">
+                      <span className="truncate pr-2">
                         {emp.name} ({emp.employeeId})
                       </span>
                       {emp.isManager ? (
-                        <Badge className="bg-amber-100 text-amber-800 text-xs">Manager</Badge>
+                        <Badge className="bg-amber-100 text-amber-800 text-xs whitespace-nowrap">Manager</Badge>
                       ) : emp.isSupervisor ? (
-                        <Badge className="bg-teal-100 text-teal-800 text-xs">Supervisor</Badge>
+                        <Badge className="bg-teal-100 text-teal-800 text-xs whitespace-nowrap">Supervisor</Badge>
                       ) : (
-                        <Badge className="bg-cyan-100 text-cyan-800 text-xs">Staff</Badge>
+                        <Badge className="bg-cyan-100 text-cyan-800 text-xs whitespace-nowrap">Staff</Badge>
                       )}
                     </div>
                   ))}
@@ -3861,7 +4801,6 @@ const EmployeesTab = ({
                               Managers: {status.managerCount}/{status.managerRequirement} | 
                               Supervisors: {status.supervisorCount}/{status.supervisorRequirement} | 
                               Staff: {status.staffCount}/{status.staffRequirement}
-                              {status.isStaffFull && " (Staff Full)"}
                             </span>
                           </div>
                         </SelectItem>
@@ -3882,7 +4821,6 @@ const EmployeesTab = ({
               )}
             </div>
 
-            {/* Site Capacity Info */}
             {selectedSiteForBulk && siteDeploymentStatus.has(selectedSiteForBulk) && (
               <div className="p-4 border rounded-lg bg-gray-50">
                 <h4 className="font-semibold text-sm mb-2">Site Capacity Info - {selectedSiteForBulk}</h4>
@@ -3927,13 +4865,14 @@ const EmployeesTab = ({
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setBulkSiteDialogOpen(false)}>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setBulkSiteDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
               <Button 
                 onClick={handleBulkSiteAssignment}
                 disabled={isBulkUpdating || !selectedSiteForBulk || allSiteNames.length === 0}
+                className="w-full sm:w-auto"
               >
                 {isBulkUpdating ? (
                   <>
@@ -3952,11 +4891,10 @@ const EmployeesTab = ({
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Delete Confirmation Dialog */}
       <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-lg text-red-600">
               <AlertCircle className="h-5 w-5" />
               Confirm Bulk Deletion
             </DialogTitle>
@@ -3974,26 +4912,29 @@ const EmployeesTab = ({
               <Label>Employees to be deleted:</Label>
               <div className="max-h-48 overflow-y-auto border rounded-lg p-2">
                 {employees
-                  .filter(emp => selectedEmployees.includes(emp.id))
+                  .filter(emp => selectedEmployees.includes(emp.id || emp._id || ''))
                   .map(emp => (
-                    <div key={emp.id} className="text-sm py-1 flex items-center gap-2">
-                      <XCircle className="h-3 w-3 text-red-500" />
-                      {emp.name} ({emp.employeeId}) - {emp.department}
-                      {emp.isManager && " (Manager)"}
-                      {emp.isSupervisor && " (Supervisor)"}
+                    <div key={emp.id || emp._id} className="text-sm py-1 flex items-center gap-2">
+                      <XCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                      <span className="truncate">
+                        {emp.name} ({emp.employeeId}) - {emp.department}
+                        {emp.isManager && " (Manager)"}
+                        {emp.isSupervisor && " (Supervisor)"}
+                      </span>
                     </div>
                   ))}
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setBulkDeleteDialogOpen(false)}>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setBulkDeleteDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
               <Button 
                 variant="destructive"
                 onClick={handleBulkDelete}
                 disabled={isBulkDeleting}
+                className="w-full sm:w-auto"
               >
                 {isBulkDeleting ? (
                   <>

@@ -126,6 +126,7 @@ interface SiteStaffingRequirements {
   missingRoles: ('manager' | 'supervisor')[];
   isManagerRequirementMet: boolean;
   isSupervisorRequirementMet: boolean;
+  hasAnyAssignee: boolean; // Added this field
 }
 
 // Interface for task staffing status
@@ -714,8 +715,7 @@ const AssigneeMultiSelect = ({
   );
 };
 
-// Multi-select Combobox for Sites - MODIFIED to filter out sites that already have assigned managers/supervisors
-// Multi-select Combobox for Sites - MODIFIED to filter out sites that already have assigned managers/supervisors
+// Multi-select Combobox for Sites - MODIFIED to filter out sites that already have any assignees
 const SiteMultiSelect = ({ 
   sites, 
   selectedSites, 
@@ -736,7 +736,7 @@ const SiteMultiSelect = ({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Filter sites based on already assigned sites and role-specific requirements
+  // Filter sites based on already assigned sites and whether they have any assignees
   const availableSites = useMemo(() => {
     return sites.filter(site => {
       // Skip if already assigned in context
@@ -744,28 +744,38 @@ const SiteMultiSelect = ({
       
       const requirements = siteStaffingRequirements?.get(site._id);
       
+      // If site has any assignees (managers or supervisors), don't show it
+      if (requirements && requirements.hasAnyAssignee) {
+        return false;
+      }
+      
       // If no requirements, site is available
       if (!requirements) return true;
       
       // Filter based on assignee type
       if (assigneeType === "manager") {
-        // For managers: only show sites that still need managers
-        return !requirements.isManagerRequirementMet;
+        // For managers: only show sites that still need managers AND have no assignees
+        return !requirements.isManagerRequirementMet && !requirements.hasAnyAssignee;
       } else if (assigneeType === "supervisor") {
-        // For supervisors: only show sites that still need supervisors
-        return !requirements.isSupervisorRequirementMet;
+        // For supervisors: only show sites that still need supervisors AND have no assignees
+        return !requirements.isSupervisorRequirementMet && !requirements.hasAnyAssignee;
       }
       
-      // For "all": show sites that need either managers OR supervisors
-      return !requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet;
+      // For "all": show sites that need either managers OR supervisors AND have no assignees
+      return (!requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet) && !requirements.hasAnyAssignee;
     });
   }, [sites, alreadyAssignedSiteIds, siteStaffingRequirements, assigneeType]);
 
   // Calculate total available sites count for display
   const totalAvailableCount = availableSites.length;
   
-  // Calculate counts for fully staffed sites
-  const fullyStaffedCount = sites.length - availableSites.length;
+  // Calculate counts for sites with assignees and fully staffed
+  const sitesWithAssignees = sites.filter(site => {
+    const requirements = siteStaffingRequirements?.get(site._id);
+    return requirements && requirements.hasAnyAssignee;
+  }).length;
+  
+  const fullyStaffedCount = sites.length - availableSites.length - sitesWithAssignees;
 
   const filteredSites = useMemo(() => {
     if (!searchValue) return availableSites;
@@ -804,11 +814,11 @@ const SiteMultiSelect = ({
   // Get a description of what sites are shown based on assignee type
   const getAvailableSitesDescription = () => {
     if (assigneeType === "manager") {
-      return "Sites that need managers";
+      return "Sites that need managers (no assignees yet)";
     } else if (assigneeType === "supervisor") {
-      return "Sites that need supervisors";
+      return "Sites that need supervisors (no assignees yet)";
     } else {
-      return "Sites that need staffing";
+      return "Sites that need staffing (no assignees yet)";
     }
   };
 
@@ -824,6 +834,11 @@ const SiteMultiSelect = ({
           <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200">
             {totalAvailableCount} available
           </Badge>
+          {sitesWithAssignees > 0 && (
+            <Badge variant="outline" className="ml-2 bg-purple-50 text-purple-700 border-purple-200">
+              {sitesWithAssignees} have assignees
+            </Badge>
+          )}
           {fullyStaffedCount > 0 && (
             <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
               {fullyStaffedCount} fully staffed
@@ -847,12 +862,12 @@ const SiteMultiSelect = ({
         </Button>
       </div>
 
-      {/* Info banner about site filtering - FIXED: Removed Info icon that wasn't imported */}
+      {/* Info banner about site filtering */}
       <div className="bg-blue-50 border border-blue-200 p-2 rounded-lg text-xs text-blue-700">
         <div className="flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" /> {/* Changed from Info to AlertCircle which is already imported */}
+          <AlertCircle className="h-3 w-3" />
           <span>
-            {getAvailableSitesDescription()}. {fullyStaffedCount} site(s) are fully staffed and hidden.
+            {getAvailableSitesDescription()}. {sitesWithAssignees} site(s) already have assignees and are hidden. {fullyStaffedCount} site(s) are fully staffed and hidden.
           </span>
         </div>
       </div>
@@ -872,9 +887,9 @@ const SiteMultiSelect = ({
                 Loading sites...
               </>
             ) : availableSites.length === 0 ? (
-              assigneeType === "manager" ? "No sites need managers" :
-              assigneeType === "supervisor" ? "No sites need supervisors" :
-              "No sites need staffing"
+              assigneeType === "manager" ? "No sites need managers (all have assignees or are staffed)" :
+              assigneeType === "supervisor" ? "No sites need supervisors (all have assignees or are staffed)" :
+              "No sites need staffing (all have assignees or are staffed)"
             ) : selectedSites.length > 0 ? (
               <div className="flex items-center gap-2 truncate">
                 <Building className="h-4 w-4" />
@@ -882,7 +897,7 @@ const SiteMultiSelect = ({
               </div>
             ) : (
               `Select sites that need ${assigneeType === "manager" ? "managers" : 
-                assigneeType === "supervisor" ? "supervisors" : "staffing"}...`
+                assigneeType === "supervisor" ? "supervisors" : "staffing"} (no assignees yet)...`
             )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -905,6 +920,7 @@ const SiteMultiSelect = ({
                   const isManagerMet = requirements?.isManagerRequirementMet || false;
                   const isSupervisorMet = requirements?.isSupervisorRequirementMet || false;
                   const isFullyStaffed = isManagerMet && isSupervisorMet;
+                  const hasAssignee = requirements?.hasAnyAssignee || false;
                   
                   // Determine which roles are still needed
                   const needsManagers = !isManagerMet;
@@ -937,7 +953,12 @@ const SiteMultiSelect = ({
                               Fully Staffed
                             </Badge>
                           )}
-                          {!isFullyStaffed && (
+                          {hasAssignee && !isFullyStaffed && (
+                            <Badge variant="default" className="text-xs bg-purple-100 text-purple-800 border-purple-200">
+                              Has Assignees
+                            </Badge>
+                          )}
+                          {!isFullyStaffed && !hasAssignee && (
                             <div className="flex gap-1">
                               {needsManagers && (
                                 <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
@@ -963,6 +984,11 @@ const SiteMultiSelect = ({
                             {requirements?.assignedSupervisors || 0}/{site.supervisorCount || 0} Supervisors
                           </Badge>
                         </div>
+                        {hasAssignee && (
+                          <div className="text-xs text-purple-600 mt-1">
+                            This site already has {requirements?.assignedManagers || 0} manager(s) and {requirements?.assignedSupervisors || 0} supervisor(s) assigned
+                          </div>
+                        )}
                       </div>
                     </CommandItem>
                   );
@@ -1133,7 +1159,7 @@ const EditTaskDialog = ({
     return filtered;
   }, [assignees, currentAssignees, assigneeType, assigneeMode, staffingStatus]);
 
-  // Get available sites for changing site - MODIFIED to filter out fully staffed sites
+  // Get available sites for changing site - MODIFIED to filter out sites that already have assignees
   const availableSites = useMemo(() => {
     return sites.filter(s => {
       if (s._id === task.siteId) return true; // Always show current site
@@ -1141,8 +1167,8 @@ const EditTaskDialog = ({
       const requirements = siteStaffingRequirements.get(s._id);
       if (!requirements) return true;
       
-      // Show sites that need staffing (not fully staffed)
-      return !requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet;
+      // Only show sites that don't have any assignees yet AND need staffing
+      return !requirements.hasAnyAssignee && (!requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet);
     });
   }, [sites, task.siteId, siteStaffingRequirements]);
 
@@ -1540,12 +1566,14 @@ const EditTaskDialog = ({
                     const requirements = siteStaffingRequirements.get(site._id);
                     const needsManagers = requirements ? !requirements.isManagerRequirementMet : true;
                     const needsSupervisors = requirements ? !requirements.isSupervisorRequirementMet : true;
+                    const hasAssignee = requirements?.hasAnyAssignee || false;
                     
                     return (
                       <SelectItem key={site._id} value={site._id}>
                         {site.name} - {site.clientName} 
-                        {!needsManagers && !needsSupervisors ? " (Fully Staffed)" : 
-                          ` (Needs: ${!needsManagers ? '' : 'M'}${!needsManagers && !needsSupervisors ? '' : ''}${!needsSupervisors ? '' : 'S'})`}
+                        {hasAssignee ? " (Has Assignees)" : 
+                         !needsManagers && !needsSupervisors ? " (Fully Staffed)" : 
+                         ` (Needs: ${!needsManagers ? '' : 'M'}${!needsManagers && !needsSupervisors ? '' : ''}${!needsSupervisors ? '' : 'S'})`}
                       </SelectItem>
                     );
                   })}
@@ -2604,7 +2632,7 @@ const AddAssignTaskDialog = ({
               siteStaffingRequirements={siteStaffingRequirements}
             />
 
-            {/* Site Selection Section - Now filtered based on assigneeType */}
+            {/* Site Selection Section - Now filtered to show only sites with no assignees */}
             <SiteMultiSelect 
               sites={sites}
               selectedSites={selectedSites}
@@ -2612,7 +2640,7 @@ const AddAssignTaskDialog = ({
               isLoading={isLoadingSites}
               alreadyAssignedSiteIds={[]}
               siteStaffingRequirements={siteStaffingRequirements}
-              assigneeType={assigneeType} // Pass assigneeType to filter sites
+              assigneeType={assigneeType}
             />
 
             {/* Assignment Summary */}
@@ -2829,7 +2857,8 @@ const TasksSection = () => {
           hasSupervisor: assignedSupervisors > 0,
           missingRoles,
           isManagerRequirementMet: assignedManagers >= requiredManagers,
-          isSupervisorRequirementMet: assignedSupervisors >= requiredSupervisors
+          isSupervisorRequirementMet: assignedSupervisors >= requiredSupervisors,
+          hasAnyAssignee: assignedManagers > 0 || assignedSupervisors > 0 // Added this field
         });
       });
       
@@ -3279,6 +3308,12 @@ const TasksSection = () => {
           continue;
         }
         
+        // If site already has assignees, skip it
+        if (requirements.hasAnyAssignee) {
+          skippedSites.push(`${site.name} (already has assignees)`);
+          continue;
+        }
+        
         // If site needs assignees but none selected, skip this site
         if (selectedAssigneeObjects.length === 0) {
           skippedSites.push(`${site.name} (needs staffing)`);
@@ -3402,6 +3437,7 @@ const TasksSection = () => {
     // Check each selected site's staffing requirements
     const sitesNeedingAssignees: string[] = [];
     const sitesFullyStaffed: string[] = [];
+    const sitesWithAssignees: string[] = [];
     
     siteIds.forEach(siteId => {
       const requirements = siteStaffingRequirements.get(siteId);
@@ -3409,13 +3445,43 @@ const TasksSection = () => {
         const missingManagers = requirements.requiredManagers - requirements.assignedManagers;
         const missingSupervisors = requirements.requiredSupervisors - requirements.assignedSupervisors;
         
-        if (missingManagers > 0 || missingSupervisors > 0) {
+        if (requirements.hasAnyAssignee) {
+          sitesWithAssignees.push(requirements.siteName);
+        } else if (missingManagers > 0 || missingSupervisors > 0) {
           sitesNeedingAssignees.push(`${requirements.siteName} (needs ${missingManagers}M, ${missingSupervisors}S)`);
         } else {
           sitesFullyStaffed.push(requirements.siteName);
         }
       }
     });
+
+    // If there are sites with assignees, show warning and filter them out
+    if (sitesWithAssignees.length > 0) {
+      toast.warning(
+        <div>
+          <p className="font-bold mb-2">The following sites already have assignees and will be skipped:</p>
+          <ul className="list-disc pl-4 mb-3">
+            {sitesWithAssignees.map((site, i) => (
+              <li key={i}>{site}</li>
+            ))}
+          </ul>
+        </div>
+      );
+      
+      // Filter out sites that already have assignees
+      const filteredSiteIds = siteIds.filter(siteId => {
+        const requirements = siteStaffingRequirements.get(siteId);
+        return requirements && !requirements.hasAnyAssignee;
+      });
+      
+      if (filteredSiteIds.length === 0) {
+        toast.error("No valid sites remaining after filtering out sites with assignees.");
+        return;
+      }
+      
+      siteIds.length = 0;
+      siteIds.push(...filteredSiteIds);
+    }
 
     // If there are sites needing assignees but no assignees selected
     if (sitesNeedingAssignees.length > 0 && assigneeIds.length === 0) {
@@ -3442,7 +3508,7 @@ const TasksSection = () => {
     // If there are sites needing assignees and we have assignees selected, create tasks for those sites
     const sitesToCreateTasks = siteIds.filter(siteId => {
       const requirements = siteStaffingRequirements.get(siteId);
-      return requirements && (!requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet);
+      return requirements && !requirements.hasAnyAssignee && (!requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet);
     });
 
     const success = await createTasksForSites(

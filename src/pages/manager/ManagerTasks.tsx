@@ -12,13 +12,193 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Plus, Search, Eye, Edit, Trash2, Loader2, AlertCircle, 
-  Users, Shield, ListFilter, RefreshCw, UserCheck, FileText, Building 
+  Users, Shield, ListFilter, RefreshCw, UserCheck, FileText, Building,
+  MoreVertical, ChevronDown, ChevronUp, Filter, Menu, Calendar,
+  Clock, CheckCircle, XCircle, AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
 import { taskService, type Assignee, type Site as TaskServiceSite } from "@/services/TaskService";
+
+// Mobile responsive task card
+const MobileTaskCard = ({
+  task,
+  supervisors,
+  onView,
+  onUpdateStatus,
+  onDelete,
+  getPriorityColor,
+  getSourceBadge,
+  formatDate,
+  isMobileView
+}: {
+  task: Task;
+  supervisors: Supervisor[];
+  onView: (task: Task) => void;
+  onUpdateStatus: (taskId: string, status: string) => void;
+  onDelete: (taskId: string) => void;
+  getPriorityColor: (priority: string) => "default" | "destructive" | "secondary" | "outline";
+  getSourceBadge: (task: Task) => JSX.Element;
+  formatDate: (date: string) => string;
+  isMobileView: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const supervisor = supervisors.find(s => s._id === task.assignedTo);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h3 className="font-semibold text-base">{task.title}</h3>
+              <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                {task.priority}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 ml-2"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Assigned To</p>
+            <div className="flex items-center gap-1 text-sm">
+              <Users className="h-3 w-3" />
+              <span className="truncate">{task.assignedToName}</span>
+              {task.isAssignedToMe && (
+                <Badge variant="outline" className="h-4 px-1 text-[10px] bg-green-50 text-green-700 border-green-200">
+                  You
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Due Date</p>
+            <div className="flex items-center gap-1 text-sm">
+              <Calendar className="h-3 w-3" />
+              {formatDate(task.deadline)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {task.status}
+            </Badge>
+            {getSourceBadge(task)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {task.siteName}
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Full Description</p>
+              <p className="text-sm mt-1">{task.description}</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Client</p>
+                <p className="text-sm font-medium">{task.clientName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Site</p>
+                <p className="text-sm font-medium">{task.siteName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Created</p>
+                <p className="text-sm">{formatDate(task.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Type</p>
+                <p className="text-sm capitalize">{task.taskType || 'routine'}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Update Status</p>
+              <Select 
+                value={task.status} 
+                onValueChange={(value) => onUpdateStatus(task._id, value)}
+                disabled={task.source === "superadmin" && !task.isAssignedToMe}
+              >
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => onView(task)}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Details
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  if (task.source === "superadmin" && !task.isAssignedToMe) {
+                    toast.warning("Cannot edit superadmin tasks");
+                  } else {
+                    toast.info("Edit feature coming soon");
+                  }
+                }}
+                disabled={task.source === "superadmin" && !task.isAssignedToMe}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="flex-1"
+                onClick={() => onDelete(task._id)}
+                disabled={task.source === "superadmin" && !task.isAssignedToMe}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 // Types
 interface Supervisor {
@@ -71,6 +251,7 @@ interface Task {
 type ViewMode = "assigned" | "created" | "site" | "all";
 
 const ManagerTasks = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState({
@@ -79,6 +260,10 @@ const ManagerTasks = () => {
     sites: false
   });
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   // Changed from viewSuperadminTasks to viewMode
   const [viewMode, setViewMode] = useState<ViewMode>("created");
@@ -103,6 +288,18 @@ const ManagerTasks = () => {
     dueDateTime: "",
     taskType: "routine"
   });
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Fetch all sites
   const fetchSites = async () => {
@@ -807,27 +1004,36 @@ const ManagerTasks = () => {
 
   // Helper functions
   const getPriorityColor = (priority: string) => {
-    return taskService.getPriorityColor(priority);
+    switch(priority) {
+      case 'high': return 'destructive';
+      case 'medium': return 'default';
+      case 'low': return 'secondary';
+      default: return 'outline';
+    }
   };
 
   const getSourceBadge = (task: Task) => {
     if (task.isAssignedToMe) {
       return (
-        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
           <UserCheck className="h-3 w-3 mr-1" />
-          Assigned to You
+          <span className="hidden sm:inline">Assigned to You</span>
+          <span className="sm:hidden">You</span>
         </Badge>
       );
     }
     
     return task.source === "superadmin" ? (
-      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
         <Shield className="h-3 w-3 mr-1" />
-        Super Admin
+        <span className="hidden sm:inline">Super Admin</span>
+        <span className="sm:hidden">Admin</span>
       </Badge>
     ) : (
-      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-        You Created
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+        <FileText className="h-3 w-3 mr-1" />
+        <span className="hidden sm:inline">You Created</span>
+        <span className="sm:hidden">You</span>
       </Badge>
     );
   };
@@ -898,11 +1104,24 @@ const ManagerTasks = () => {
   // Check if user is a manager
   if (!isAuthenticated || !currentUser) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">Please login to access this page</p>
+      <div className="min-h-screen bg-background">
+        <DashboardHeader 
+          title="Task Management" 
+          onMenuClick={onMenuClick}
+        />
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="p-6 md:p-8 text-center">
+              <AlertCircle className="h-12 w-12 md:h-16 md:w-16 text-destructive mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+              <p className="text-sm md:text-base text-muted-foreground mb-4">
+                Please login to access this page
+              </p>
+              <Button onClick={() => window.location.href = '/login'} className="w-full md:w-auto">
+                Go to Login
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -910,16 +1129,29 @@ const ManagerTasks = () => {
 
   if (currentUser.role !== "manager") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
-          <p className="text-muted-foreground mb-4">This page is only accessible to managers</p>
-          <div className="space-y-2">
-            <Badge variant="outline" className="text-lg capitalize">
-              Your role: {currentUser.role}
-            </Badge>
-          </div>
+      <div className="min-h-screen bg-background">
+        <DashboardHeader 
+          title="Task Management" 
+          onMenuClick={onMenuClick}
+        />
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="p-6 md:p-8 text-center">
+              <Shield className="h-12 w-12 md:h-16 md:w-16 text-primary mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
+              <p className="text-sm md:text-base text-muted-foreground mb-4">
+                This page is only accessible to managers
+              </p>
+              <div className="space-y-2 mb-4">
+                <Badge variant="outline" className="text-lg capitalize">
+                  Your role: {currentUser.role}
+                </Badge>
+              </div>
+              <Button onClick={() => window.location.href = '/dashboard'} className="w-full md:w-auto">
+                Go to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -929,77 +1161,90 @@ const ManagerTasks = () => {
     <div className="min-h-screen bg-background">
       <DashboardHeader 
         title="Task Management" 
-        subtitle={getViewModeText(viewMode)} 
+        subtitle={getViewModeText(viewMode)}
+        onMenuClick={onMenuClick}
       />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
         {/* Manager Info Card */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">{currentUser.name}</h3>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg font-semibold truncate">{currentUser.name}</h3>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="default" className="text-sm capitalize">
+                  <Badge variant="default" className="text-xs md:text-sm capitalize">
                     <Shield className="h-3 w-3 mr-1" />
                     {currentUser.role}
                   </Badge>
                   {currentUser.site && (
-                    <Badge variant="outline" className="text-sm">
+                    <Badge variant="outline" className="text-xs md:text-sm">
                       <Users className="h-3 w-3 mr-1" />
                       Site: {currentUser.site}
                     </Badge>
                   )}
                   {currentUser.email && (
-                    <Badge variant="outline" className="text-sm">
-                      {currentUser.email}
+                    <Badge variant="outline" className="text-xs md:text-sm max-w-full">
+                      <span className="truncate">{currentUser.email}</span>
                     </Badge>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2">
-                  <ListFilter className="h-4 w-4 text-muted-foreground" />
-                  <Select value={viewMode} onValueChange={(value: ViewMode) => setViewMode(value)}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Select view" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="assigned">
-                        <div className="flex items-center">
-                          <UserCheck className="h-4 w-4 mr-2" />
-                          Tasks Assigned to Me
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="created">
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Tasks I Created
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="site">
-                        <div className="flex items-center">
-                          <Building className="h-4 w-4 mr-2" />
-                          All Tasks on My Site
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="all">
-                        <div className="flex items-center">
-                          <ListFilter className="h-4 w-4 mr-2" />
-                          All Tasks
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col items-start md:items-end gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <ListFilter className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                    <Select value={viewMode} onValueChange={(value: ViewMode) => setViewMode(value)}>
+                      <SelectTrigger className="w-[180px] sm:w-[200px] h-9">
+                        <SelectValue placeholder="Select view" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="assigned">
+                          <div className="flex items-center">
+                            <UserCheck className="h-4 w-4 mr-2" />
+                            <span className="truncate">Tasks Assigned to Me</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="created">
+                          <div className="flex items-center">
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span className="truncate">Tasks I Created</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="site">
+                          <div className="flex items-center">
+                            <Building className="h-4 w-4 mr-2" />
+                            <span className="truncate">All Tasks on My Site</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="all">
+                          <div className="flex items-center">
+                            <ListFilter className="h-4 w-4 mr-2" />
+                            <span className="truncate">All Tasks</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {isMobileView && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => setShowMobileFilters(!showMobileFilters)}
+                    >
+                      <Filter className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={showDebugInfo}
                     className="text-xs"
                   >
@@ -1007,31 +1252,71 @@ const ManagerTasks = () => {
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={fetchTasks}
                     disabled={loading.tasks}
                     className="text-xs"
                   >
                     <RefreshCw className={`h-3 w-3 mr-1 ${loading.tasks ? 'animate-spin' : ''}`} />
-                    Refresh
+                    {!isMobileView && "Refresh"}
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {tasks.length} tasks • {tasks.filter(t => t.isAssignedToMe).length} assigned to you • {sites.length} sites
+                  {tasks.length} tasks • {tasks.filter(t => t.isAssignedToMe).length} assigned • {sites.length} sites
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Mobile Filters */}
+        {showMobileFilters && isMobileView && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm">Filter by Status</Label>
+                  <Select value={activeTab} onValueChange={setActiveTab}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tasks</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="my-tasks">My Tasks</SelectItem>
+                      <SelectItem value="superadmin-tasks">Superadmin Tasks</SelectItem>
+                      <SelectItem value="assigned-to-me">Assigned to Me</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm">Search</Label>
+                  <div className="relative mt-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search tasks..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 h-9"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tasks Card */}
         <Card>
-          <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6">
             <div>
-              <CardTitle>
+              <CardTitle className="text-lg md:text-xl">
                 {getViewModeText(viewMode)}
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs md:text-sm text-muted-foreground mt-1">
                 {viewMode === "assigned" 
                   ? "Tasks assigned directly to you"
                   : viewMode === "created"
@@ -1045,49 +1330,52 @@ const ManagerTasks = () => {
             <Button 
               onClick={() => setDialogOpen(true)} 
               disabled={loading.supervisors || supervisors.length === 0 || loading.sites || sites.length === 0}
-              className="whitespace-nowrap"
+              className="whitespace-nowrap w-full md:w-auto"
+              size={isMobileView ? "default" : "default"}
             >
               <Plus className="mr-2 h-4 w-4" />
               Assign Task
             </Button>
           </CardHeader>
-          <CardContent>
-            {/* Search and Filters */}
-            <div className="mb-6">
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid grid-cols-8 h-9">
-                  <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-                  <TabsTrigger value="pending" className="text-xs">Pending</TabsTrigger>
-                  <TabsTrigger value="in-progress" className="text-xs">In Progress</TabsTrigger>
-                  <TabsTrigger value="completed" className="text-xs">Completed</TabsTrigger>
-                  <TabsTrigger value="cancelled" className="text-xs">Cancelled</TabsTrigger>
-                  <TabsTrigger value="my-tasks" className="text-xs">My Tasks</TabsTrigger>
-                  <TabsTrigger value="superadmin-tasks" className="text-xs">Superadmin</TabsTrigger>
-                  <TabsTrigger value="assigned-to-me" className="text-xs">Assigned to Me</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+          <CardContent className="p-4 md:p-6 pt-0">
+            {/* Desktop Search and Tabs */}
+            {!isMobileView && (
+              <>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search tasks..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+                  <TabsList className="grid grid-cols-8 h-9">
+                    <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+                    <TabsTrigger value="pending" className="text-xs">Pending</TabsTrigger>
+                    <TabsTrigger value="in-progress" className="text-xs">In Progress</TabsTrigger>
+                    <TabsTrigger value="completed" className="text-xs">Completed</TabsTrigger>
+                    <TabsTrigger value="cancelled" className="text-xs">Cancelled</TabsTrigger>
+                    <TabsTrigger value="my-tasks" className="text-xs">My Tasks</TabsTrigger>
+                    <TabsTrigger value="superadmin-tasks" className="text-xs">Superadmin</TabsTrigger>
+                    <TabsTrigger value="assigned-to-me" className="text-xs">Assigned to Me</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </>
+            )}
 
-            {/* Tasks Table */}
+            {/* Tasks Display */}
             {loading.tasks ? (
               <div className="text-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                <p className="text-muted-foreground mt-4">Loading tasks...</p>
+                <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mx-auto text-primary" />
+                <p className="text-sm md:text-base text-muted-foreground mt-4">Loading tasks...</p>
               </div>
             ) : filteredTasks.length === 0 ? (
-              <div className="text-center py-12">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
+              <div className="text-center py-8 md:py-12">
+                <AlertCircle className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-sm md:text-base text-muted-foreground">
                   {searchQuery 
                     ? "No tasks match your search" 
                     : `No ${activeTab !== "all" ? activeTab : ""} tasks found for this view`
@@ -1097,24 +1385,42 @@ const ManagerTasks = () => {
                   variant="outline"
                   onClick={fetchTasks}
                   className="mt-4"
+                  size={isMobileView ? "sm" : "default"}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh Tasks
                 </Button>
               </div>
+            ) : isMobileView ? (
+              <div className="space-y-3">
+                {filteredTasks.map((task) => (
+                  <MobileTaskCard
+                    key={task._id}
+                    task={task}
+                    supervisors={supervisors}
+                    onView={handleViewTask}
+                    onUpdateStatus={updateStatus}
+                    onDelete={handleDeleteTask}
+                    getPriorityColor={getPriorityColor}
+                    getSourceBadge={getSourceBadge}
+                    formatDate={formatDate}
+                    isMobileView={isMobileView}
+                  />
+                ))}
+              </div>
             ) : (
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Assigned To</TableHead>
-                      <TableHead>Site/Client</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="whitespace-nowrap">Task</TableHead>
+                      <TableHead className="whitespace-nowrap">Assigned To</TableHead>
+                      <TableHead className="whitespace-nowrap">Site/Client</TableHead>
+                      <TableHead className="whitespace-nowrap">Source</TableHead>
+                      <TableHead className="whitespace-nowrap">Priority</TableHead>
+                      <TableHead className="whitespace-nowrap">Status</TableHead>
+                      <TableHead className="whitespace-nowrap">Due Date</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1130,7 +1436,7 @@ const ManagerTasks = () => {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 whitespace-nowrap">
                               {task.assignedToName}
                               {task.isAssignedToMe && (
                                 <Badge variant="outline" className="h-4 px-1 text-[10px] bg-green-50 text-green-700 border-green-200">
@@ -1145,7 +1451,7 @@ const ManagerTasks = () => {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div>{task.siteName}</div>
+                            <div className="whitespace-nowrap">{task.siteName}</div>
                             <div className="text-xs text-muted-foreground">
                               {task.clientName}
                             </div>
@@ -1155,7 +1461,7 @@ const ManagerTasks = () => {
                           {getSourceBadge(task)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getPriorityColor(task.priority)}>
+                          <Badge variant={getPriorityColor(task.priority)} className="whitespace-nowrap">
                             {task.priority}
                           </Badge>
                         </TableCell>
@@ -1165,7 +1471,7 @@ const ManagerTasks = () => {
                             onValueChange={(value) => updateStatus(task._id, value)}
                             disabled={task.source === "superadmin" && !task.isAssignedToMe}
                           >
-                            <SelectTrigger className="w-[130px]">
+                            <SelectTrigger className="w-[130px] h-8">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1176,7 +1482,7 @@ const ManagerTasks = () => {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {formatDate(task.deadline)}
                         </TableCell>
                         <TableCell className="text-right">
@@ -1223,7 +1529,7 @@ const ManagerTasks = () => {
 
         {/* Assign Task Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Assign New Task</DialogTitle>
             </DialogHeader>
@@ -1236,6 +1542,7 @@ const ManagerTasks = () => {
                   onChange={(e) => handleInputChange('title', e.target.value)}
                   placeholder="Enter task title"
                   required
+                  className="h-10"
                 />
               </div>
               
@@ -1251,7 +1558,7 @@ const ManagerTasks = () => {
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="site">Site *</Label>
                   <Select
@@ -1260,7 +1567,7 @@ const ManagerTasks = () => {
                     required
                     disabled={loading.sites}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10">
                       <SelectValue placeholder={loading.sites ? "Loading sites..." : "Select site"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1281,7 +1588,7 @@ const ManagerTasks = () => {
                     required
                     disabled={loading.supervisors || !newTask.siteId}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10">
                       <SelectValue 
                         placeholder={
                           !newTask.siteId ? "Select site first" : 
@@ -1301,7 +1608,7 @@ const ManagerTasks = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="priority">Priority *</Label>
                   <Select
@@ -1309,7 +1616,7 @@ const ManagerTasks = () => {
                     onValueChange={(value) => handleInputChange('priority', value)}
                     required
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1329,6 +1636,7 @@ const ManagerTasks = () => {
                     onChange={(e) => handleInputChange('deadline', e.target.value)}
                     required
                     min={new Date().toISOString().split('T')[0]}
+                    className="h-10"
                   />
                 </div>
               </div>
@@ -1339,7 +1647,7 @@ const ManagerTasks = () => {
                   value={newTask.taskType}
                   onValueChange={(value) => handleInputChange('taskType', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Select task type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1356,7 +1664,7 @@ const ManagerTasks = () => {
                 </Select>
               </div>
               
-              <Button type="submit" className="w-full" disabled={loading.supervisors || loading.sites}>
+              <Button type="submit" className="w-full h-10" disabled={loading.supervisors || loading.sites}>
                 Assign Task
               </Button>
             </form>

@@ -8,11 +8,18 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Alert } from "@/types/alert";
 import { alertService } from "@/services/alertService";
-import { workQueryApi } from "../../../services/workQueryApi"; // Assuming you have workQueryApi
-import { Plus, Eye, Camera, X, Image as ImageIcon, Calendar, Clock, Loader2, Wifi, WifiOff, RefreshCw, MessageCircle, AlertCircle, CheckCircle, FileText, User, Filter } from "lucide-react";
+import { workQueryApi } from "../../../services/workQueryApi";
+import { Plus, Eye, Camera, X, Image as ImageIcon, Calendar, Clock, Loader2, Wifi, WifiOff, RefreshCw, MessageCircle, AlertCircle, CheckCircle, FileText, User, Filter, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useRole } from "@/context/RoleContext";
 
 // Types for Work Queries
@@ -43,6 +50,198 @@ interface WorkQuery {
   updatedAt: string;
 }
 
+// Mobile responsive alert card
+const MobileAlertCard = ({ 
+  alert, 
+  onView, 
+  onUpdateStatus, 
+  submitting,
+  getSeverityColor,
+  formatDateTime 
+}: { 
+  alert: Alert; 
+  onView: (alert: Alert) => void;
+  onUpdateStatus: (id: string, status: Alert["status"]) => void;
+  submitting: boolean;
+  getSeverityColor: (severity: Alert["severity"]) => string;
+  formatDateTime: (dateTimeString: string) => JSX.Element;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <h3 className="font-semibold">{alert.title}</h3>
+            <p className="text-xs text-muted-foreground mt-1">Site: {alert.site}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onView(alert)}>
+                  <Eye className="h-4 w-4 mr-2" /> View
+                </DropdownMenuItem>
+                {alert.status !== "open" && (
+                  <DropdownMenuItem onClick={() => onUpdateStatus(alert.id, "open")}>
+                    <CheckCircle className="h-4 w-4 mr-2" /> Reopen
+                  </DropdownMenuItem>
+                )}
+                {alert.status !== "in-progress" && (
+                  <DropdownMenuItem onClick={() => onUpdateStatus(alert.id, "in-progress")}>
+                    <Clock className="h-4 w-4 mr-2" /> In Progress
+                  </DropdownMenuItem>
+                )}
+                {alert.status !== "resolved" && (
+                  <DropdownMenuItem onClick={() => onUpdateStatus(alert.id, "resolved")}>
+                    <CheckCircle className="h-4 w-4 mr-2" /> Resolve
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          <Badge className={getSeverityColor(alert.severity)}>
+            {alert.severity}
+          </Badge>
+          <Badge variant={
+            alert.status === "resolved" ? "default" : 
+            alert.status === "in-progress" ? "secondary" : "outline"
+          } className="capitalize">
+            {alert.status}
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar className="h-3 w-3 text-muted-foreground" />
+          <span className="text-xs">{formatDateTime(alert.date)}</span>
+          {alert.photos && alert.photos.length > 0 && (
+            <>
+              <span>•</span>
+              <ImageIcon className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs">{alert.photos.length}</span>
+            </>
+          )}
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Reported By</p>
+              <p className="text-sm">{alert.reportedBy}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Assigned To</p>
+              <p className="text-sm">{alert.assignedTo || 'Unassigned'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Description</p>
+              <p className="text-sm">{alert.description}</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive work query card
+const MobileWorkQueryCard = ({ 
+  query, 
+  onView,
+  getPriorityBadge,
+  getStatusBadge,
+  formatDate 
+}: { 
+  query: WorkQuery; 
+  onView: (query: WorkQuery) => void;
+  getPriorityBadge: (priority: WorkQuery["priority"]) => JSX.Element;
+  getStatusBadge: (status: WorkQuery["status"]) => JSX.Element;
+  formatDate: (date: string) => string;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <p className="text-xs font-mono text-muted-foreground">{query.queryId}</p>
+            <h3 className="font-semibold mt-1">{query.title}</h3>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onView(query)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          {getPriorityBadge(query.priority)}
+          {getStatusBadge(query.status)}
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar className="h-3 w-3 text-muted-foreground" />
+          <span className="text-xs">{formatDate(query.createdAt)}</span>
+          {query.proofFiles && query.proofFiles.length > 0 && (
+            <>
+              <span>•</span>
+              <FileText className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs">{query.proofFiles.length}</span>
+            </>
+          )}
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Description</p>
+              <p className="text-sm">{query.description.substring(0, 100)}...</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Service</p>
+              <p className="text-sm">{query.serviceId || 'N/A'} • {query.category}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Reported By</p>
+              <p className="text-sm">{query.reportedBy?.name} ({query.reportedBy?.role})</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const AlertsSection = () => {
   const [activeTab, setActiveTab] = useState<string>("alerts");
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -59,9 +258,25 @@ const AlertsSection = () => {
   const [editPhotoFiles, setEditPhotoFiles] = useState<File[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<"checking" | "connected" | "disconnected">("checking");
   
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const { user: authUser } = useRole();
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     checkConnectionAndFetch();
@@ -103,98 +318,96 @@ const AlertsSection = () => {
     }
   };
 
-// Replace the entire fetchWorkQueries function in your AlertsSection.tsx:
-
-const fetchWorkQueries = async () => {
-  if (!authUser?.id) {
-    console.log('⚠️ No authenticated user found. Trying to fetch all queries...');
-  }
-
-  try {
-    setLoading(prev => ({ ...prev, queries: true }));
-    
-    console.group('🔍 WORK QUERIES FETCH DEBUG');
-    console.log('Current auth user:', authUser);
-    console.log('User ID:', authUser?.id);
-    console.log('User role:', authUser?.role);
-    console.groupEnd();
-
-    // STRATEGY: Try multiple approaches
-    let response;
-    
-    // Approach 1: Try with current user's ID (for supervisor)
-    if (authUser?.id) {
-      console.log(`🔄 Attempt 1: Fetching for supervisorId: ${authUser.id}`);
-      response = await workQueryApi.getAllWorkQueries({
-        supervisorId: authUser.id,
-        limit: 100
-      });
+  const fetchWorkQueries = async () => {
+    if (!authUser?.id) {
+      console.log('⚠️ No authenticated user found. Trying to fetch all queries...');
     }
-    
-    // Approach 2: If empty, try without supervisor filter
-    if (!response || response.data?.length === 0) {
-      console.log('🔄 Attempt 2: Fetching ALL work queries (no filter)');
-      response = await workQueryApi.getAllWorkQueries({
-        limit: 100
-      });
-    }
-    
-    // Approach 3: Try with a fallback supervisor ID
-    if (!response || response.data?.length === 0) {
-      const fallbackIds = ['SUP001', 'SUP002', 'supervisor1', 'supervisor'];
-      for (const id of fallbackIds) {
-        console.log(`🔄 Attempt 3: Trying fallback supervisorId: ${id}`);
-        try {
-          response = await workQueryApi.getAllWorkQueries({
-            supervisorId: id,
-            limit: 50
-          });
-          if (response.data?.length > 0) {
-            console.log(`✅ Found ${response.data.length} queries with ID: ${id}`);
-            break;
+
+    try {
+      setLoading(prev => ({ ...prev, queries: true }));
+      
+      console.group('🔍 WORK QUERIES FETCH DEBUG');
+      console.log('Current auth user:', authUser);
+      console.log('User ID:', authUser?.id);
+      console.log('User role:', authUser?.role);
+      console.groupEnd();
+
+      // STRATEGY: Try multiple approaches
+      let response;
+      
+      // Approach 1: Try with current user's ID (for supervisor)
+      if (authUser?.id) {
+        console.log(`🔄 Attempt 1: Fetching for supervisorId: ${authUser.id}`);
+        response = await workQueryApi.getAllWorkQueries({
+          supervisorId: authUser.id,
+          limit: 100
+        });
+      }
+      
+      // Approach 2: If empty, try without supervisor filter
+      if (!response || response.data?.length === 0) {
+        console.log('🔄 Attempt 2: Fetching ALL work queries (no filter)');
+        response = await workQueryApi.getAllWorkQueries({
+          limit: 100
+        });
+      }
+      
+      // Approach 3: Try with a fallback supervisor ID
+      if (!response || response.data?.length === 0) {
+        const fallbackIds = ['SUP001', 'SUP002', 'supervisor1', 'supervisor'];
+        for (const id of fallbackIds) {
+          console.log(`🔄 Attempt 3: Trying fallback supervisorId: ${id}`);
+          try {
+            response = await workQueryApi.getAllWorkQueries({
+              supervisorId: id,
+              limit: 50
+            });
+            if (response.data?.length > 0) {
+              console.log(`✅ Found ${response.data.length} queries with ID: ${id}`);
+              break;
+            }
+          } catch (e) {
+            continue; // Try next ID
           }
-        } catch (e) {
-          continue; // Try next ID
         }
       }
-    }
 
-    console.log('📊 Final API Response:', response);
-    
-    if (response && response.success) {
-      const queryCount = response.data?.length || 0;
-      setWorkQueries(response.data || []);
+      console.log('📊 Final API Response:', response);
       
-      if (queryCount > 0) {
-        toast.success(`Loaded ${queryCount} work queries`);
+      if (response && response.success) {
+        const queryCount = response.data?.length || 0;
+        setWorkQueries(response.data || []);
+        
+        if (queryCount > 0) {
+          toast.success(`Loaded ${queryCount} work queries`);
+        } else {
+          toast.info('No work queries found in the system');
+          console.log('💡 Tip: Create some test work queries first');
+        }
       } else {
-        toast.info('No work queries found in the system');
-        console.log('💡 Tip: Create some test work queries first');
+        toast.error("Failed to load work queries");
+        setWorkQueries([]);
       }
-    } else {
-      toast.error("Failed to load work queries");
+    } catch (error: any) {
+      console.error('❌ Error fetching work queries:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      
+      // User-friendly error messages
+      if (error.response?.status === 401) {
+        toast.error('Authentication failed. Please log in again.');
+      } else if (error.response?.status === 404) {
+        toast.error('API endpoint not found. Check backend server.');
+      } else if (error.code === 'NETWORK_ERROR') {
+        toast.error('Network error. Check if backend is running.');
+      } else {
+        toast.error('Failed to load work queries. Please check API connection.');
+      }
+      
       setWorkQueries([]);
+    } finally {
+      setLoading(prev => ({ ...prev, queries: false }));
     }
-  } catch (error: any) {
-    console.error('❌ Error fetching work queries:', error);
-    console.error('Error details:', error.response?.data || error.message);
-    
-    // User-friendly error messages
-    if (error.response?.status === 401) {
-      toast.error('Authentication failed. Please log in again.');
-    } else if (error.response?.status === 404) {
-      toast.error('API endpoint not found. Check backend server.');
-    } else if (error.code === 'NETWORK_ERROR') {
-      toast.error('Network error. Check if backend is running.');
-    } else {
-      toast.error('Failed to load work queries. Please check API connection.');
-    }
-    
-    setWorkQueries([]);
-  } finally {
-    setLoading(prev => ({ ...prev, queries: false }));
-  }
-};
+  };
 
   const handleUpdateStatus = async (alertId: string, status: Alert["status"]) => {
     try {
@@ -414,7 +627,7 @@ const fetchWorkQueries = async () => {
     };
 
     return (
-      <Badge variant="outline" className={`${styles[priority]} flex items-center gap-1`}>
+      <Badge variant="outline" className={`${styles[priority]} flex items-center gap-1 text-xs`}>
         {icons[priority]}
         {priority.charAt(0).toUpperCase() + priority.slice(1)}
       </Badge>
@@ -437,7 +650,7 @@ const fetchWorkQueries = async () => {
     };
 
     return (
-      <Badge variant="outline" className={`${styles[status]} flex items-center gap-1`}>
+      <Badge variant="outline" className={`${styles[status]} flex items-center gap-1 text-xs`}>
         {icons[status]}
         {status.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
       </Badge>
@@ -448,7 +661,7 @@ const fetchWorkQueries = async () => {
     const [date, time] = dateTimeString.split(' ');
     return (
       <div className="space-y-1">
-        <div className="font-medium">{date}</div>
+        <div className="font-medium text-sm">{date}</div>
         <div className="text-xs text-muted-foreground">{time || 'No time specified'}</div>
       </div>
     );
@@ -493,21 +706,23 @@ const fetchWorkQueries = async () => {
   const renderAlertsTab = () => (
     <>
       {alerts.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg">
+        <div className="text-center py-8 md:py-12 border rounded-lg">
           <div className="text-muted-foreground mb-4">
-            <ImageIcon className="h-16 w-16 mx-auto opacity-20" />
+            <ImageIcon className="h-12 w-12 md:h-16 md:w-16 mx-auto opacity-20" />
           </div>
           <h3 className="text-lg font-semibold mb-2">No alerts found</h3>
-          <p className="text-muted-foreground mb-4">
+          <p className="text-sm md:text-base text-muted-foreground mb-4 px-4">
             {connectionStatus === "disconnected" 
               ? "Cannot connect to server. Please check if backend is running."
               : "Create your first alert to get started"}
           </p>
-          <div className="flex gap-2 justify-center">
+          <div className="flex flex-col sm:flex-row gap-2 justify-center px-4">
             <Button
               variant="outline"
+              size={isMobileView ? "sm" : "default"}
               onClick={handleTestConnection}
               disabled={connectionStatus === "checking"}
+              className="w-full sm:w-auto"
             >
               {connectionStatus === "checking" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -519,7 +734,11 @@ const fetchWorkQueries = async () => {
             
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button disabled={connectionStatus === "disconnected"}>
+                <Button 
+                  disabled={connectionStatus === "disconnected"}
+                  className="w-full sm:w-auto"
+                  size={isMobileView ? "sm" : "default"}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Create First Alert
                 </Button>
@@ -527,109 +746,125 @@ const fetchWorkQueries = async () => {
             </Dialog>
           </div>
         </div>
+      ) : isMobileView ? (
+        <div className="space-y-3">
+          {alerts.map((alert) => (
+            <MobileAlertCard
+              key={alert.id}
+              alert={alert}
+              onView={handleViewAlert}
+              onUpdateStatus={handleUpdateStatus}
+              submitting={submitting}
+              getSeverityColor={getSeverityColor}
+              formatDateTime={formatDateTime}
+            />
+          ))}
+        </div>
       ) : (
         <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[300px]">Alert Title</TableHead>
-                <TableHead className="w-[100px]">Severity</TableHead>
-                <TableHead className="w-[120px]">Status</TableHead>
-                <TableHead className="w-[150px]">Date & Time</TableHead>
-                <TableHead className="w-[120px]">Photos</TableHead>
-                <TableHead className="w-[200px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alerts.map((alert) => (
-                <TableRow key={alert.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">
-                    <div className="space-y-1">
-                      <div className="font-semibold">{alert.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="font-medium">Site:</span> {alert.site}
-                        </span>
-                        <span className="mx-2">•</span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="font-medium">By:</span> {alert.reportedBy}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${getSeverityColor(alert.severity)} capitalize`}>
-                      {alert.severity}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      alert.status === "resolved" ? "default" : 
-                      alert.status === "in-progress" ? "secondary" : "outline"
-                    } className="capitalize">
-                      {alert.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatDateTime(alert.date)}</TableCell>
-                  <TableCell>
-                    {alert.photos && alert.photos.length > 0 ? (
-                      <div className="flex items-center gap-1">
-                        <ImageIcon className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">{alert.photos.length}</span>
-                        <span className="text-xs text-muted-foreground">photo{alert.photos.length !== 1 ? 's' : ''}</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">No photos</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewAlert(alert)}
-                        disabled={submitting}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      
-                      {alert.status !== "open" && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleUpdateStatus(alert.id, "open")}
-                          disabled={submitting}
-                        >
-                          Reopen
-                        </Button>
-                      )}
-                      {alert.status !== "in-progress" && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleUpdateStatus(alert.id, "in-progress")}
-                          disabled={submitting}
-                        >
-                          In Progress
-                        </Button>
-                      )}
-                      {alert.status !== "resolved" && (
-                        <Button 
-                          variant="default" 
-                          size="sm"
-                          onClick={() => handleUpdateStatus(alert.id, "resolved")}
-                          disabled={submitting}
-                        >
-                          Resolve
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px] whitespace-nowrap">Alert Title</TableHead>
+                  <TableHead className="w-[100px] whitespace-nowrap">Severity</TableHead>
+                  <TableHead className="w-[120px] whitespace-nowrap">Status</TableHead>
+                  <TableHead className="w-[150px] whitespace-nowrap">Date & Time</TableHead>
+                  <TableHead className="w-[120px] whitespace-nowrap">Photos</TableHead>
+                  <TableHead className="w-[200px] text-right whitespace-nowrap">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {alerts.map((alert) => (
+                  <TableRow key={alert.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">
+                      <div className="space-y-1">
+                        <div className="font-semibold">{alert.title}</div>
+                        <div className="text-sm text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="font-medium">Site:</span> {alert.site}
+                          </span>
+                          <span className="mx-2">•</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="font-medium">By:</span> {alert.reportedBy}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${getSeverityColor(alert.severity)} capitalize`}>
+                        {alert.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        alert.status === "resolved" ? "default" : 
+                        alert.status === "in-progress" ? "secondary" : "outline"
+                      } className="capitalize">
+                        {alert.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatDateTime(alert.date)}</TableCell>
+                    <TableCell>
+                      {alert.photos && alert.photos.length > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <ImageIcon className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">{alert.photos.length}</span>
+                          <span className="text-xs text-muted-foreground">photo{alert.photos.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">No photos</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewAlert(alert)}
+                          disabled={submitting}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        
+                        {alert.status !== "open" && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleUpdateStatus(alert.id, "open")}
+                            disabled={submitting}
+                          >
+                            Reopen
+                          </Button>
+                        )}
+                        {alert.status !== "in-progress" && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleUpdateStatus(alert.id, "in-progress")}
+                            disabled={submitting}
+                          >
+                            In Progress
+                          </Button>
+                        )}
+                        {alert.status !== "resolved" && (
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => handleUpdateStatus(alert.id, "resolved")}
+                            disabled={submitting}
+                          >
+                            Resolve
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </>
@@ -638,96 +873,115 @@ const fetchWorkQueries = async () => {
   const renderWorkQueriesTab = () => (
     <>
       {workQueries.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg">
+        <div className="text-center py-8 md:py-12 border rounded-lg">
           <div className="text-muted-foreground mb-4">
-            <MessageCircle className="h-16 w-16 mx-auto opacity-20" />
+            <MessageCircle className="h-12 w-12 md:h-16 md:w-16 mx-auto opacity-20" />
           </div>
           <h3 className="text-lg font-semibold mb-2">No work queries found</h3>
-          <p className="text-muted-foreground mb-4">
+          <p className="text-sm md:text-base text-muted-foreground mb-4 px-4">
             {loading.queries 
               ? "Loading work queries..." 
               : "No work queries have been created yet"}
           </p>
           {!loading.queries && (
-            <Button onClick={fetchWorkQueries}>
+            <Button 
+              onClick={fetchWorkQueries}
+              size={isMobileView ? "sm" : "default"}
+              className="w-full sm:w-auto"
+            >
               <RefreshCw className="mr-2 h-4 w-4" />
               Retry
             </Button>
           )}
         </div>
+      ) : isMobileView ? (
+        <div className="space-y-3">
+          {workQueries.map((query) => (
+            <MobileWorkQueryCard
+              key={query._id}
+              query={query}
+              onView={handleViewWorkQuery}
+              getPriorityBadge={getPriorityBadge}
+              getStatusBadge={getStatusBadge}
+              formatDate={formatDate}
+            />
+          ))}
+        </div>
       ) : (
         <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Query ID</TableHead>
-                <TableHead className="w-[250px]">Title</TableHead>
-                <TableHead className="w-[150px]">Service</TableHead>
-                <TableHead className="w-[100px]">Priority</TableHead>
-                <TableHead className="w-[120px]">Status</TableHead>
-                <TableHead className="w-[150px]">Reported By</TableHead>
-                <TableHead className="w-[150px]">Created</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {workQueries.map((query) => (
-                <TableRow key={query._id} className="hover:bg-muted/50">
-                  <TableCell className="font-mono text-sm font-medium">
-                    {query.queryId}
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-semibold">{query.title}</div>
-                      <div className="text-sm text-muted-foreground truncate max-w-[240px]">
-                        {query.description.substring(0, 60)}...
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{query.serviceId || "N/A"}</div>
-                    {query.serviceId && (
-                      <div className="text-xs text-muted-foreground">
-                        {query.category}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {getPriorityBadge(query.priority)}
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(query.status)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="h-3 w-3 text-muted-foreground" />
-                      <div>
-                        <div className="font-medium text-sm">{query.reportedBy?.name}</div>
-                        <div className="text-xs text-muted-foreground capitalize">{query.reportedBy?.role}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-medium text-sm">{formatDate(query.createdAt)}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewWorkQuery(query)}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        View
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px] whitespace-nowrap">Query ID</TableHead>
+                  <TableHead className="w-[250px] whitespace-nowrap">Title</TableHead>
+                  <TableHead className="w-[150px] whitespace-nowrap">Service</TableHead>
+                  <TableHead className="w-[100px] whitespace-nowrap">Priority</TableHead>
+                  <TableHead className="w-[120px] whitespace-nowrap">Status</TableHead>
+                  <TableHead className="w-[150px] whitespace-nowrap">Reported By</TableHead>
+                  <TableHead className="w-[150px] whitespace-nowrap">Created</TableHead>
+                  <TableHead className="w-[100px] text-right whitespace-nowrap">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {workQueries.map((query) => (
+                  <TableRow key={query._id} className="hover:bg-muted/50">
+                    <TableCell className="font-mono text-sm font-medium whitespace-nowrap">
+                      {query.queryId}
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-semibold">{query.title}</div>
+                        <div className="text-sm text-muted-foreground truncate max-w-[240px]">
+                          {query.description.substring(0, 60)}...
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{query.serviceId || "N/A"}</div>
+                      {query.serviceId && (
+                        <div className="text-xs text-muted-foreground">
+                          {query.category}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {getPriorityBadge(query.priority)}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(query.status)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3 text-muted-foreground" />
+                        <div>
+                          <div className="font-medium text-sm">{query.reportedBy?.name}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{query.reportedBy?.role}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium text-sm whitespace-nowrap">{formatDate(query.createdAt)}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewWorkQuery(query)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </>
@@ -741,8 +995,8 @@ const fetchWorkQueries = async () => {
             <CardTitle>Alerts & Issues</CardTitle>
           </CardHeader>
           <CardContent className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2">Loading alerts...</span>
+            <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+            <span className="ml-2 text-sm md:text-base">Loading alerts...</span>
           </CardContent>
         </Card>
       </div>
@@ -750,108 +1004,116 @@ const fetchWorkQueries = async () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="text-2xl">Alerts & Issues</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                connectionStatus === "connected" 
-                  ? "bg-green-100 text-green-800" 
-                  : connectionStatus === "disconnected"
-                  ? "bg-red-100 text-red-800"
-                  : "bg-yellow-100 text-yellow-800"
-              }`}>
-                {connectionStatus === "connected" ? (
-                  <>
-                    <Wifi className="h-3 w-3" />
-                    Connected
-                  </>
-                ) : connectionStatus === "disconnected" ? (
-                  <>
-                    <WifiOff className="h-3 w-3" />
-                    Disconnected
-                  </>
-                ) : (
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Checking...
-                  </>
-                )}
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-xl md:text-2xl">Alerts & Issues</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                  connectionStatus === "connected" 
+                    ? "bg-green-100 text-green-800" 
+                    : connectionStatus === "disconnected"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-yellow-100 text-yellow-800"
+                }`}>
+                  {connectionStatus === "connected" ? (
+                    <>
+                      <Wifi className="h-3 w-3" />
+                      Connected
+                    </>
+                  ) : connectionStatus === "disconnected" ? (
+                    <>
+                      <WifiOff className="h-3 w-3" />
+                      Disconnected
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Checking...
+                    </>
+                  )}
+                </div>
+                <span className="text-xs md:text-sm text-muted-foreground">
+                  {activeTab === "alerts" 
+                    ? `${alerts.length} alert${alerts.length !== 1 ? 's' : ''}`
+                    : `${workQueries.length} work quer${workQueries.length !== 1 ? 'ies' : 'y'}`
+                  }
+                </span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {activeTab === "alerts" 
-                  ? `${alerts.length} alert${alerts.length !== 1 ? 's' : ''}`
-                  : `${workQueries.length} work quer${workQueries.length !== 1 ? 'ies' : 'y'}`
-                }
-              </span>
             </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTestConnection}
-              disabled={loading.alerts || connectionStatus === "checking"}
-              className="gap-1"
-            >
-              {connectionStatus === "checking" ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              Test Connection
-            </Button>
             
-            {activeTab === "alerts" && (
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Alert
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
-            )}
-            
-            {activeTab === "work-queries" && authUser?.id && (
-              <Button 
+            <div className="flex flex-wrap gap-2">
+              <Button
                 variant="outline"
-                onClick={() => window.open('/work-queries', '_blank')}
+                size={isMobileView ? "sm" : "default"}
+                onClick={handleTestConnection}
+                disabled={loading.alerts || connectionStatus === "checking"}
+                className="gap-1"
               >
-                <Plus className="mr-2 h-4 w-4" />
-                New Work Query
+                {connectionStatus === "checking" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                {!isMobileView && "Test Connection"}
               </Button>
-            )}
+              
+              {activeTab === "alerts" && (
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size={isMobileView ? "sm" : "default"}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {!isMobileView && "Create Alert"}
+                      {isMobileView && "Create"}
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              )}
+              
+              {activeTab === "work-queries" && authUser?.id && (
+                <Button 
+                  variant="outline"
+                  size={isMobileView ? "sm" : "default"}
+                  onClick={() => window.open('/work-queries', '_blank')}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  {!isMobileView && "New Work Query"}
+                  {isMobileView && "New"}
+                </Button>
+              )}
 
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh}
-              disabled={loading.alerts || loading.queries || connectionStatus === "checking"}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading.alerts || loading.queries ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+              <Button 
+                variant="outline" 
+                size={isMobileView ? "sm" : "default"}
+                onClick={handleRefresh}
+                disabled={loading.alerts || loading.queries || connectionStatus === "checking"}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading.alerts || loading.queries ? 'animate-spin' : ''}`} />
+                {!isMobileView && "Refresh"}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         
-        <CardContent>
+        <CardContent className="p-4 md:p-6 pt-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="alerts" className="flex items-center gap-2">
+              <TabsTrigger value="alerts" className="flex items-center gap-2 text-sm">
                 <AlertCircle className="h-4 w-4" />
-                Alerts
+                <span className="hidden sm:inline">Alerts</span>
+                <span className="sm:hidden">Alert</span>
                 {alerts.length > 0 && (
                   <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 flex items-center justify-center">
                     {alerts.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="work-queries" className="flex items-center gap-2">
+              <TabsTrigger value="work-queries" className="flex items-center gap-2 text-sm">
                 <MessageCircle className="h-4 w-4" />
-                Work Queries
+                <span className="hidden sm:inline">Work Queries</span>
+                <span className="sm:hidden">Queries</span>
                 {workQueries.length > 0 && (
                   <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 flex items-center justify-center">
                     {workQueries.length}
@@ -863,8 +1125,8 @@ const fetchWorkQueries = async () => {
             <TabsContent value="alerts" className="space-y-4">
               {loading.alerts ? (
                 <div className="flex justify-center items-center h-64">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading alerts...</span>
+                  <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+                  <span className="ml-2 text-sm md:text-base">Loading alerts...</span>
                 </div>
               ) : (
                 renderAlertsTab()
@@ -874,8 +1136,8 @@ const fetchWorkQueries = async () => {
             <TabsContent value="work-queries" className="space-y-4">
               {loading.queries ? (
                 <div className="flex justify-center items-center h-64">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading work queries...</span>
+                  <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+                  <span className="ml-2 text-sm md:text-base">Loading work queries...</span>
                 </div>
               ) : (
                 renderWorkQueriesTab()
@@ -887,20 +1149,20 @@ const fetchWorkQueries = async () => {
 
       {/* View/Edit Alert Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg md:text-xl">
               {selectedAlert ? `Alert Details: ${selectedAlert.title}` : 'Alert Details'}
             </DialogTitle>
           </DialogHeader>
           
           {selectedAlertForEdit && (
-            <form onSubmit={handleUpdateAlert} className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <form onSubmit={handleUpdateAlert} className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 {/* Left Column - Basic Info */}
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="editTitle">
+                    <Label htmlFor="editTitle" className="text-sm md:text-base">
                       Alert Title <span className="text-red-500">*</span>
                     </Label>
                     <Input 
@@ -909,32 +1171,33 @@ const fetchWorkQueries = async () => {
                       defaultValue={selectedAlertForEdit.title}
                       required 
                       disabled={submitting}
+                      className="h-9 md:h-10"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="editDescription">
+                    <Label htmlFor="editDescription" className="text-sm md:text-base">
                       Description <span className="text-red-500">*</span>
                     </Label>
                     <Textarea 
                       id="editDescription" 
                       name="editDescription" 
                       defaultValue={selectedAlertForEdit.description}
-                      rows={6}
+                      rows={isMobileView ? 4 : 6}
                       required 
                       disabled={submitting}
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="editSeverity">
+                      <Label htmlFor="editSeverity" className="text-sm md:text-base">
                         Severity <span className="text-red-500">*</span>
                       </Label>
                       <select
                         id="editSeverity"
                         name="editSeverity"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-9 md:h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         defaultValue={selectedAlertForEdit.severity}
                         required
                         disabled={submitting}
@@ -947,13 +1210,13 @@ const fetchWorkQueries = async () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="editStatus">
+                      <Label htmlFor="editStatus" className="text-sm md:text-base">
                         Status <span className="text-red-500">*</span>
                       </Label>
                       <select
                         id="editStatus"
                         name="editStatus"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-9 md:h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         defaultValue={selectedAlertForEdit.status}
                         required
                         disabled={submitting}
@@ -967,10 +1230,10 @@ const fetchWorkQueries = async () => {
                 </div>
 
                 {/* Right Column - Additional Info & Photos */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3 md:space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="editSite">
+                      <Label htmlFor="editSite" className="text-sm md:text-base">
                         Site <span className="text-red-500">*</span>
                       </Label>
                       <Input 
@@ -979,11 +1242,12 @@ const fetchWorkQueries = async () => {
                         defaultValue={selectedAlertForEdit.site}
                         required 
                         disabled={submitting}
+                        className="h-9 md:h-10"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="editReportedBy">
+                      <Label htmlFor="editReportedBy" className="text-sm md:text-base">
                         Reported By <span className="text-red-500">*</span>
                       </Label>
                       <Input 
@@ -992,54 +1256,52 @@ const fetchWorkQueries = async () => {
                         defaultValue={selectedAlertForEdit.reportedBy}
                         required 
                         disabled={submitting}
+                        className="h-9 md:h-10"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="editAssignedTo">Assigned To</Label>
+                      <Label htmlFor="editAssignedTo" className="text-sm md:text-base">Assigned To</Label>
                       <Input 
                         id="editAssignedTo" 
                         name="editAssignedTo" 
                         defaultValue={selectedAlertForEdit.assignedTo || ""}
                         disabled={submitting}
+                        className="h-9 md:h-10"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
-                        <Label htmlFor="editDate">
+                        <Label htmlFor="editDate" className="text-sm md:text-base">
                           Date <span className="text-red-500">*</span>
                         </Label>
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <Input 
-                            id="editDate" 
-                            name="editDate" 
-                            type="date"
-                            defaultValue={selectedAlertForEdit.date}
-                            required 
-                            disabled={submitting}
-                          />
-                        </div>
+                        <Input 
+                          id="editDate" 
+                          name="editDate" 
+                          type="date"
+                          defaultValue={selectedAlertForEdit.date}
+                          required 
+                          disabled={submitting}
+                          className="h-9 md:h-10"
+                        />
                       </div>
                       
                       <div className="space-y-2">
-                        <Label htmlFor="editTime">
+                        <Label htmlFor="editTime" className="text-sm md:text-base">
                           Time <span className="text-red-500">*</span>
                         </Label>
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <Input 
-                            id="editTime" 
-                            name="editTime" 
-                            type="time"
-                            defaultValue={selectedAlertForEdit.time}
-                            required 
-                            disabled={submitting}
-                          />
-                        </div>
+                        <Input 
+                          id="editTime" 
+                          name="editTime" 
+                          type="time"
+                          defaultValue={selectedAlertForEdit.time}
+                          required 
+                          disabled={submitting}
+                          className="h-9 md:h-10"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1047,8 +1309,8 @@ const fetchWorkQueries = async () => {
                   {/* Photos Section */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label>Photos (Max 5 total)</Label>
-                      <span className="text-sm text-muted-foreground">
+                      <Label className="text-sm md:text-base">Photos (Max 5 total)</Label>
+                      <span className="text-xs md:text-sm text-muted-foreground">
                         {selectedAlertForEdit.photos?.length || 0 + editPhotoFiles.length}/5
                       </span>
                     </div>
@@ -1070,7 +1332,7 @@ const fetchWorkQueries = async () => {
                         type="button"
                         variant="outline"
                         onClick={() => editFileInputRef.current?.click()}
-                        className="w-full"
+                        className="w-full h-9 md:h-10"
                         disabled={submitting || 
                           ((selectedAlertForEdit.photos?.length || 0) + editPhotoFiles.length >= 5)
                         }
@@ -1087,7 +1349,7 @@ const fetchWorkQueries = async () => {
                     {editPhotoFiles.length > 0 && (
                       <div>
                         <p className="text-sm font-medium mb-2">New Photos to Upload:</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {editPhotoFiles.map((file, index) => (
                             <div key={index} className="relative group">
                               <div className="aspect-square border rounded-md overflow-hidden">
@@ -1118,13 +1380,13 @@ const fetchWorkQueries = async () => {
                     {selectedAlertForEdit.photos && selectedAlertForEdit.photos.length > 0 && (
                       <div>
                         <p className="text-sm font-medium mb-2">Existing Photos:</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {selectedAlertForEdit.photos.map((photo, index) => (
                             <div key={index} className="border rounded-md overflow-hidden">
                               <img
                                 src={photo}
                                 alt={`Existing photo ${index + 1}`}
-                                className="w-full h-24 object-cover"
+                                className="w-full h-20 sm:h-24 object-cover"
                               />
                               <div className="p-1 text-xs text-center truncate bg-muted">
                                 Photo {index + 1}
@@ -1138,11 +1400,11 @@ const fetchWorkQueries = async () => {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
                 <Button 
                   type="button" 
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 h-9 md:h-10"
                   onClick={() => {
                     setViewDialogOpen(false);
                     setSelectedAlert(null);
@@ -1156,7 +1418,7 @@ const fetchWorkQueries = async () => {
                 <Button 
                   type="button"
                   variant="destructive"
-                  className="flex-1"
+                  className="flex-1 h-9 md:h-10"
                   onClick={() => handleDeleteAlert(selectedAlertForEdit.id)}
                   disabled={submitting}
                 >
@@ -1164,7 +1426,7 @@ const fetchWorkQueries = async () => {
                 </Button>
                 <Button 
                   type="submit" 
-                  className="flex-1"
+                  className="flex-1 h-9 md:h-10"
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -1184,70 +1446,70 @@ const fetchWorkQueries = async () => {
 
       {/* View Work Query Dialog */}
       <Dialog open={workQueryDialogOpen} onOpenChange={setWorkQueryDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg md:text-xl">
               {selectedWorkQuery ? `Work Query: ${selectedWorkQuery.queryId}` : 'Work Query Details'}
             </DialogTitle>
           </DialogHeader>
           
           {selectedWorkQuery && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <Label className="font-semibold">Query ID</Label>
-                  <p className="mt-1 font-mono">{selectedWorkQuery.queryId}</p>
+                  <Label className="text-xs md:text-sm font-semibold">Query ID</Label>
+                  <p className="mt-1 font-mono text-sm md:text-base">{selectedWorkQuery.queryId}</p>
                 </div>
                 <div>
-                  <Label className="font-semibold">Status</Label>
+                  <Label className="text-xs md:text-sm font-semibold">Status</Label>
                   <div className="mt-1">
                     {getStatusBadge(selectedWorkQuery.status)}
                   </div>
                 </div>
                 <div>
-                  <Label className="font-semibold">Priority</Label>
+                  <Label className="text-xs md:text-sm font-semibold">Priority</Label>
                   <div className="mt-1">
                     {getPriorityBadge(selectedWorkQuery.priority)}
                   </div>
                 </div>
                 <div>
-                  <Label className="font-semibold">Category</Label>
-                  <p className="mt-1 capitalize">{selectedWorkQuery.category.replace('-', ' ')}</p>
+                  <Label className="text-xs md:text-sm font-semibold">Category</Label>
+                  <p className="mt-1 text-sm md:text-base capitalize">{selectedWorkQuery.category.replace('-', ' ')}</p>
                 </div>
                 <div>
-                  <Label className="font-semibold">Service ID</Label>
-                  <p className="mt-1">{selectedWorkQuery.serviceId || "N/A"}</p>
+                  <Label className="text-xs md:text-sm font-semibold">Service ID</Label>
+                  <p className="mt-1 text-sm md:text-base">{selectedWorkQuery.serviceId || "N/A"}</p>
                 </div>
                 <div>
-                  <Label className="font-semibold">Created</Label>
-                  <p className="mt-1">{formatDate(selectedWorkQuery.createdAt)}</p>
+                  <Label className="text-xs md:text-sm font-semibold">Created</Label>
+                  <p className="mt-1 text-sm md:text-base">{formatDate(selectedWorkQuery.createdAt)}</p>
                 </div>
               </div>
 
               <div>
-                <Label className="font-semibold">Title</Label>
-                <p className="mt-1 font-medium">{selectedWorkQuery.title}</p>
+                <Label className="text-xs md:text-sm font-semibold">Title</Label>
+                <p className="mt-1 text-sm md:text-base font-medium">{selectedWorkQuery.title}</p>
               </div>
 
               <div>
-                <Label className="font-semibold">Description</Label>
+                <Label className="text-xs md:text-sm font-semibold">Description</Label>
                 <div className="mt-1 p-3 bg-gray-50 rounded-lg border">
                   <p className="text-sm whitespace-pre-wrap">{selectedWorkQuery.description}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <Label className="font-semibold text-blue-900">Reported By</Label>
+                  <Label className="text-xs md:text-sm font-semibold text-blue-900">Reported By</Label>
                   <div className="mt-2 space-y-1">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-blue-600" />
                       <div>
-                        <div className="font-medium">{selectedWorkQuery.reportedBy?.name}</div>
-                        <div className="text-sm text-blue-700 capitalize">{selectedWorkQuery.reportedBy?.role}</div>
+                        <div className="font-medium text-sm">{selectedWorkQuery.reportedBy?.name}</div>
+                        <div className="text-xs text-blue-700 capitalize">{selectedWorkQuery.reportedBy?.role}</div>
                       </div>
                     </div>
-                    <div className="text-sm text-blue-600">
+                    <div className="text-xs text-blue-600">
                       Supervisor: {selectedWorkQuery.supervisorName}
                     </div>
                   </div>
@@ -1255,20 +1517,20 @@ const fetchWorkQueries = async () => {
 
                 {selectedWorkQuery.proofFiles && selectedWorkQuery.proofFiles.length > 0 && (
                   <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                    <Label className="font-semibold text-green-900">Supporting Evidence</Label>
+                    <Label className="text-xs md:text-sm font-semibold text-green-900">Supporting Evidence</Label>
                     <div className="mt-2">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">{selectedWorkQuery.proofFiles.length} file(s)</span>
+                        <span className="font-medium text-sm">{selectedWorkQuery.proofFiles.length} file(s)</span>
                       </div>
                       <div className="mt-2 space-y-1">
                         {selectedWorkQuery.proofFiles.slice(0, 3).map((file, index) => (
-                          <div key={index} className="text-sm text-green-700 truncate">
+                          <div key={index} className="text-xs text-green-700 truncate">
                             • {file.name} ({file.size})
                           </div>
                         ))}
                         {selectedWorkQuery.proofFiles.length > 3 && (
-                          <div className="text-sm text-green-600">
+                          <div className="text-xs text-green-600">
                             + {selectedWorkQuery.proofFiles.length - 3} more files
                           </div>
                         )}
@@ -1280,17 +1542,18 @@ const fetchWorkQueries = async () => {
 
               {selectedWorkQuery.superadminResponse && (
                 <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <Label className="font-semibold text-yellow-900">Superadmin Response</Label>
+                  <Label className="text-xs md:text-sm font-semibold text-yellow-900">Superadmin Response</Label>
                   <div className="mt-1 p-2 bg-white rounded border">
                     <p className="text-sm whitespace-pre-wrap">{selectedWorkQuery.superadminResponse}</p>
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t">
                 <Button 
                   type="button" 
                   variant="outline"
+                  className="w-full sm:w-auto h-9 md:h-10"
                   onClick={() => setWorkQueryDialogOpen(false)}
                 >
                   Close
@@ -1298,6 +1561,7 @@ const fetchWorkQueries = async () => {
                 <Button 
                   type="button"
                   variant="default"
+                  className="w-full sm:w-auto h-9 md:h-10"
                   onClick={() => window.open(`/work-queries/${selectedWorkQuery._id}`, '_blank')}
                 >
                   <Eye className="mr-2 h-4 w-4" />
@@ -1311,15 +1575,15 @@ const fetchWorkQueries = async () => {
 
       {/* Create Alert Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Alert</DialogTitle>
+            <DialogTitle className="text-lg md:text-xl">Create New Alert</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleAddAlert} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleAddAlert} className="space-y-3 md:space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="title">
+                <Label htmlFor="title" className="text-sm md:text-base">
                   Alert Title <span className="text-red-500">*</span>
                 </Label>
                 <Input 
@@ -1328,17 +1592,18 @@ const fetchWorkQueries = async () => {
                   placeholder="Enter alert title" 
                   required 
                   disabled={submitting}
+                  className="h-9 md:h-10"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="severity">
+                <Label htmlFor="severity" className="text-sm md:text-base">
                   Severity <span className="text-red-500">*</span>
                 </Label>
                 <select
                   id="severity"
                   name="severity"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-9 md:h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   required
                   disabled={submitting}
                   defaultValue="medium"
@@ -1352,7 +1617,7 @@ const fetchWorkQueries = async () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="site">
+                <Label htmlFor="site" className="text-sm md:text-base">
                   Site <span className="text-red-500">*</span>
                 </Label>
                 <Input 
@@ -1361,11 +1626,12 @@ const fetchWorkQueries = async () => {
                   placeholder="Enter site name" 
                   required 
                   disabled={submitting}
+                  className="h-9 md:h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reportedBy">
+                <Label htmlFor="reportedBy" className="text-sm md:text-base">
                   Reported By <span className="text-red-500">*</span>
                 </Label>
                 <Input 
@@ -1374,21 +1640,23 @@ const fetchWorkQueries = async () => {
                   placeholder="Enter reporter name" 
                   required 
                   disabled={submitting}
+                  className="h-9 md:h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="assignedTo">Assigned To</Label>
+                <Label htmlFor="assignedTo" className="text-sm md:text-base">Assigned To</Label>
                 <Input 
                   id="assignedTo" 
                   name="assignedTo" 
                   placeholder="Assign to staff" 
                   disabled={submitting}
+                  className="h-9 md:h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="date">
+                <Label htmlFor="date" className="text-sm md:text-base">
                   Date <span className="text-red-500">*</span>
                 </Label>
                 <Input 
@@ -1398,11 +1666,12 @@ const fetchWorkQueries = async () => {
                   defaultValue={new Date().toISOString().split('T')[0]}
                   required 
                   disabled={submitting}
+                  className="h-9 md:h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="time">
+                <Label htmlFor="time" className="text-sm md:text-base">
                   Time <span className="text-red-500">*</span>
                 </Label>
                 <Input 
@@ -1412,27 +1681,28 @@ const fetchWorkQueries = async () => {
                   defaultValue={new Date().toTimeString().slice(0, 5)}
                   required 
                   disabled={submitting}
+                  className="h-9 md:h-10"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">
+              <Label htmlFor="description" className="text-sm md:text-base">
                 Description <span className="text-red-500">*</span>
               </Label>
               <Textarea 
                 id="description" 
                 name="description" 
                 placeholder="Describe the issue in detail..."
-                rows={4}
+                rows={isMobileView ? 4 : 5}
                 required 
                 disabled={submitting}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Upload Photos (Max 5)</Label>
-              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+              <Label className="text-sm md:text-base">Upload Photos (Max 5)</Label>
+              <div className="border-2 border-dashed rounded-lg p-3 md:p-4 text-center">
                 <Input
                   type="file"
                   ref={fileInputRef}
@@ -1446,14 +1716,14 @@ const fetchWorkQueries = async () => {
                   type="button"
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full"
+                  className="w-full h-9 md:h-10"
                   disabled={submitting || photoFiles.length >= 5}
                 >
                   <Camera className="mr-2 h-4 w-4" />
                   Click to upload photos
                   {photoFiles.length > 0 && ` (${photoFiles.length}/5)`}
                 </Button>
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Supports JPG, PNG up to 5MB each
                 </p>
               </div>
@@ -1461,7 +1731,7 @@ const fetchWorkQueries = async () => {
               {photoFiles.length > 0 && (
                 <div className="mt-4">
                   <p className="text-sm font-medium mb-2">Uploaded Photos:</p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {photoFiles.map((file, index) => (
                       <div key={index} className="relative group">
                         <div className="aspect-square border rounded-md overflow-hidden">
@@ -1489,17 +1759,17 @@ const fetchWorkQueries = async () => {
               )}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <Button 
                 type="button" 
                 variant="outline" 
-                className="flex-1"
+                className="flex-1 h-9 md:h-10"
                 onClick={() => setDialogOpen(false)}
                 disabled={submitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1" disabled={submitting}>
+              <Button type="submit" className="flex-1 h-9 md:h-10" disabled={submitting}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

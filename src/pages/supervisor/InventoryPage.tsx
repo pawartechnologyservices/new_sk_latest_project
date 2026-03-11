@@ -34,6 +34,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Upload,
   Plus,
   Search,
@@ -67,6 +73,7 @@ import {
   Database,
   Filter,
   UserCog,
+  MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -75,6 +82,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { inventoryService, type FrontendInventoryItem } from '@/services/inventoryService';
 import { machineService, type FrontendMachine, type MachineStats, type MaintenanceRecordDTO } from '@/services/machineService';
 import { useRole } from '@/context/RoleContext';
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { useOutletContext } from "react-router-dom";
 
 // Types
 interface Site {
@@ -100,7 +109,214 @@ type InventoryItem = FrontendInventoryItem;
 // Use the FrontendMachine type from service
 type Machine = FrontendMachine;
 
+// Mobile responsive card component for inventory items
+const MobileInventoryCard = ({ 
+  item, 
+  onEdit, 
+  onView, 
+  onHistory, 
+  onDelete,
+  formatCurrency,
+  getDepartmentIcon,
+  departments 
+}: { 
+  item: InventoryItem; 
+  onEdit: (item: InventoryItem) => void;
+  onView: (item: InventoryItem) => void;
+  onHistory: (itemId: string) => void;
+  onDelete: (itemId: string) => void;
+  formatCurrency: (amount: number) => string;
+  getDepartmentIcon: (department: string) => any;
+  departments: Department[];
+}) => {
+  const DeptIcon = getDepartmentIcon(item.department);
+  const isLowStock = item.quantity <= item.reorderLevel;
+  
+  return (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg ${isLowStock ? 'bg-amber-100' : 'bg-blue-100'}`}>
+              <Package className={`h-5 w-5 ${isLowStock ? 'text-amber-600' : 'text-blue-600'}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-base">{item.name}</h3>
+              <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
+            </div>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(item)}>
+                <Edit className="h-4 w-4 mr-2" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onView(item)}>
+                <Eye className="h-4 w-4 mr-2" /> View
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onHistory(item.id)}>
+                <History className="h-4 w-4 mr-2" /> History
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(item.id)} className="text-red-600">
+                <Trash2 className="h-4 w-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Department</p>
+            <div className="flex items-center gap-1 mt-1">
+              <DeptIcon className="h-3 w-3" />
+              <span className="text-sm font-medium">
+                {departments.find(d => d.value === item.department)?.label || item.department}
+              </span>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Category</p>
+            <p className="text-sm font-medium">{item.category}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Quantity</p>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-bold ${isLowStock ? 'text-amber-600' : ''}`}>
+                {item.quantity}
+              </span>
+              {isLowStock && (
+                <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700">
+                  Low
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Price</p>
+            <p className="text-sm font-bold">{formatCurrency(item.price)}</p>
+          </div>
+          <div className="col-span-2">
+            <p className="text-xs text-muted-foreground">Manager</p>
+            <div className="flex items-center gap-1 mt-1">
+              <UserCheck className="h-3 w-3" />
+              <span className="text-sm">{item.assignedManager}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive card component for machines
+const MobileMachineCard = ({ 
+  machine, 
+  onView, 
+  onEdit, 
+  onMaintenance, 
+  onDelete,
+  formatCurrency,
+  formatDate,
+  machineStatusOptions,
+  role,
+  user
+}: { 
+  machine: Machine; 
+  onView: (machineId: string) => void;
+  onEdit: (machine: Machine) => void;
+  onMaintenance: (machineId: string) => void;
+  onDelete: (machineId: string) => void;
+  formatCurrency: (amount: number) => string;
+  formatDate: (dateString: string) => string;
+  machineStatusOptions: any[];
+  role: string;
+  user: any;
+}) => {
+  const statusOption = machineStatusOptions.find(s => s.value === machine.status);
+  const StatusIcon = statusOption?.icon || CheckCircle;
+  
+  return (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-purple-100">
+              <Cpu className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-base">{machine.name}</h3>
+              {machine.model && <p className="text-xs text-muted-foreground">Model: {machine.model}</p>}
+            </div>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onView(machine.id)}>
+                <Eye className="h-4 w-4 mr-2" /> View
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(machine)}>
+                <Edit className="h-4 w-4 mr-2" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMaintenance(machine.id)}>
+                <Wrench className="h-4 w-4 mr-2" /> Maintenance
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDelete(machine.id)} className="text-red-600">
+                <Trash2 className="h-4 w-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Status</p>
+            <Badge className={`${statusOption?.color} border-0 flex items-center gap-1 w-fit mt-1`}>
+              <StatusIcon className="h-3 w-3" />
+              {statusOption?.label}
+            </Badge>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Quantity</p>
+            <p className="text-sm font-bold">{machine.quantity}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Cost</p>
+            <p className="text-sm font-bold">{formatCurrency(machine.cost)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Purchase Date</p>
+            <p className="text-sm">{formatDate(machine.purchaseDate)}</p>
+          </div>
+          {machine.assignedTo && (
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground">Assigned To</p>
+              <div className="flex items-center gap-1 mt-1">
+                <UserCheck className="h-3 w-3" />
+                <span className="text-sm">{machine.assignedTo}</span>
+                {role === 'supervisor' && machine.assignedTo === user?.name && (
+                  <Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const InventoryPage = () => {
+  // Get outlet context for hamburger menu
+  const outletContext = useOutletContext<{ onMenuClick?: () => void }>();
+  
   // Get logged in user info
   const { user, role } = useRole();
   
@@ -139,6 +355,9 @@ const InventoryPage = () => {
   // New state for tracking data source
   const [usingLocalMachineStats, setUsingLocalMachineStats] = useState(false);
   const [backendConnected, setBackendConnected] = useState(true);
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
   
   // New item form state
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
@@ -222,6 +441,18 @@ const InventoryPage = () => {
     "Scheduled",
     "Overhaul"
   ];
+
+  // Check if mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Helper function to calculate stats from items
   const calculateStats = (itemsList: InventoryItem[]): InventoryStats => {
@@ -923,11 +1154,18 @@ const InventoryPage = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading data from backend...</p>
+      <div className="min-h-screen bg-background">
+        <DashboardHeader 
+          title="Inventory Management" 
+          subtitle="Loading your data..." 
+          onMenuClick={outletContext?.onMenuClick}
+        />
+        <div className="container mx-auto p-4 md:p-6">
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading data from backend...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -935,16 +1173,23 @@ const InventoryPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <DashboardHeader 
+        title="Inventory Management" 
+        subtitle="Manage and track your inventory and machinery" 
+        onMenuClick={outletContext?.onMenuClick}
+      />
+      
+      <div className="container mx-auto p-4 md:p-6">
+        {/* Header with actions */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Inventory Management</h1>
-            <p className="text-muted-foreground">Manage and track your inventory and machinery across all sites</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
+            <p className="text-sm text-muted-foreground">Manage and track your inventory and machinery across all sites</p>
             
             {/* Role Indicator */}
             {role === 'supervisor' && user && (
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                   <UserCog className="h-3 w-3 mr-1" />
                   Supervisor Dashboard
@@ -961,1581 +1206,1734 @@ const InventoryPage = () => {
             )}
           </div>
           
-          {/* Backend Status Indicator */}
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${backendConnected ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-            <span className="text-xs text-muted-foreground">
-              {backendConnected ? 'Backend connected' : 'Backend offline'}
-            </span>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={refreshData}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {role !== 'supervisor' && (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={handleExport}
-                disabled={items.length === 0}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setImportDialogOpen(true)}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Import
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Stats Cards - Conditionally render based on active tab */}
-      {activeTab === "inventory" || activeTab === "low-stock" ? (
-        // Inventory Stats Cards (3 cards)
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalItems}</div>
-              <p className="text-xs text-muted-foreground">
-                {role === 'supervisor' ? 'Your items only' : 'Across all departments'}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{stats.lowStockItems}</div>
-              <p className="text-xs text-muted-foreground">Need reordering</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</div>
-              <p className="text-xs text-muted-foreground">Current inventory value</p>
-            </CardContent>
-          </Card>
-        </div>
-      ) : activeTab === "machine-statistics" ? (
-        // Machine Stats Cards (6 cards)
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Machines</CardTitle>
-              <Cpu className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{machineStatsDisplay.totalMachines}</div>
-              <p className="text-xs text-muted-foreground">
-                {role === 'supervisor' ? 'Your machines only' : 'Across all locations'}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(machineStatsDisplay.totalMachineValue)}</div>
-              <p className="text-xs text-muted-foreground">Machinery value</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Operational</CardTitle>
-              <div className="h-4 w-4 rounded-full bg-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{machineStatsDisplay.operationalMachines}</div>
-              <p className="text-xs text-muted-foreground">Ready for use</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Under Maintenance</CardTitle>
-              <div className="h-4 w-4 rounded-full bg-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{machineStatsDisplay.maintenanceMachines}</div>
-              <p className="text-xs text-muted-foreground">Currently in maintenance</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Out of Service</CardTitle>
-              <div className="h-4 w-4 rounded-full bg-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{machineStatsDisplay.outOfServiceMachines}</div>
-              <p className="text-xs text-muted-foreground">Not operational</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Maintenance Due</CardTitle>
-              <div className="h-4 w-4 rounded-full bg-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{machineStatsDisplay.upcomingMaintenanceCount}</div>
-              <p className="text-xs text-muted-foreground">Within 30 days</p>
-            </CardContent>
-          </Card>
-        </div>
-      ) : (
-        // For Categories tab or others, show default cards
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalItems}</div>
-              <p className="text-xs text-muted-foreground">
-                {role === 'supervisor' ? 'Your items only' : 'Across all departments'}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Machines</CardTitle>
-              <Cpu className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{machineStatsDisplay.totalMachines}</div>
-              <p className="text-xs text-muted-foreground">
-                {role === 'supervisor' ? 'Your machines only' : 'Across all locations'}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Departments</CardTitle>
-              <Tag className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{departments.length}</div>
-              <p className="text-xs text-muted-foreground">Total departments</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mb-4">
-        <Tabs defaultValue="inventory" className="flex-1" onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between">
-            <TabsList>
-              <TabsTrigger value="inventory">
-                <Package className="mr-2 h-4 w-4" />
-                Inventory ({items.length})
-              </TabsTrigger>
-              <TabsTrigger value="low-stock">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Low Stock ({stats.lowStockItems})
-              </TabsTrigger>
-              <TabsTrigger value="machine-statistics">
-                <Cpu className="mr-2 h-4 w-4" />
-                Machine Statistics ({machines.length})
-              </TabsTrigger>
-              <TabsTrigger value="categories">
-                <Tag className="mr-2 h-4 w-4" />
-                Categories
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Backend Status Indicator */}
+            <div className="flex items-center gap-2 mr-2">
+              <div className={`h-2 w-2 rounded-full ${backendConnected ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                {backendConnected ? 'Backend connected' : 'Backend offline'}
+              </span>
+            </div>
             
-            {/* Add Item Button - ONLY VISIBLE IN INVENTORY TAB */}
-            {activeTab === "inventory" && (
-              <Button 
-                onClick={() => {
-                  setEditItem(null);
-                  setItemDialogOpen(true);
-                }}
-                className="ml-4"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
-            )}
+            <Button 
+              variant="outline" 
+              size={isMobileView ? "icon" : "default"}
+              onClick={refreshData}
+              disabled={refreshing}
+              className={isMobileView ? "h-9 w-9" : ""}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''} ${!isMobileView ? 'mr-2' : ''}`} />
+              {!isMobileView && "Refresh"}
+            </Button>
             
-            {/* Add Machine Button - ONLY VISIBLE IN MACHINE STATISTICS TAB */}
-            {activeTab === "machine-statistics" && (
-              <div className="flex items-center gap-2 ml-4">
-                {usingLocalMachineStats && (
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                    <Database className="h-3 w-3 mr-1" />
-                    Local Data
-                  </Badge>
-                )}
-                {role !== 'supervisor' && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleExportMachines}
-                    disabled={machines.length === 0}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Machines
-                  </Button>
-                )}
-                <Button onClick={() => {
-                  setEditMachine(null);
-                  resetNewMachineForm();
-                  setMachineDialogOpen(true);
-                }}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Machine
+            {role !== 'supervisor' && !isMobileView && (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleExport}
+                  disabled={items.length === 0}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
                 </Button>
-              </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setImportDialogOpen(true)}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import
+                </Button>
+              </>
             )}
           </div>
+        </div>
 
-          {/* INVENTORY TAB */}
-          <TabsContent value="inventory">
+        {/* Stats Cards - Conditionally render based on active tab */}
+        {activeTab === "inventory" || activeTab === "low-stock" ? (
+          // Inventory Stats Cards (3 cards) - Mobile responsive grid
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             <Card>
-              <CardContent className="pt-6">
-                {/* Filters */}
-                <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search items..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  
-                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Departments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Departments</SelectItem>
-                      {departments.map(dept => {
-                        const Icon = dept.icon;
-                        return (
-                          <SelectItem key={dept.value} value={dept.value}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {dept.label}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select 
-                    value={selectedCategory} 
-                    onValueChange={setSelectedCategory}
-                    disabled={selectedDepartment === "all"}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {selectedDepartment !== "all" && 
-                        getCategoriesForDepartment(selectedDepartment).map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))
-                      }
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Supervisor Info Alert */}
-                {role === 'supervisor' && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-center gap-2 text-blue-700">
-                      <UserCheck className="h-4 w-4" />
-                      <span className="text-sm font-medium">Personal Dashboard</span>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">
-                      You can only see and manage items that you have created or are assigned to you.
-                      Other supervisors' items are not visible to you.
-                    </p>
-                  </div>
-                )}
-
-                {/* Table */}
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead>Department</TableHead>
-                        <TableHead>Manager</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredItems.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8">
-                            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                            <p className="text-lg font-medium">No items found</p>
-                            <p className="text-muted-foreground">
-                              {items.length === 0 
-                                ? "No items in database. Add your first item!" 
-                                : role === 'supervisor' 
-                                  ? "You haven't added any items yet." 
-                                  : "Try adjusting your search or filters"}
-                            </p>
-                            {role === 'supervisor' && items.length === 0 && (
-                              <Button 
-                                onClick={() => {
-                                  setEditItem(null);
-                                  setItemDialogOpen(true);
-                                }}
-                                className="mt-4"
-                              >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Your First Item
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredItems.map((item) => {
-                          const DeptIcon = getDepartmentIcon(item.department);
-                          const isLowStock = item.quantity <= item.reorderLevel;
-                          
-                          return (
-                            <TableRow key={item.id}>
-                              <TableCell className="font-mono font-medium">{item.sku}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Package className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium">{item.name}</span>
-                                </div>
-                                {item.description && (
-                                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                    {item.description}
-                                  </p>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                                  <DeptIcon className="h-3 w-3" />
-                                  {departments.find(d => d.value === item.department)?.label}
-                                </Badge>
-                                <div className="text-xs text-muted-foreground mt-1">{item.category}</div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <UserCheck className="h-3 w-3" />
-                                  {item.assignedManager}
-                                  {role === 'supervisor' && (
-                                    <Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <span className={`font-medium ${isLowStock ? 'text-amber-600' : ''}`}>
-                                    {item.quantity}
-                                  </span>
-                                  {isLowStock && (
-                                    <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700">
-                                      <AlertTriangle className="h-3 w-3 mr-1" />
-                                      Low
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Reorder: {item.reorderLevel}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-medium">{formatCurrency(item.price)}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  Cost: {formatCurrency(item.costPrice)}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {isLowStock ? (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Low Stock
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                                    In Stock
-                                  </Badge>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => openEditDialog(item)}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <Eye className="h-4 w-4" />
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-2xl">
-                                      <DialogHeader>
-                                        <DialogTitle>Item Details</DialogTitle>
-                                      </DialogHeader>
-                                      <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <div><strong>SKU:</strong> {item.sku}</div>
-                                          <div><strong>Name:</strong> {item.name}</div>
-                                          <div><strong>Department:</strong> {departments.find(d => d.value === item.department)?.label}</div>
-                                          <div><strong>Category:</strong> {item.category}</div>
-                                          <div><strong>Quantity:</strong> {item.quantity}</div>
-                                          <div><strong>Price:</strong> {formatCurrency(item.price)}</div>
-                                          <div><strong>Cost Price:</strong> {formatCurrency(item.costPrice)}</div>
-                                          <div><strong>Supplier:</strong> {item.supplier}</div>
-                                          <div><strong>Reorder Level:</strong> {item.reorderLevel}</div>
-                                          <div><strong>Manager:</strong> {item.assignedManager}</div>
-                                          {item.description && (
-                                            <div className="col-span-2">
-                                              <strong>Description:</strong> {item.description}
-                                            </div>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Change History */}
-                                        <div>
-                                          <h4 className="font-semibold mb-2">Change History</h4>
-                                          <div className="space-y-2 max-h-40 overflow-y-auto">
-                                            {item.changeHistory && item.changeHistory.length > 0 ? (
-                                              item.changeHistory.map((change, index) => (
-                                                <div key={index} className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded">
-                                                  <span>{change.date}</span>
-                                                  <span>{change.change}</span>
-                                                  <span>by {change.user}</span>
-                                                  <span className={`font-medium ${change.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    {change.quantity > 0 ? '+' : ''}{change.quantity}
-                                                  </span>
-                                                </div>
-                                              ))
-                                            ) : (
-                                              <p className="text-sm text-muted-foreground text-center py-2">
-                                                No change history available
-                                              </p>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
-                                  
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setChangeHistoryDialogOpen(item.id)}
-                                  >
-                                    <History className="h-4 w-4" />
-                                  </Button>
-                                  
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteItem(item.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* LOW STOCK TAB */}
-          <TabsContent value="low-stock">
-            <Card>
-              <CardHeader>
-                <CardTitle>Low Stock Items</CardTitle>
-                <CardDescription>Items that need reordering</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                {role === 'supervisor' && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-center gap-2 text-blue-700">
-                      <UserCheck className="h-4 w-4" />
-                      <span className="text-sm font-medium">Personal Dashboard</span>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Showing only your low stock items. Other supervisors' items are not visible.
-                    </p>
-                  </div>
-                )}
-                
-                {stats.lowStockItems === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertTriangle className="h-12 w-12 mx-auto text-green-500 mb-2" />
-                    <p className="text-lg font-medium">All items are in stock!</p>
-                    <p className="text-muted-foreground">
-                      {role === 'supervisor' 
-                        ? "Your items are well stocked." 
-                        : "No items need reordering at this time."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {items
-                      .filter(item => item.quantity <= item.reorderLevel)
-                      .map(item => (
-                        <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Package className="h-5 w-5" />
-                            <div>
-                              <div className="font-medium">{item.name}</div>
-                              <div className="text-sm text-muted-foreground">{item.sku}</div>
-                              <div className="text-sm">{item.supplier}</div>
-                            </div>
-                          </div>
-                          <div className="text-amber-600 font-medium">
-                            {item.quantity} / {item.reorderLevel}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
+                <div className="text-2xl font-bold">{stats.totalItems}</div>
+                <p className="text-xs text-muted-foreground">
+                  {role === 'supervisor' ? 'Your items only' : 'Across all departments'}
+                </p>
               </CardContent>
             </Card>
-          </TabsContent>
-
-         {/* MACHINE STATISTICS TAB */}
-<TabsContent value="machine-statistics">
-  <Card>
-    <CardHeader>
-      <div>
-        <CardTitle>Machine Statistics</CardTitle>
-        <CardDescription>Manage and track machinery equipment</CardDescription>
-        {usingLocalMachineStats && (
-          <div className="mt-2">
-            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-              <Database className="h-3 w-3 mr-1" />
-              Using locally calculated statistics
-            </Badge>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600">{stats.lowStockItems}</div>
+                <p className="text-xs text-muted-foreground">Need reordering</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</div>
+                <p className="text-xs text-muted-foreground">Current inventory value</p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : activeTab === "machine-statistics" ? (
+          // Machine Stats Cards (6 cards) - Mobile responsive grid
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Machines</CardTitle>
+                <Cpu className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl md:text-2xl font-bold">{machineStatsDisplay.totalMachines}</div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {role === 'supervisor' ? 'Your machines' : 'All locations'}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm md:text-xl font-bold truncate">{formatCurrency(machineStatsDisplay.totalMachineValue)}</div>
+                <p className="text-xs text-muted-foreground">Machinery value</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Operational</CardTitle>
+                <div className="h-4 w-4 rounded-full bg-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl md:text-2xl font-bold text-green-600">{machineStatsDisplay.operationalMachines}</div>
+                <p className="text-xs text-muted-foreground">Ready for use</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Maintenance</CardTitle>
+                <div className="h-4 w-4 rounded-full bg-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl md:text-2xl font-bold text-yellow-600">{machineStatsDisplay.maintenanceMachines}</div>
+                <p className="text-xs text-muted-foreground">In maintenance</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Out of Service</CardTitle>
+                <div className="h-4 w-4 rounded-full bg-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl md:text-2xl font-bold text-red-600">{machineStatsDisplay.outOfServiceMachines}</div>
+                <p className="text-xs text-muted-foreground">Not operational</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Maintenance Due</CardTitle>
+                <div className="h-4 w-4 rounded-full bg-orange-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl md:text-2xl font-bold text-orange-600">{machineStatsDisplay.upcomingMaintenanceCount}</div>
+                <p className="text-xs text-muted-foreground">Within 30 days</p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          // For Categories tab or others, show default cards
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalItems}</div>
+                <p className="text-xs text-muted-foreground">
+                  {role === 'supervisor' ? 'Your items only' : 'Across all departments'}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Machines</CardTitle>
+                <Cpu className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{machineStatsDisplay.totalMachines}</div>
+                <p className="text-xs text-muted-foreground">
+                  {role === 'supervisor' ? 'Your machines only' : 'Across all locations'}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Departments</CardTitle>
+                <Tag className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{departments.length}</div>
+                <p className="text-xs text-muted-foreground">Total departments</p>
+              </CardContent>
+            </Card>
           </div>
         )}
-      </div>
-    </CardHeader>
-    <CardContent>
-      {/* Supervisor Info Alert */}
-      {role === 'supervisor' && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div className="flex items-center gap-2 text-blue-700">
-            <UserCheck className="h-4 w-4" />
-            <span className="text-sm font-medium">Personal Dashboard</span>
-          </div>
-          <p className="text-xs text-blue-600 mt-1">
-            You can only see and manage machines that you have added or are assigned to you.
-            Other supervisors' machines are not visible to you.
-          </p>
-        </div>
-      )}
 
-      {/* Machine Search and Actions */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search machines by name, manufacturer, model, or location..."
-            value={machineSearchQuery}
-            onChange={(e) => setMachineSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button 
-          variant="outline" 
-          onClick={() => setMaintenanceDialogOpen(true)}
-          disabled={machines.length === 0}
-        >
-          <Wrench className="mr-2 h-4 w-4" />
-          Add Maintenance
-        </Button>
-      </div>
-
-      {/* Machines Table - CHANGED TO INDIAN RUPEES */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Machine Name</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Cost</TableHead>
-              <TableHead>Purchase Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredMachines.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
-                  <Cpu className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-lg font-medium">No machines found</p>
-                  <p className="text-muted-foreground">
-                    {machines.length === 0 
-                      ? "No machines in database. Add your first machine!" 
-                      : role === 'supervisor'
-                        ? "You haven't added any machines yet." 
-                        : "Try adjusting your search"}
-                  </p>
-                  {role === 'supervisor' && machines.length === 0 && (
+        {/* Tabs and Actions */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+          <Tabs defaultValue="inventory" className="w-full" onValueChange={setActiveTab}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:grid-cols-4 h-auto">
+                <TabsTrigger value="inventory" className="text-xs sm:text-sm py-2">
+                  <Package className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Inventory</span>
+                  <span className="xs:hidden">Inv</span> ({items.length})
+                </TabsTrigger>
+                <TabsTrigger value="low-stock" className="text-xs sm:text-sm py-2">
+                  <AlertTriangle className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Low Stock</span>
+                  <span className="xs:hidden">Low</span> ({stats.lowStockItems})
+                </TabsTrigger>
+                <TabsTrigger value="machine-statistics" className="text-xs sm:text-sm py-2">
+                  <Cpu className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Machines</span>
+                  <span className="xs:hidden">Mach</span> ({machines.length})
+                </TabsTrigger>
+                <TabsTrigger value="categories" className="text-xs sm:text-sm py-2">
+                  <Tag className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Categories</span>
+                  <span className="xs:hidden">Cat</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="flex items-center gap-2">
+                {/* Add Item Button - ONLY VISIBLE IN INVENTORY TAB */}
+                {activeTab === "inventory" && (
+                  <Button 
+                    onClick={() => {
+                      setEditItem(null);
+                      setItemDialogOpen(true);
+                    }}
+                    size={isMobileView ? "sm" : "default"}
+                    className="w-full sm:w-auto"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {!isMobileView && "Add Item"}
+                    {isMobileView && "Add"}
+                  </Button>
+                )}
+                
+                {/* Add Machine Button - ONLY VISIBLE IN MACHINE STATISTICS TAB */}
+                {activeTab === "machine-statistics" && (
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {usingLocalMachineStats && (
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                        <Database className="h-3 w-3 mr-1" />
+                        Local
+                      </Badge>
+                    )}
+                    {role !== 'supervisor' && !isMobileView && (
+                      <Button 
+                        variant="outline" 
+                        onClick={handleExportMachines}
+                        disabled={machines.length === 0}
+                        size="sm"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                      </Button>
+                    )}
                     <Button 
                       onClick={() => {
                         setEditMachine(null);
                         resetNewMachineForm();
                         setMachineDialogOpen(true);
                       }}
-                      className="mt-4"
+                      size={isMobileView ? "sm" : "default"}
+                      className="w-full sm:w-auto"
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Your First Machine
+                      {!isMobileView && "Add Machine"}
+                      {isMobileView && "Add"}
                     </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredMachines.map((machine) => {
-                const statusOption = machineStatusOptions.find(s => s.value === machine.status);
-                const StatusIcon = statusOption?.icon || CheckCircle;
-                const machineAge = calculateMachineAge(machine.purchaseDate);
-                
-                return (
-                  <TableRow key={machine.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Cpu className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <span className="font-medium">{machine.name}</span>
-                          {machine.manufacturer && (
-                            <div className="text-xs text-muted-foreground">{machine.manufacturer}</div>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{machine.model || 'N/A'}</div>
-                      {machine.serialNumber && (
-                        <div className="text-xs text-muted-foreground">SN: {machine.serialNumber}</div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{machine.quantity}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{formatCurrency(machine.cost)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Total: {formatCurrency(machine.cost * machine.quantity)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        {formatDate(machine.purchaseDate)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Age: {machineAge} year{machineAge !== 1 ? 's' : ''}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${statusOption?.color} border-0 flex items-center gap-1`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {statusOption?.label}
-                      </Badge>
-                      {machine.nextMaintenanceDate && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Next: {formatDate(machine.nextMaintenanceDate)}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleViewMachine(machine.id)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditMachine(machine)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedMachineForMaintenance(machine.id);
-                            setMaintenanceDialogOpen(true);
-                          }}
-                        >
-                          <Wrench className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteMachine(machine.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </CardContent>
-  </Card>
-</TabsContent>
-
-          {/* CATEGORIES TAB */}
-          <TabsContent value="categories">
-            <Card>
-              <CardHeader>
-                <CardTitle>Categories</CardTitle>
-                <CardDescription>Item categories by department</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {role === 'supervisor' && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-center gap-2 text-blue-700">
-                      <UserCheck className="h-4 w-4" />
-                      <span className="text-sm font-medium">Personal Dashboard</span>
-                    </div>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Showing categories based on your items only.
-                    </p>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {departments.map(dept => {
-                    const Icon = dept.icon;
-                    const deptItems = items.filter(item => item.department === dept.value);
-                    const deptCategories = [...new Set(deptItems.map(item => item.category))];
-                    
-                    if (deptItems.length === 0 && role === 'supervisor') {
-                      return null; // Don't show empty departments for supervisor
-                    }
-                    
-                    return (
-                      <Card key={dept.value}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-5 w-5" />
-                            <CardTitle className="text-lg">{dept.label}</CardTitle>
-                          </div>
-                          <CardDescription>
-                            {deptItems.length} items • {deptCategories.length} categories
-                            {role === 'supervisor' && " (Your items only)"}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            {deptCategories.length > 0 ? (
-                              deptCategories.map(category => {
-                                const categoryItems = deptItems.filter(item => item.category === category);
-                                return (
-                                  <div key={category} className="flex justify-between items-center">
-                                    <span>{category}</span>
-                                    <Badge variant="secondary">{categoryItems.length}</Badge>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <p className="text-sm text-muted-foreground">No items in this department</p>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  }).filter(Boolean)}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* ADD/EDIT ITEM DIALOG */}
-      <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editItem ? 'Edit Item' : 'Add New Item'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Item Name *</Label>
-              <Input
-                id="name"
-                value={editItem ? editItem.name : newItem.name}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, name: e.target.value})
-                    : setNewItem({...newItem, name: e.target.value})
-                }
-                placeholder="Enter item name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU *</Label>
-              <Input
-                id="sku"
-                value={editItem ? editItem.sku : newItem.sku}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, sku: e.target.value.toUpperCase()})
-                    : setNewItem({...newItem, sku: e.target.value.toUpperCase()})
-                }
-                placeholder="Enter SKU (e.g., INV-001)"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="department">Department *</Label>
-              <Select
-                value={editItem ? editItem.department : newItem.department}
-                onValueChange={(value) => 
-                  editItem 
-                    ? setEditItem({...editItem, department: value, category: ''})
-                    : setNewItem({...newItem, department: value, category: ''})
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map(dept => {
-                    const Icon = dept.icon;
-                    return (
-                      <SelectItem key={dept.value} value={dept.value}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {dept.label}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
-              <Select
-                value={editItem ? editItem.category : newItem.category}
-                onValueChange={(value) => 
-                  editItem 
-                    ? setEditItem({...editItem, category: value})
-                    : setNewItem({...newItem, category: value})
-                }
-                disabled={!editItem?.department && !newItem.department}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(editItem ? getCategoriesForDepartment(editItem.department) : 
-                    getCategoriesForDepartment(newItem.department || '')).map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="assignedManager">Assigned Manager *</Label>
-              {role === 'supervisor' && user ? (
-                <div className="p-2 border rounded-md bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="h-4 w-4" />
-                    <span>{user.name}</span>
-                    <Badge variant="secondary" className="h-5 text-xs">You</Badge>
-                  </div>
-                  <input type="hidden" value={user.name} />
-                </div>
-              ) : (
-                <Select
-                  value={editItem ? editItem.assignedManager : newItem.assignedManager}
-                  onValueChange={(value) => 
-                    editItem 
-                      ? setEditItem({...editItem, assignedManager: value})
-                      : setNewItem({...newItem, assignedManager: value})
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select manager" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {managers.map(manager => (
-                      <SelectItem key={manager} value={manager}>{manager}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity *</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0"
-                value={editItem ? editItem.quantity : newItem.quantity}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, quantity: parseInt(e.target.value) || 0})
-                    : setNewItem({...newItem, quantity: parseInt(e.target.value) || 0})
-                }
-                placeholder="Enter quantity"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="reorderLevel">Reorder Level *</Label>
-              <Input
-                id="reorderLevel"
-                type="number"
-                min="0"
-                value={editItem ? editItem.reorderLevel : newItem.reorderLevel}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, reorderLevel: parseInt(e.target.value) || 0})
-                    : setNewItem({...newItem, reorderLevel: parseInt(e.target.value) || 0})
-                }
-                placeholder="Enter reorder level"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="price">Price *</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                min="0"
-                value={editItem ? editItem.price : newItem.price}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, price: parseFloat(e.target.value) || 0})
-                    : setNewItem({...newItem, price: parseFloat(e.target.value) || 0})
-                }
-                placeholder="Enter price"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="costPrice">Cost Price *</Label>
-              <Input
-                id="costPrice"
-                type="number"
-                step="0.01"
-                min="0"
-                value={editItem ? editItem.costPrice : newItem.costPrice}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, costPrice: parseFloat(e.target.value) || 0})
-                    : setNewItem({...newItem, costPrice: parseFloat(e.target.value) || 0})
-                }
-                placeholder="Enter cost price"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="supplier">Supplier *</Label>
-              <Input
-                id="supplier"
-                value={editItem ? editItem.supplier : newItem.supplier}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, supplier: e.target.value})
-                    : setNewItem({...newItem, supplier: e.target.value})
-                }
-                placeholder="Enter supplier name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={editItem ? editItem.description : newItem.description}
-                onChange={(e) => 
-                  editItem 
-                    ? setEditItem({...editItem, description: e.target.value})
-                    : setNewItem({...newItem, description: e.target.value})
-                }
-                placeholder="Enter item description"
-                rows={3}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setItemDialogOpen(false);
-              setEditItem(null);
-              resetNewItemForm();
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={editItem ? handleEditItem : handleAddItem}>
-              {editItem ? 'Update Item' : 'Add Item'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ADD/EDIT MACHINE DIALOG */}
-      <Dialog open={machineDialogOpen} onOpenChange={(open) => {
-        setMachineDialogOpen(open);
-        if (!open) {
-          setEditMachine(null);
-          resetNewMachineForm();
-        }
-      }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editMachine ? 'Edit Machine' : 'Add New Machine'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="machineName">Machine Name *</Label>
-              <Input
-                id="machineName"
-                value={newMachine.name}
-                onChange={(e) => setNewMachine({...newMachine, name: e.target.value})}
-                placeholder="Enter machine name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Input
-                id="model"
-                value={newMachine.model} 
-                onChange={(e) => setNewMachine({...newMachine, model: e.target.value})} 
-                placeholder="Enter model"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="manufacturer">Manufacturer</Label>
-              <Input
-                id="manufacturer"
-                value={newMachine.manufacturer}
-                onChange={(e) => setNewMachine({...newMachine, manufacturer: e.target.value})}
-                placeholder="Enter manufacturer"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="serialNumber">Serial Number</Label>
-              <Input
-                id="serialNumber"
-                value={newMachine.serialNumber}
-                onChange={(e) => setNewMachine({...newMachine, serialNumber: e.target.value})}
-                placeholder="Enter serial number"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="machineCost">Cost/Price *</Label>
-              <Input
-                id="machineCost"
-                type="number"
-                step="0.01"
-                min="0"
-                value={newMachine.cost}
-                onChange={(e) => setNewMachine({...newMachine, cost: parseFloat(e.target.value) || 0})}
-                placeholder="Enter cost"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="purchaseDate">Purchase Date *</Label>
-              <Input
-                id="purchaseDate"
-                type="date"
-                value={newMachine.purchaseDate}
-                onChange={(e) => setNewMachine({...newMachine, purchaseDate: e.target.value})}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="machineQuantity">Quantity *</Label>
-              <Input
-                id="machineQuantity"
-                type="number"
-                min="1"
-                value={newMachine.quantity}
-                onChange={(e) => setNewMachine({...newMachine, quantity: parseInt(e.target.value) || 1})}
-                placeholder="Enter quantity"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="machineStatus">Status *</Label>
-              <Select
-                value={newMachine.status}
-                onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => 
-                  setNewMachine({...newMachine, status: value})
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {machineStatusOptions.map(status => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Input
-                id="department"
-                value={newMachine.department}
-                onChange={(e) => setNewMachine({...newMachine, department: e.target.value})}
-                placeholder="Enter department"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="machineLocation">Location</Label>
-              <Input
-                id="machineLocation"
-                value={newMachine.location}
-                onChange={(e) => setNewMachine({...newMachine, location: e.target.value})}
-                placeholder="Enter location"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="assignedTo">Assigned To</Label>
-              {role === 'supervisor' && user ? (
-                <div className="p-2 border rounded-md bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="h-4 w-4" />
-                    <span>{user.name}</span>
-                    <Badge variant="secondary" className="h-5 text-xs">You</Badge>
-                  </div>
-                  <input type="hidden" value={user.name} />
-                </div>
-              ) : (
-                <Input
-                  id="assignedTo"
-                  value={newMachine.assignedTo}
-                  onChange={(e) => setNewMachine({...newMachine, assignedTo: e.target.value})}
-                  placeholder="Enter assigned person"
-                />
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="lastMaintenanceDate">Last Maintenance Date</Label>
-              <Input
-                id="lastMaintenanceDate"
-                type="date"
-                value={newMachine.lastMaintenanceDate}
-                onChange={(e) => setNewMachine({...newMachine, lastMaintenanceDate: e.target.value})}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="nextMaintenanceDate">Next Maintenance Date</Label>
-              <Input
-                id="nextMaintenanceDate"
-                type="date"
-                value={newMachine.nextMaintenanceDate}
-                onChange={(e) => setNewMachine({...newMachine, nextMaintenanceDate: e.target.value})}
-              />
-            </div>
-            
-            <div className="space-y-2 col-span-2">
-              <Label htmlFor="machineDescription">Description</Label>
-              <Textarea
-                id="machineDescription"
-                value={newMachine.description}
-                onChange={(e) => setNewMachine({...newMachine, description: e.target.value})}
-                placeholder="Enter machine description"
-                rows={3}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setMachineDialogOpen(false);
-              setEditMachine(null);
-              resetNewMachineForm();
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddMachine}>
-              {editMachine ? 'Update Machine' : 'Add Machine'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* VIEW MACHINE DETAILS DIALOG */}
-      <Dialog open={!!viewMachine} onOpenChange={() => setViewMachine(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Machine Details</DialogTitle>
-          </DialogHeader>
-          {viewMachine && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><strong>Machine Name:</strong> {viewMachine.name}</div>
-                <div><strong>Status:</strong> 
-                  <Badge className={`ml-2 ${machineStatusOptions.find(s => s.value === viewMachine.status)?.color} border-0`}>
-                    {machineStatusOptions.find(s => s.value === viewMachine.status)?.label}
-                  </Badge>
-                </div>
-                <div><strong>Manufacturer:</strong> {viewMachine.manufacturer || 'N/A'}</div>
-                <div><strong>Model:</strong> {viewMachine.model || 'N/A'}</div>
-                <div><strong>Serial Number:</strong> {viewMachine.serialNumber || 'N/A'}</div>
-                <div><strong>Cost:</strong> {formatCurrency(viewMachine.cost)}</div>
-                <div><strong>Total Value:</strong> {formatCurrency(viewMachine.cost * viewMachine.quantity)}</div>
-                <div><strong>Quantity:</strong> {viewMachine.quantity}</div>
-                <div><strong>Purchase Date:</strong> {formatDate(viewMachine.purchaseDate)}</div>
-                <div><strong>Age:</strong> {calculateMachineAge(viewMachine.purchaseDate)} years</div>
-                {viewMachine.location && <div><strong>Location:</strong> {viewMachine.location}</div>}
-                {viewMachine.department && <div><strong>Department:</strong> {viewMachine.department}</div>}
-                {viewMachine.assignedTo && (
-                  <div>
-                    <strong>Assigned To:</strong> {viewMachine.assignedTo}
-                    {role === 'supervisor' && viewMachine.assignedTo === user?.name && (
-                      <Badge variant="secondary" className="h-5 text-xs ml-2">You</Badge>
-                    )}
-                  </div>
-                )}
-                {viewMachine.lastMaintenanceDate && (
-                  <div><strong>Last Maintenance:</strong> {formatDate(viewMachine.lastMaintenanceDate)}</div>
-                )}
-                {viewMachine.nextMaintenanceDate && (
-                  <div><strong>Next Maintenance:</strong> {formatDate(viewMachine.nextMaintenanceDate)}</div>
-                )}
-                {viewMachine.description && (
-                  <div className="col-span-2">
-                    <strong>Description:</strong>
-                    <p className="mt-1 text-sm text-muted-foreground">{viewMachine.description}</p>
                   </div>
                 )}
               </div>
-              
-              {/* Maintenance History */}
-              {viewMachine.maintenanceHistory && viewMachine.maintenanceHistory.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Maintenance History</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {viewMachine.maintenanceHistory.map((record, index) => (
-                      <div key={index} className="flex flex-col p-2 bg-muted/50 rounded text-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">{record.type}</span>
-                          <span>{formatDate(record.date)}</span>
-                        </div>
-                        <div className="text-muted-foreground">{record.description}</div>
-                        <div className="flex justify-between text-xs mt-1">
-                          <span>Performed by: {record.performedBy}</span>
-                          <span>Cost: {formatCurrency(record.cost)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
-      {/* ADD MAINTENANCE RECORD DIALOG */}
-      <Dialog open={maintenanceDialogOpen} onOpenChange={(open) => {
-        setMaintenanceDialogOpen(open);
-        if (!open) {
-          setSelectedMachineForMaintenance(null);
-          setMaintenanceRecord({
-            type: "Routine",
-            description: "",
-            cost: 0,
-            performedBy: "",
-          });
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Maintenance Record</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="maintenanceMachine">Select Machine</Label>
-              <Select
-                value={selectedMachineForMaintenance || ""}
-                onValueChange={setSelectedMachineForMaintenance}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select machine" />
-                </SelectTrigger>
-                <SelectContent>
-                  {machines.map(machine => (
-                    <SelectItem key={machine.id} value={machine.id}>
-                      {machine.name} {machine.model ? `(${machine.model})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* INVENTORY TAB */}
+            <TabsContent value="inventory">
+              <Card>
+                <CardContent className="p-4 md:p-6">
+                  {/* Filters */}
+                  <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search items..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Departments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Departments</SelectItem>
+                        {departments.map(dept => {
+                          const Icon = dept.icon;
+                          return (
+                            <SelectItem key={dept.value} value={dept.value}>
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-4 w-4" />
+                                {dept.label}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select 
+                      value={selectedCategory} 
+                      onValueChange={setSelectedCategory}
+                      disabled={selectedDepartment === "all"}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {selectedDepartment !== "all" && 
+                          getCategoriesForDepartment(selectedDepartment).map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Supervisor Info Alert */}
+                  {role === 'supervisor' && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <UserCheck className="h-4 w-4" />
+                        <span className="text-sm font-medium">Personal Dashboard</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">
+                        You can only see and manage items that you have created or are assigned to you.
+                        Other supervisors' items are not visible to you.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Mobile Export/Import for supervisors on mobile */}
+                  {role !== 'supervisor' && isMobileView && (
+                    <div className="flex gap-2 mb-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleExport}
+                        disabled={items.length === 0}
+                        className="flex-1"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setImportDialogOpen(true)}
+                        className="flex-1"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Table for desktop, Cards for mobile */}
+                  {isMobileView ? (
+                    <div className="space-y-4">
+                      {filteredItems.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-lg font-medium">No items found</p>
+                          <p className="text-muted-foreground">
+                            {items.length === 0 
+                              ? "No items in database. Add your first item!" 
+                              : role === 'supervisor' 
+                                ? "You haven't added any items yet." 
+                                : "Try adjusting your search or filters"}
+                          </p>
+                          {role === 'supervisor' && items.length === 0 && (
+                            <Button 
+                              onClick={() => {
+                                setEditItem(null);
+                                setItemDialogOpen(true);
+                              }}
+                              className="mt-4"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Your First Item
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        filteredItems.map((item) => (
+                          <MobileInventoryCard
+                            key={item.id}
+                            item={item}
+                            onEdit={openEditDialog}
+                            onView={(item) => {
+                              setEditItem(item);
+                              setItemDialogOpen(true);
+                            }}
+                            onHistory={setChangeHistoryDialogOpen}
+                            onDelete={handleDeleteItem}
+                            formatCurrency={formatCurrency}
+                            getDepartmentIcon={getDepartmentIcon}
+                            departments={departments}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead>Manager</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredItems.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center py-8">
+                                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                                <p className="text-lg font-medium">No items found</p>
+                                <p className="text-muted-foreground">
+                                  {items.length === 0 
+                                    ? "No items in database. Add your first item!" 
+                                    : role === 'supervisor' 
+                                      ? "You haven't added any items yet." 
+                                      : "Try adjusting your search or filters"}
+                                </p>
+                                {role === 'supervisor' && items.length === 0 && (
+                                  <Button 
+                                    onClick={() => {
+                                      setEditItem(null);
+                                      setItemDialogOpen(true);
+                                    }}
+                                    className="mt-4"
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add Your First Item
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredItems.map((item) => {
+                              const DeptIcon = getDepartmentIcon(item.department);
+                              const isLowStock = item.quantity <= item.reorderLevel;
+                              
+                              return (
+                                <TableRow key={item.id}>
+                                  <TableCell className="font-mono font-medium">{item.sku}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <Package className="h-4 w-4 text-muted-foreground" />
+                                      <span className="font-medium">{item.name}</span>
+                                    </div>
+                                    {item.description && (
+                                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                        {item.description}
+                                      </p>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                      <DeptIcon className="h-3 w-3" />
+                                      {departments.find(d => d.value === item.department)?.label}
+                                    </Badge>
+                                    <div className="text-xs text-muted-foreground mt-1">{item.category}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1">
+                                      <UserCheck className="h-3 w-3" />
+                                      {item.assignedManager}
+                                      {role === 'supervisor' && (
+                                        <Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-medium ${isLowStock ? 'text-amber-600' : ''}`}>
+                                        {item.quantity}
+                                      </span>
+                                      {isLowStock && (
+                                        <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700">
+                                          <AlertTriangle className="h-3 w-3 mr-1" />
+                                          Low
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Reorder: {item.reorderLevel}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-medium">{formatCurrency(item.price)}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Cost: {formatCurrency(item.costPrice)}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {isLowStock ? (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Low Stock
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                        In Stock
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => openEditDialog(item)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button variant="ghost" size="icon">
+                                            <Eye className="h-4 w-4" />
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-2xl">
+                                          <DialogHeader>
+                                            <DialogTitle>Item Details</DialogTitle>
+                                          </DialogHeader>
+                                          <div className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4">
+                                              <div><strong>SKU:</strong> {item.sku}</div>
+                                              <div><strong>Name:</strong> {item.name}</div>
+                                              <div><strong>Department:</strong> {departments.find(d => d.value === item.department)?.label}</div>
+                                              <div><strong>Category:</strong> {item.category}</div>
+                                              <div><strong>Quantity:</strong> {item.quantity}</div>
+                                              <div><strong>Price:</strong> {formatCurrency(item.price)}</div>
+                                              <div><strong>Cost Price:</strong> {formatCurrency(item.costPrice)}</div>
+                                              <div><strong>Supplier:</strong> {item.supplier}</div>
+                                              <div><strong>Reorder Level:</strong> {item.reorderLevel}</div>
+                                              <div><strong>Manager:</strong> {item.assignedManager}</div>
+                                              {item.description && (
+                                                <div className="col-span-2">
+                                                  <strong>Description:</strong> {item.description}
+                                                </div>
+                                              )}
+                                            </div>
+                                            
+                                            {/* Change History */}
+                                            <div>
+                                              <h4 className="font-semibold mb-2">Change History</h4>
+                                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                                {item.changeHistory && item.changeHistory.length > 0 ? (
+                                                  item.changeHistory.map((change, index) => (
+                                                    <div key={index} className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded">
+                                                      <span>{change.date}</span>
+                                                      <span>{change.change}</span>
+                                                      <span>by {change.user}</span>
+                                                      <span className={`font-medium ${change.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {change.quantity > 0 ? '+' : ''}{change.quantity}
+                                                      </span>
+                                                    </div>
+                                                  ))
+                                                ) : (
+                                                  <p className="text-sm text-muted-foreground text-center py-2">
+                                                    No change history available
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </DialogContent>
+                                      </Dialog>
+                                      
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setChangeHistoryDialogOpen(item.id)}
+                                      >
+                                        <History className="h-4 w-4" />
+                                      </Button>
+                                      
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleDeleteItem(item.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
             
-            {selectedMachineForMaintenance && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="maintenanceType">Maintenance Type *</Label>
+            {/* LOW STOCK TAB */}
+            <TabsContent value="low-stock">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Low Stock Items</CardTitle>
+                  <CardDescription>Items that need reordering</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {role === 'supervisor' && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <UserCheck className="h-4 w-4" />
+                        <span className="text-sm font-medium">Personal Dashboard</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Showing only your low stock items. Other supervisors' items are not visible.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {stats.lowStockItems === 0 ? (
+                    <div className="text-center py-8">
+                      <AlertTriangle className="h-12 w-12 mx-auto text-green-500 mb-2" />
+                      <p className="text-lg font-medium">All items are in stock!</p>
+                      <p className="text-muted-foreground">
+                        {role === 'supervisor' 
+                          ? "Your items are well stocked." 
+                          : "No items need reordering at this time."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {items
+                        .filter(item => item.quantity <= item.reorderLevel)
+                        .map(item => (
+                          <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3">
+                            <div className="flex items-center gap-3">
+                              <Package className="h-5 w-5 flex-shrink-0" />
+                              <div>
+                                <div className="font-medium">{item.name}</div>
+                                <div className="text-sm text-muted-foreground">{item.sku}</div>
+                                <div className="text-sm">{item.supplier}</div>
+                              </div>
+                            </div>
+                            <div className="text-amber-600 font-medium sm:text-right">
+                              {item.quantity} / {item.reorderLevel}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* MACHINE STATISTICS TAB */}
+            <TabsContent value="machine-statistics">
+              <Card>
+                <CardHeader>
+                  <div>
+                    <CardTitle>Machine Statistics</CardTitle>
+                    <CardDescription>Manage and track machinery equipment</CardDescription>
+                    {usingLocalMachineStats && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          <Database className="h-3 w-3 mr-1" />
+                          Using locally calculated statistics
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Supervisor Info Alert */}
+                  {role === 'supervisor' && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <UserCheck className="h-4 w-4" />
+                        <span className="text-sm font-medium">Personal Dashboard</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">
+                        You can only see and manage machines that you have added or are assigned to you.
+                        Other supervisors' machines are not visible to you.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Machine Search and Actions */}
+                  <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search machines..."
+                        value={machineSearchQuery}
+                        onChange={(e) => setMachineSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setMaintenanceDialogOpen(true)}
+                      disabled={machines.length === 0}
+                      className="w-full sm:w-auto"
+                    >
+                      <Wrench className="mr-2 h-4 w-4" />
+                      Add Maintenance
+                    </Button>
+                  </div>
+
+                  {/* Mobile Export for machines */}
+                  {role !== 'supervisor' && isMobileView && (
+                    <div className="mb-4">
+                      <Button 
+                        variant="outline" 
+                        onClick={handleExportMachines}
+                        disabled={machines.length === 0}
+                        className="w-full"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Machines
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Machines Table/Cards */}
+                  {isMobileView ? (
+                    <div className="space-y-4">
+                      {filteredMachines.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Cpu className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-lg font-medium">No machines found</p>
+                          <p className="text-muted-foreground">
+                            {machines.length === 0 
+                              ? "No machines in database. Add your first machine!" 
+                              : role === 'supervisor'
+                                ? "You haven't added any machines yet." 
+                                : "Try adjusting your search"}
+                          </p>
+                          {role === 'supervisor' && machines.length === 0 && (
+                            <Button 
+                              onClick={() => {
+                                setEditMachine(null);
+                                resetNewMachineForm();
+                                setMachineDialogOpen(true);
+                              }}
+                              className="mt-4"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Your First Machine
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        filteredMachines.map((machine) => (
+                          <MobileMachineCard
+                            key={machine.id}
+                            machine={machine}
+                            onView={handleViewMachine}
+                            onEdit={handleEditMachine}
+                            onMaintenance={setSelectedMachineForMaintenance}
+                            onDelete={handleDeleteMachine}
+                            formatCurrency={formatCurrency}
+                            formatDate={formatDate}
+                            machineStatusOptions={machineStatusOptions}
+                            role={role}
+                            user={user}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Machine Name</TableHead>
+                            <TableHead>Model</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Cost</TableHead>
+                            <TableHead>Purchase Date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredMachines.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-8">
+                                <Cpu className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                                <p className="text-lg font-medium">No machines found</p>
+                                <p className="text-muted-foreground">
+                                  {machines.length === 0 
+                                    ? "No machines in database. Add your first machine!" 
+                                    : role === 'supervisor'
+                                      ? "You haven't added any machines yet." 
+                                      : "Try adjusting your search"}
+                                </p>
+                                {role === 'supervisor' && machines.length === 0 && (
+                                  <Button 
+                                    onClick={() => {
+                                      setEditMachine(null);
+                                      resetNewMachineForm();
+                                      setMachineDialogOpen(true);
+                                    }}
+                                    className="mt-4"
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add Your First Machine
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredMachines.map((machine) => {
+                              const statusOption = machineStatusOptions.find(s => s.value === machine.status);
+                              const StatusIcon = statusOption?.icon || CheckCircle;
+                              const machineAge = calculateMachineAge(machine.purchaseDate);
+                              
+                              return (
+                                <TableRow key={machine.id}>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <Cpu className="h-4 w-4 text-muted-foreground" />
+                                      <div>
+                                        <span className="font-medium">{machine.name}</span>
+                                        {machine.manufacturer && (
+                                          <div className="text-xs text-muted-foreground">{machine.manufacturer}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>{machine.model || 'N/A'}</div>
+                                    {machine.serialNumber && (
+                                      <div className="text-xs text-muted-foreground">SN: {machine.serialNumber}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-medium">{machine.quantity}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-medium">{formatCurrency(machine.cost)}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Total: {formatCurrency(machine.cost * machine.quantity)}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                                      {formatDate(machine.purchaseDate)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Age: {machineAge} year{machineAge !== 1 ? 's' : ''}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={`${statusOption?.color} border-0 flex items-center gap-1`}>
+                                      <StatusIcon className="h-3 w-3" />
+                                      {statusOption?.label}
+                                    </Badge>
+                                    {machine.nextMaintenanceDate && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        Next: {formatDate(machine.nextMaintenanceDate)}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleViewMachine(machine.id)}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleEditMachine(machine)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => {
+                                          setSelectedMachineForMaintenance(machine.id);
+                                          setMaintenanceDialogOpen(true);
+                                        }}
+                                      >
+                                        <Wrench className="h-4 w-4" />
+                                      </Button>
+                                      
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleDeleteMachine(machine.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* CATEGORIES TAB */}
+            <TabsContent value="categories">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Categories</CardTitle>
+                  <CardDescription>Item categories by department</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {role === 'supervisor' && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <UserCheck className="h-4 w-4" />
+                        <span className="text-sm font-medium">Personal Dashboard</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Showing categories based on your items only.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {departments.map(dept => {
+                      const Icon = dept.icon;
+                      const deptItems = items.filter(item => item.department === dept.value);
+                      const deptCategories = [...new Set(deptItems.map(item => item.category))];
+                      
+                      if (deptItems.length === 0 && role === 'supervisor') {
+                        return null; // Don't show empty departments for supervisor
+                      }
+                      
+                      return (
+                        <Card key={dept.value}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-5 w-5" />
+                              <CardTitle className="text-lg">{dept.label}</CardTitle>
+                            </div>
+                            <CardDescription>
+                              {deptItems.length} items • {deptCategories.length} categories
+                              {role === 'supervisor' && " (Your items only)"}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {deptCategories.length > 0 ? (
+                                deptCategories.map(category => {
+                                  const categoryItems = deptItems.filter(item => item.category === category);
+                                  return (
+                                    <div key={category} className="flex justify-between items-center">
+                                      <span>{category}</span>
+                                      <Badge variant="secondary">{categoryItems.length}</Badge>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-sm text-muted-foreground">No items in this department</p>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    }).filter(Boolean)}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* ADD/EDIT ITEM DIALOG */}
+        <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editItem ? 'Edit Item' : 'Add New Item'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Item Name *</Label>
+                <Input
+                  id="name"
+                  value={editItem ? editItem.name : newItem.name}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, name: e.target.value})
+                      : setNewItem({...newItem, name: e.target.value})
+                  }
+                  placeholder="Enter item name"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU *</Label>
+                <Input
+                  id="sku"
+                  value={editItem ? editItem.sku : newItem.sku}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, sku: e.target.value.toUpperCase()})
+                      : setNewItem({...newItem, sku: e.target.value.toUpperCase()})
+                  }
+                  placeholder="Enter SKU (e.g., INV-001)"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="department">Department *</Label>
+                <Select
+                  value={editItem ? editItem.department : newItem.department}
+                  onValueChange={(value) => 
+                    editItem 
+                      ? setEditItem({...editItem, department: value, category: ''})
+                      : setNewItem({...newItem, department: value, category: ''})
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(dept => {
+                      const Icon = dept.icon;
+                      return (
+                        <SelectItem key={dept.value} value={dept.value}>
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-4 w-4" />
+                            {dept.label}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="category">Category *</Label>
+                <Select
+                  value={editItem ? editItem.category : newItem.category}
+                  onValueChange={(value) => 
+                    editItem 
+                      ? setEditItem({...editItem, category: value})
+                      : setNewItem({...newItem, category: value})
+                  }
+                  disabled={!editItem?.department && !newItem.department}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(editItem ? getCategoriesForDepartment(editItem.department) : 
+                      getCategoriesForDepartment(newItem.department || '')).map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="assignedManager">Assigned Manager *</Label>
+                {role === 'supervisor' && user ? (
+                  <div className="p-2 border rounded-md bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span>{user.name}</span>
+                      <Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge>
+                    </div>
+                    <input type="hidden" value={user.name} />
+                  </div>
+                ) : (
                   <Select
-                    value={maintenanceRecord.type}
-                    onValueChange={(value) => setMaintenanceRecord({...maintenanceRecord, type: value})}
+                    value={editItem ? editItem.assignedManager : newItem.assignedManager}
+                    onValueChange={(value) => 
+                      editItem 
+                        ? setEditItem({...editItem, assignedManager: value})
+                        : setNewItem({...newItem, assignedManager: value})
+                    }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder="Select manager" />
                     </SelectTrigger>
                     <SelectContent>
-                      {maintenanceTypes.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      {managers.map(manager => (
+                        <SelectItem key={manager} value={manager}>{manager}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="maintenanceDescription">Description *</Label>
-                  <Textarea
-                    id="maintenanceDescription"
-                    value={maintenanceRecord.description}
-                    onChange={(e) => setMaintenanceRecord({...maintenanceRecord, description: e.target.value})}
-                    placeholder="Describe the maintenance performed"
-                    rows={3}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="maintenanceCost">Cost</Label>
-                  <Input
-                    id="maintenanceCost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={maintenanceRecord.cost}
-                    onChange={(e) => setMaintenanceRecord({...maintenanceRecord, cost: parseFloat(e.target.value) || 0})}
-                    placeholder="Enter maintenance cost"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="performedBy">Performed By *</Label>
-                  {role === 'supervisor' && user ? (
-                    <div className="p-2 border rounded-md bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4" />
-                        <span>{user.name}</span>
-                        <Badge variant="secondary" className="h-5 text-xs">You</Badge>
-                      </div>
-                      <input type="hidden" value={user.name} />
-                    </div>
-                  ) : (
-                    <Input
-                      id="performedBy"
-                      value={maintenanceRecord.performedBy}
-                      onChange={(e) => setMaintenanceRecord({...maintenanceRecord, performedBy: e.target.value})}
-                      placeholder="Enter technician name"
-                    />
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMaintenanceDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddMaintenance}
-              disabled={!selectedMachineForMaintenance || maintenanceLoading}
-            >
-              {maintenanceLoading ? "Adding..." : "Add Maintenance"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* IMPORT DIALOG - Only for non-supervisors */}
-      {role !== 'supervisor' && (
-        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Import Data</DialogTitle>
-            </DialogHeader>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity *</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0"
+                  value={editItem ? editItem.quantity : newItem.quantity}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, quantity: parseInt(e.target.value) || 0})
+                      : setNewItem({...newItem, quantity: parseInt(e.target.value) || 0})
+                  }
+                  placeholder="Enter quantity"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="reorderLevel">Reorder Level *</Label>
+                <Input
+                  id="reorderLevel"
+                  type="number"
+                  min="0"
+                  value={editItem ? editItem.reorderLevel : newItem.reorderLevel}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, reorderLevel: parseInt(e.target.value) || 0})
+                      : setNewItem({...newItem, reorderLevel: parseInt(e.target.value) || 0})
+                  }
+                  placeholder="Enter reorder level"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="price">Price *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editItem ? editItem.price : newItem.price}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, price: parseFloat(e.target.value) || 0})
+                      : setNewItem({...newItem, price: parseFloat(e.target.value) || 0})
+                  }
+                  placeholder="Enter price"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="costPrice">Cost Price *</Label>
+                <Input
+                  id="costPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editItem ? editItem.costPrice : newItem.costPrice}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, costPrice: parseFloat(e.target.value) || 0})
+                      : setNewItem({...newItem, costPrice: parseFloat(e.target.value) || 0})
+                  }
+                  placeholder="Enter cost price"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2 col-span-1 md:col-span-2">
+                <Label htmlFor="supplier">Supplier *</Label>
+                <Input
+                  id="supplier"
+                  value={editItem ? editItem.supplier : newItem.supplier}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, supplier: e.target.value})
+                      : setNewItem({...newItem, supplier: e.target.value})
+                  }
+                  placeholder="Enter supplier name"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2 col-span-1 md:col-span-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={editItem ? editItem.description : newItem.description}
+                  onChange={(e) => 
+                    editItem 
+                      ? setEditItem({...editItem, description: e.target.value})
+                      : setNewItem({...newItem, description: e.target.value})
+                  }
+                  placeholder="Enter item description"
+                  rows={3}
+                />
+              </div>
+            </div>
             
-            <Tabs defaultValue="inventory">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                <TabsTrigger value="machines">Machines</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="inventory" className="space-y-4">
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                  <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <p className="mt-4">Drop your CSV file here or click to browse</p>
-                  <p className="text-sm text-muted-foreground">Supports .csv files with item data</p>
-                  <Input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleImport}
-                    className="mt-4 mx-auto max-w-xs"
-                  />
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-semibold">CSV Format:</p>
-                  <p>SKU,Name,Department,Category,Site,AssignedManager,Quantity,Price,CostPrice,Supplier,ReorderLevel</p>
-                  <p className="mt-2 text-xs">Note: SKU must be unique</p>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="machines" className="space-y-4">
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                  <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
-                  <p className="mt-4">Drop your CSV file here or click to browse</p>
-                  <p className="text-sm text-muted-foreground">Supports .csv files with machine data</p>
-                  <Input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleImportMachines}
-                    className="mt-4 mx-auto max-w-xs"
-                  />
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-semibold">CSV Format:</p>
-                  <p>Name,Cost,PurchaseDate,Quantity,Description,Status,Location,Manufacturer,Model,SerialNumber,Department,AssignedTo</p>
-                </div>
-              </TabsContent>
-            </Tabs>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => {
+                setItemDialogOpen(false);
+                setEditItem(null);
+                resetNewItemForm();
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={editItem ? handleEditItem : handleAddItem}>
+                {editItem ? 'Update Item' : 'Add Item'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
-      )}
 
-      {/* CHANGE HISTORY DIALOG */}
-      <Dialog open={!!changeHistoryDialogOpen} onOpenChange={() => setChangeHistoryDialogOpen(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change History</DialogTitle>
-          </DialogHeader>
-          {changeHistoryDialogOpen && (
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {(() => {
-                const item = items.find(item => item.id === changeHistoryDialogOpen);
-                return item?.changeHistory && item.changeHistory.length > 0 ? (
-                  item.changeHistory.map((change, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded">
-                      <span>{change.date}</span>
-                      <span>{change.change}</span>
-                      <span>by {change.user}</span>
-                      <span className={`font-medium ${change.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {change.quantity > 0 ? '+' : ''}{change.quantity}
-                      </span>
+        {/* ADD/EDIT MACHINE DIALOG */}
+        <Dialog open={machineDialogOpen} onOpenChange={(open) => {
+          setMachineDialogOpen(open);
+          if (!open) {
+            setEditMachine(null);
+            resetNewMachineForm();
+          }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editMachine ? 'Edit Machine' : 'Add New Machine'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="machineName">Machine Name *</Label>
+                <Input
+                  id="machineName"
+                  value={newMachine.name}
+                  onChange={(e) => setNewMachine({...newMachine, name: e.target.value})}
+                  placeholder="Enter machine name"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="model">Model</Label>
+                <Input
+                  id="model"
+                  value={newMachine.model} 
+                  onChange={(e) => setNewMachine({...newMachine, model: e.target.value})} 
+                  placeholder="Enter model"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="manufacturer">Manufacturer</Label>
+                <Input
+                  id="manufacturer"
+                  value={newMachine.manufacturer}
+                  onChange={(e) => setNewMachine({...newMachine, manufacturer: e.target.value})}
+                  placeholder="Enter manufacturer"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="serialNumber">Serial Number</Label>
+                <Input
+                  id="serialNumber"
+                  value={newMachine.serialNumber}
+                  onChange={(e) => setNewMachine({...newMachine, serialNumber: e.target.value})}
+                  placeholder="Enter serial number"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="machineCost">Cost/Price *</Label>
+                <Input
+                  id="machineCost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newMachine.cost}
+                  onChange={(e) => setNewMachine({...newMachine, cost: parseFloat(e.target.value) || 0})}
+                  placeholder="Enter cost"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="purchaseDate">Purchase Date *</Label>
+                <Input
+                  id="purchaseDate"
+                  type="date"
+                  value={newMachine.purchaseDate}
+                  onChange={(e) => setNewMachine({...newMachine, purchaseDate: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="machineQuantity">Quantity *</Label>
+                <Input
+                  id="machineQuantity"
+                  type="number"
+                  min="1"
+                  value={newMachine.quantity}
+                  onChange={(e) => setNewMachine({...newMachine, quantity: parseInt(e.target.value) || 1})}
+                  placeholder="Enter quantity"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="machineStatus">Status *</Label>
+                <Select
+                  value={newMachine.status}
+                  onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => 
+                    setNewMachine({...newMachine, status: value})
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {machineStatusOptions.map(status => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Input
+                  id="department"
+                  value={newMachine.department}
+                  onChange={(e) => setNewMachine({...newMachine, department: e.target.value})}
+                  placeholder="Enter department"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="machineLocation">Location</Label>
+                <Input
+                  id="machineLocation"
+                  value={newMachine.location}
+                  onChange={(e) => setNewMachine({...newMachine, location: e.target.value})}
+                  placeholder="Enter location"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="assignedTo">Assigned To</Label>
+                {role === 'supervisor' && user ? (
+                  <div className="p-2 border rounded-md bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span>{user.name}</span>
+                      <Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge>
                     </div>
-                  ))
+                    <input type="hidden" value={user.name} />
+                  </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No change history available for this item
-                  </p>
-                );
-              })()}
+                  <Input
+                    id="assignedTo"
+                    value={newMachine.assignedTo}
+                    onChange={(e) => setNewMachine({...newMachine, assignedTo: e.target.value})}
+                    placeholder="Enter assigned person"
+                  />
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="lastMaintenanceDate">Last Maintenance Date</Label>
+                <Input
+                  id="lastMaintenanceDate"
+                  type="date"
+                  value={newMachine.lastMaintenanceDate}
+                  onChange={(e) => setNewMachine({...newMachine, lastMaintenanceDate: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="nextMaintenanceDate">Next Maintenance Date</Label>
+                <Input
+                  id="nextMaintenanceDate"
+                  type="date"
+                  value={newMachine.nextMaintenanceDate}
+                  onChange={(e) => setNewMachine({...newMachine, nextMaintenanceDate: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2 col-span-1 md:col-span-2">
+                <Label htmlFor="machineDescription">Description</Label>
+                <Textarea
+                  id="machineDescription"
+                  value={newMachine.description}
+                  onChange={(e) => setNewMachine({...newMachine, description: e.target.value})}
+                  placeholder="Enter machine description"
+                  rows={3}
+                />
+              </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => {
+                setMachineDialogOpen(false);
+                setEditMachine(null);
+                resetNewMachineForm();
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddMachine}>
+                {editMachine ? 'Update Machine' : 'Add Machine'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* VIEW MACHINE DETAILS DIALOG */}
+        <Dialog open={!!viewMachine} onOpenChange={() => setViewMachine(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Machine Details</DialogTitle>
+            </DialogHeader>
+            {viewMachine && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div><strong>Machine Name:</strong> {viewMachine.name}</div>
+                  <div><strong>Status:</strong> 
+                    <Badge className={`ml-2 ${machineStatusOptions.find(s => s.value === viewMachine.status)?.color} border-0`}>
+                      {machineStatusOptions.find(s => s.value === viewMachine.status)?.label}
+                    </Badge>
+                  </div>
+                  <div><strong>Manufacturer:</strong> {viewMachine.manufacturer || 'N/A'}</div>
+                  <div><strong>Model:</strong> {viewMachine.model || 'N/A'}</div>
+                  <div><strong>Serial Number:</strong> {viewMachine.serialNumber || 'N/A'}</div>
+                  <div><strong>Cost:</strong> {formatCurrency(viewMachine.cost)}</div>
+                  <div><strong>Total Value:</strong> {formatCurrency(viewMachine.cost * viewMachine.quantity)}</div>
+                  <div><strong>Quantity:</strong> {viewMachine.quantity}</div>
+                  <div><strong>Purchase Date:</strong> {formatDate(viewMachine.purchaseDate)}</div>
+                  <div><strong>Age:</strong> {calculateMachineAge(viewMachine.purchaseDate)} years</div>
+                  {viewMachine.location && <div><strong>Location:</strong> {viewMachine.location}</div>}
+                  {viewMachine.department && <div><strong>Department:</strong> {viewMachine.department}</div>}
+                  {viewMachine.assignedTo && (
+                    <div>
+                      <strong>Assigned To:</strong> {viewMachine.assignedTo}
+                      {role === 'supervisor' && viewMachine.assignedTo === user?.name && (
+                        <Badge variant="secondary" className="h-5 text-xs ml-2">You</Badge>
+                      )}
+                    </div>
+                  )}
+                  {viewMachine.lastMaintenanceDate && (
+                    <div><strong>Last Maintenance:</strong> {formatDate(viewMachine.lastMaintenanceDate)}</div>
+                  )}
+                  {viewMachine.nextMaintenanceDate && (
+                    <div><strong>Next Maintenance:</strong> {formatDate(viewMachine.nextMaintenanceDate)}</div>
+                  )}
+                  {viewMachine.description && (
+                    <div className="col-span-2">
+                      <strong>Description:</strong>
+                      <p className="mt-1 text-sm text-muted-foreground">{viewMachine.description}</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Maintenance History */}
+                {viewMachine.maintenanceHistory && viewMachine.maintenanceHistory.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Maintenance History</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {viewMachine.maintenanceHistory.map((record, index) => (
+                        <div key={index} className="flex flex-col p-2 bg-muted/50 rounded text-sm">
+                          <div className="flex justify-between">
+                            <span className="font-medium">{record.type}</span>
+                            <span>{formatDate(record.date)}</span>
+                          </div>
+                          <div className="text-muted-foreground">{record.description}</div>
+                          <div className="flex justify-between text-xs mt-1">
+                            <span>Performed by: {record.performedBy}</span>
+                            <span>Cost: {formatCurrency(record.cost)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* ADD MAINTENANCE RECORD DIALOG */}
+        <Dialog open={maintenanceDialogOpen} onOpenChange={(open) => {
+          setMaintenanceDialogOpen(open);
+          if (!open) {
+            setSelectedMachineForMaintenance(null);
+            setMaintenanceRecord({
+              type: "Routine",
+              description: "",
+              cost: 0,
+              performedBy: "",
+            });
+          }
+        }}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add Maintenance Record</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="maintenanceMachine">Select Machine *</Label>
+                <Select
+                  value={selectedMachineForMaintenance || ""}
+                  onValueChange={setSelectedMachineForMaintenance}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select machine" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {machines.map(machine => (
+                      <SelectItem key={machine.id} value={machine.id}>
+                        {machine.name} {machine.model ? `(${machine.model})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedMachineForMaintenance && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenanceType">Maintenance Type *</Label>
+                    <Select
+                      value={maintenanceRecord.type}
+                      onValueChange={(value) => setMaintenanceRecord({...maintenanceRecord, type: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {maintenanceTypes.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenanceDescription">Description *</Label>
+                    <Textarea
+                      id="maintenanceDescription"
+                      value={maintenanceRecord.description}
+                      onChange={(e) => setMaintenanceRecord({...maintenanceRecord, description: e.target.value})}
+                      placeholder="Describe the maintenance performed"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenanceCost">Cost</Label>
+                    <Input
+                      id="maintenanceCost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={maintenanceRecord.cost}
+                      onChange={(e) => setMaintenanceRecord({...maintenanceRecord, cost: parseFloat(e.target.value) || 0})}
+                      placeholder="Enter maintenance cost"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="performedBy">Performed By *</Label>
+                    {role === 'supervisor' && user ? (
+                      <div className="p-2 border rounded-md bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4" />
+                          <span>{user.name}</span>
+                          <Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge>
+                        </div>
+                        <input type="hidden" value={user.name} />
+                      </div>
+                    ) : (
+                      <Input
+                        id="performedBy"
+                        value={maintenanceRecord.performedBy}
+                        onChange={(e) => setMaintenanceRecord({...maintenanceRecord, performedBy: e.target.value})}
+                        placeholder="Enter technician name"
+                      />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => setMaintenanceDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddMaintenance}
+                disabled={!selectedMachineForMaintenance || maintenanceLoading}
+              >
+                {maintenanceLoading ? "Adding..." : "Add Maintenance"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* IMPORT DIALOG - Only for non-supervisors */}
+        {role !== 'supervisor' && (
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Import Data</DialogTitle>
+              </DialogHeader>
+              
+              <Tabs defaultValue="inventory">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                  <TabsTrigger value="machines">Machines</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="inventory" className="space-y-4">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 md:p-8 text-center">
+                    <Upload className="h-8 w-8 md:h-12 md:w-12 mx-auto text-muted-foreground" />
+                    <p className="mt-4 text-sm md:text-base">Drop your CSV file here or click to browse</p>
+                    <p className="text-xs text-muted-foreground">Supports .csv files with item data</p>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleImport}
+                      className="mt-4 mx-auto max-w-xs"
+                    />
+                  </div>
+                  <div className="text-xs md:text-sm text-muted-foreground">
+                    <p className="font-semibold">CSV Format:</p>
+                    <p className="break-all">SKU,Name,Department,Category,Site,AssignedManager,Quantity,Price,CostPrice,Supplier,ReorderLevel</p>
+                    <p className="mt-2 text-xs">Note: SKU must be unique</p>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="machines" className="space-y-4">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 md:p-8 text-center">
+                    <Upload className="h-8 w-8 md:h-12 md:w-12 mx-auto text-muted-foreground" />
+                    <p className="mt-4 text-sm md:text-base">Drop your CSV file here or click to browse</p>
+                    <p className="text-xs text-muted-foreground">Supports .csv files with machine data</p>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleImportMachines}
+                      className="mt-4 mx-auto max-w-xs"
+                    />
+                  </div>
+                  <div className="text-xs md:text-sm text-muted-foreground">
+                    <p className="font-semibold">CSV Format:</p>
+                    <p className="break-all">Name,Cost,PurchaseDate,Quantity,Description,Status,Location,Manufacturer,Model,SerialNumber,Department,AssignedTo</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* CHANGE HISTORY DIALOG */}
+        <Dialog open={!!changeHistoryDialogOpen} onOpenChange={() => setChangeHistoryDialogOpen(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change History</DialogTitle>
+            </DialogHeader>
+            {changeHistoryDialogOpen && (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {(() => {
+                  const item = items.find(item => item.id === changeHistoryDialogOpen);
+                  return item?.changeHistory && item.changeHistory.length > 0 ? (
+                    item.changeHistory.map((change, index) => (
+                      <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between text-sm p-2 bg-muted/50 rounded gap-1">
+                        <span>{change.date}</span>
+                        <span>{change.change}</span>
+                        <span>by {change.user}</span>
+                        <span className={`font-medium ${change.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {change.quantity > 0 ? '+' : ''}{change.quantity}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No change history available for this item
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 };

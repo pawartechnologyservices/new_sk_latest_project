@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,13 +57,211 @@ import {
   Car,
   Sparkles,
   Truck,
-  Info
+  Info,
+  Menu,
+  Home,
+  Users,
+  BarChart3,
+  LogOut,
+  Settings,
+  ClipboardList
 } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useWorkQuery } from "@/hooks/useWorkQuery";
 import { format } from "date-fns";
 import { useRole } from "@/context/RoleContext";
+
+// Dashboard Header Component with Hamburger Menu
+interface DashboardHeaderProps {
+  title: string;
+  subtitle?: string;
+  onMenuClick?: () => void;
+  showMenu?: boolean;
+}
+
+const DashboardHeader = ({ title, subtitle, onMenuClick, showMenu = true }: DashboardHeaderProps) => {
+  return (
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-4 sticky top-0 z-40 shadow-sm"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Hamburger Menu for Mobile */}
+          {showMenu && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMenuClick}
+              className="lg:hidden hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Toggle menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+            {subtitle && (
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Mobile Menu Button Alternative */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onMenuClick}
+            aria-label="Menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+    </motion.header>
+  );
+};
+
+// Mobile Navigation Drawer Component
+interface MobileNavDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onNavigate: (path: string) => void;
+  userName: string;
+  userRole: string;
+  userDepartment?: string;
+  userSite?: string;
+}
+
+const MobileNavDrawer = ({ isOpen, onClose, onNavigate, userName, userRole, userDepartment, userSite }: MobileNavDrawerProps) => {
+  const navItems = [
+    { icon: Home, label: 'Dashboard', path: '/supervisor' },
+    { icon: Users, label: 'Employees', path: '/supervisor/employees' },
+    { icon: ClipboardList, label: 'Tasks', path: '/supervisor/tasks' },
+    { icon: MessageCircle, label: 'Work Queries', path: '/supervisor/work-queries' },
+    { icon: User, label: 'Profile', path: '/supervisor/profile' },
+    { icon: BarChart3, label: 'Reports', path: '/supervisor/reports' },
+    { icon: Settings, label: 'Settings', path: '/supervisor/settings' },
+  ];
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 z-50 lg:hidden"
+          />
+          
+          {/* Drawer */}
+          <motion.div
+            initial={{ x: -300 }}
+            animate={{ x: 0 }}
+            exit={{ x: -300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed top-0 left-0 h-full w-80 bg-white dark:bg-gray-800 shadow-xl z-50 lg:hidden"
+          >
+            <div className="flex flex-col h-full">
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Menu</h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onClose}
+                    className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                {/* User Info */}
+                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                      {userName?.charAt(0) || 'S'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {userName}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {userRole}
+                      </p>
+                    </div>
+                  </div>
+                  {(userDepartment || userSite) && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                      {userDepartment && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          {userDepartment}
+                        </p>
+                      )}
+                      {userSite && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
+                          <MapPin className="h-3 w-3" />
+                          {userSite}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Navigation Links */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <nav className="space-y-2">
+                  {navItems.map((item) => (
+                    <Button
+                      key={item.path}
+                      variant="ghost"
+                      className="w-full justify-start gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => {
+                        onNavigate(item.path);
+                        onClose();
+                      }}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => {
+                    localStorage.removeItem('sk_user');
+                    window.location.href = '/login';
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
 
 // Types
 interface WorkQueryProofFile {
@@ -182,12 +380,12 @@ const FilePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) =
 
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-white rounded-lg border">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="p-2 bg-white rounded-lg border flex-shrink-0">
           <FileIcon type={fileType} />
         </div>
-        <div>
-          <div className="font-medium text-sm truncate max-w-xs">{file.name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm truncate">{file.name}</div>
           <div className="text-xs text-muted-foreground">
             {formatFileSize(file.size)} • {fileType.charAt(0).toUpperCase() + fileType.slice(1)}
           </div>
@@ -196,7 +394,7 @@ const FilePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) =
       <Button
         size="sm"
         variant="ghost"
-        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 flex-shrink-0"
         onClick={onRemove}
       >
         <X className="h-3 w-3" />
@@ -231,7 +429,10 @@ const SERVICE_EXAMPLES = [
 
 // Main Component
 const WorkQueryPage = () => {
+  const navigate = useNavigate();
+  const outletContext = useOutletContext<{ onMenuClick?: () => void }>();
   const { user: authUser, role, isAuthenticated, loading: authLoading } = useRole();
+  
   const [currentSupervisor, setCurrentSupervisor] = useState<{
     id: string;
     name: string;
@@ -249,6 +450,8 @@ const WorkQueryPage = () => {
   });
   
   const [loadingSupervisor, setLoadingSupervisor] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
   
   const {
     workQueries,
@@ -296,6 +499,18 @@ const WorkQueryPage = () => {
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [selectedServiceType, setSelectedServiceType] = useState<string>("other");
+
+  // Check if mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Service types for radio buttons
   const serviceTypes = [
@@ -381,6 +596,18 @@ const WorkQueryPage = () => {
       toast.error("Access denied. Only supervisors can access this page.");
     }
   }, [isAuthenticated, role, authLoading, loadingSupervisor]);
+
+  const handleMenuClick = () => {
+    if (outletContext?.onMenuClick) {
+      outletContext.onMenuClick();
+    } else {
+      setMobileMenuOpen(true);
+    }
+  };
+
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
 
   // Filter work queries
   const filteredQueries = workQueries.filter(query => {
@@ -570,7 +797,7 @@ const WorkQueryPage = () => {
   // Show access denied if not a supervisor
   if (!isAuthenticated || role !== 'supervisor') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-red-600">Access Denied</CardTitle>
@@ -582,6 +809,9 @@ const WorkQueryPage = () => {
             <p className="text-center mb-4">
               Please log in with a supervisor account to continue.
             </p>
+            <Button onClick={() => navigate('/login')} className="w-full">
+              Go to Login
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -592,124 +822,162 @@ const WorkQueryPage = () => {
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader 
         title="Work Query Management" 
-        subtitle={`Report and track issues with facility services - ${currentSupervisor.name}`}
+        subtitle={`Report and track issues with facility services`}
+        onMenuClick={handleMenuClick}
+      />
+      
+      <MobileNavDrawer
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        onNavigate={handleNavigate}
+        userName={currentSupervisor.name}
+        userRole="Supervisor"
+        userDepartment={currentSupervisor.department}
+        userSite={currentSupervisor.site}
       />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Statistics Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Queries</CardTitle>
-              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+        {/* Statistics Cards - Mobile Optimized */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <Card className="bg-white">
+            <CardHeader className="p-3 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium flex items-center justify-between">
+                Total Queries
+                <MessageCircle className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {workQueryLoading.statistics ? "Loading..." : statistics?.total || 0}
+            <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+              <div className="text-lg md:text-2xl font-bold">
+                {workQueryLoading.statistics ? "..." : statistics?.total || 0}
               </div>
-              <p className="text-xs text-muted-foreground">All queries</p>
+              <p className="text-xs text-muted-foreground mt-1">All queries</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-600" />
+          <Card className="bg-white">
+            <CardHeader className="p-3 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium flex items-center justify-between">
+                Pending
+                <Clock className="h-3 w-3 md:h-4 md:w-4 text-yellow-600" />
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
+            <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+              <div className="text-lg md:text-2xl font-bold text-yellow-600">
                 {workQueryLoading.statistics ? "..." : statistics?.statusCounts?.pending || 0}
               </div>
-              <p className="text-xs text-muted-foreground">Awaiting response</p>
+              <p className="text-xs text-muted-foreground mt-1">Awaiting</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <AlertCircle className="h-4 w-4 text-blue-600" />
+          <Card className="bg-white">
+            <CardHeader className="p-3 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium flex items-center justify-between">
+                In Progress
+                <AlertCircle className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
+            <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+              <div className="text-lg md:text-2xl font-bold text-blue-600">
                 {workQueryLoading.statistics ? "..." : statistics?.statusCounts?.['in-progress'] || 0}
               </div>
-              <p className="text-xs text-muted-foreground">Being investigated</p>
+              <p className="text-xs text-muted-foreground mt-1">In Progress</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
+          <Card className="bg-white">
+            <CardHeader className="p-3 md:p-6 pb-2 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium flex items-center justify-between">
+                Resolved
+                <CheckCircle className="h-3 w-3 md:h-4 md:w-4 text-green-600" />
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+            <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+              <div className="text-lg md:text-2xl font-bold text-green-600">
                 {workQueryLoading.statistics ? "..." : statistics?.statusCounts?.resolved || 0}
               </div>
-              <p className="text-xs text-muted-foreground">Completed queries</p>
+              <p className="text-xs text-muted-foreground mt-1">Completed</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <CardTitle>Work Queries</CardTitle>
-                <CardDescription>
-                  Manage and track issues with facility services
-                </CardDescription>
-                <div className="mt-2 space-y-1">
-                  <div className="text-sm text-muted-foreground flex items-center">
-                    <User className="inline h-3 w-3 mr-1" />
-                    <span className="font-medium mr-1">Supervisor:</span> {currentSupervisor.name}
-                  </div>
-                  {currentSupervisor.department && (
-                    <div className="text-xs text-muted-foreground flex items-center">
-                      <Building2 className="inline h-3 w-3 mr-1" />
-                      <span className="font-medium mr-1">Department:</span> {currentSupervisor.department}
-                    </div>
-                  )}
-                  {currentSupervisor.site && (
-                    <div className="text-xs text-muted-foreground flex items-center">
-                      <MapPin className="inline h-3 w-3 mr-1" />
-                      <span className="font-medium mr-1">Site:</span> {currentSupervisor.site}
-                    </div>
-                  )}
+        {/* Supervisor Info Card - Mobile Optimized */}
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm md:text-base">
+                  {currentSupervisor.name?.charAt(0) || 'S'}
+                </div>
+                <div>
+                  <div className="font-medium text-sm md:text-base text-blue-900">{currentSupervisor.name}</div>
+                  <div className="text-xs text-blue-700">Supervisor</div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={handleRefresh} disabled={workQueryLoading.queries}>
+              <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs">
+                {currentSupervisor.department && (
+                  <div className="flex items-center gap-1 text-blue-700">
+                    <Building2 className="h-3 w-3" />
+                    <span className="truncate">{currentSupervisor.department}</span>
+                  </div>
+                )}
+                {currentSupervisor.site && (
+                  <div className="flex items-center gap-1 text-blue-700">
+                    <MapPin className="h-3 w-3" />
+                    <span className="truncate">{currentSupervisor.site}</span>
+                  </div>
+                )}
+                {currentSupervisor.email && (
+                  <div className="flex items-center gap-1 text-blue-700">
+                    <Mail className="h-3 w-3" />
+                    <span className="truncate">{currentSupervisor.email}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Content */}
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <CardTitle className="text-lg md:text-xl">Work Queries</CardTitle>
+                <CardDescription className="text-sm">
+                  Manage and track issues with facility services
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                <Button variant="outline" onClick={handleRefresh} disabled={workQueryLoading.queries} size={isMobileView ? "sm" : "default"} className="flex-1 sm:flex-none">
                   <RefreshCw className={`h-4 w-4 mr-2 ${workQueryLoading.queries ? 'animate-spin' : ''}`} />
-                  Refresh
+                  <span className="sm:inline">Refresh</span>
                 </Button>
                 
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="flex-1 sm:flex-none" size={isMobileView ? "sm" : "default"}>
                       <Plus className="mr-2 h-4 w-4" />
-                      New Query
+                      <span className="sm:inline">New Query</span>
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
                     <DialogHeader>
-                      <DialogTitle>Create New Work Query</DialogTitle>
-                      <DialogDescription>
+                      <DialogTitle className="text-lg">Create New Work Query</DialogTitle>
+                      <DialogDescription className="text-sm">
                         Report an issue with a facility service
                       </DialogDescription>
                     </DialogHeader>
                     
-                    <form onSubmit={handleSubmitQuery} className="space-y-6">
+                    <form onSubmit={handleSubmitQuery} className="space-y-4 md:space-y-6">
                       {/* Basic Information */}
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="title">Query Title *</Label>
+                          <Label htmlFor="title" className="text-sm">Query Title *</Label>
                           <Input
                             id="title"
                             value={newQuery.title}
@@ -717,11 +985,12 @@ const WorkQueryPage = () => {
                             placeholder="Brief description of the issue"
                             required
                             disabled={workQueryLoading.creating}
+                            className="text-sm"
                           />
                         </div>
                         
                         <div className="space-y-2">
-                          <Label htmlFor="description">Detailed Description *</Label>
+                          <Label htmlFor="description" className="text-sm">Detailed Description *</Label>
                           <Textarea
                             id="description"
                             value={newQuery.description}
@@ -730,35 +999,37 @@ const WorkQueryPage = () => {
                             rows={4}
                             required
                             disabled={workQueryLoading.creating}
+                            className="text-sm"
                           />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* SERVICE INPUT FIELD - CHANGED FROM DROPDOWN TO INPUT */}
+                          {/* SERVICE INPUT FIELD */}
                           <div className="space-y-2">
-                            <Label htmlFor="serviceId">Service ID/Name *</Label>
+                            <Label htmlFor="serviceId" className="text-sm">Service ID/Name *</Label>
                             <Input
                               id="serviceId"
                               value={newQuery.serviceId}
                               onChange={(e) => setNewQuery(prev => ({ ...prev, serviceId: e.target.value }))}
-                              placeholder="Enter Service ID or Name (e.g., CLEAN001 or 'Office Cleaning')"
+                              placeholder="Enter Service ID or Name"
                               required
                               disabled={workQueryLoading.creating}
+                              className="text-sm"
                             />
-                            <div className="text-xs text-muted-foreground">
-                              <Info className="inline h-3 w-3 mr-1" />
-                              Enter the Service ID or Name you want to report an issue for
+                            <div className="text-xs text-muted-foreground flex items-start gap-1">
+                              <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                              <span>Enter the Service ID or Name you want to report an issue for</span>
                             </div>
                           </div>
                           
                           <div className="space-y-2">
-                            <Label htmlFor="category">Category *</Label>
+                            <Label htmlFor="category" className="text-sm">Category *</Label>
                             <Select 
                               value={newQuery.category} 
                               onValueChange={(value) => setNewQuery(prev => ({ ...prev, category: value }))}
                               disabled={workQueryLoading.creating}
                             >
-                              <SelectTrigger>
+                              <SelectTrigger className="text-sm">
                                 <SelectValue placeholder="Select category">
                                   {categories.find(c => c.value === newQuery.category)?.label || "Select category"}
                                 </SelectValue>
@@ -779,9 +1050,9 @@ const WorkQueryPage = () => {
                           </div>
                         </div>
 
-                        {/* Service Type Selection - Optional but helpful */}
+                        {/* Service Type Selection */}
                         <div className="space-y-2">
-                          <Label>Service Type (Optional)</Label>
+                          <Label className="text-sm">Service Type (Optional)</Label>
                           <p className="text-xs text-muted-foreground mb-2">
                             Select the type of service you're reporting an issue for
                           </p>
@@ -791,12 +1062,12 @@ const WorkQueryPage = () => {
                                 key={serviceType.value}
                                 type="button"
                                 variant={selectedServiceType === serviceType.value ? "default" : "outline"}
-                                className="justify-start h-auto py-2"
+                                className="justify-start h-auto py-2 text-xs md:text-sm"
                                 onClick={() => setSelectedServiceType(serviceType.value)}
                               >
                                 <div className="flex items-center gap-2">
                                   {serviceType.icon}
-                                  <span>{serviceType.label}</span>
+                                  <span className="truncate">{serviceType.label}</span>
                                 </div>
                               </Button>
                             ))}
@@ -804,13 +1075,13 @@ const WorkQueryPage = () => {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="priority">Priority Level *</Label>
+                          <Label htmlFor="priority" className="text-sm">Priority Level *</Label>
                           <Select 
                             value={newQuery.priority} 
                             onValueChange={(value) => setNewQuery(prev => ({ ...prev, priority: value as any }))}
                             disabled={workQueryLoading.creating}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue placeholder="Select priority">
                                 {priorities.find(p => p.value === newQuery.priority)?.label || "Select priority"}
                               </SelectValue>
@@ -819,13 +1090,13 @@ const WorkQueryPage = () => {
                               {priorities.map(priority => (
                                 <SelectItem key={priority.value} value={priority.value}>
                                   <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${
+                                    <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
                                       priority.value === 'low' ? 'bg-green-500' :
                                       priority.value === 'medium' ? 'bg-yellow-500' :
                                       priority.value === 'high' ? 'bg-orange-500' : 'bg-red-500'
                                     }`} />
                                     <div className="flex flex-col">
-                                      <span>{priority.label}</span>
+                                      <span className="text-sm">{priority.label}</span>
                                       <span className="text-xs text-muted-foreground">
                                         {priority.description}
                                       </span>
@@ -840,11 +1111,11 @@ const WorkQueryPage = () => {
 
                       {/* File Upload Section */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Supporting Evidence (Optional)</h3>
+                        <h3 className="text-base md:text-lg font-semibold">Supporting Evidence (Optional)</h3>
                         
-                        <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                          <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                          <p className="mt-2 text-sm text-muted-foreground">
+                        <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center">
+                          <Upload className="mx-auto h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
+                          <p className="mt-2 text-xs md:text-sm text-muted-foreground">
                             Upload screenshots, photos, or documents (Max 10 files, 25MB each)
                           </p>
                           <Input
@@ -859,7 +1130,7 @@ const WorkQueryPage = () => {
                           <Label htmlFor="file-upload">
                             <Button 
                               variant="outline" 
-                              className="mt-4" 
+                              className="mt-4 text-sm" 
                               type="button"
                               disabled={workQueryLoading.creating}
                             >
@@ -870,8 +1141,8 @@ const WorkQueryPage = () => {
 
                         {uploadedFiles.length > 0 && (
                           <div className="space-y-3">
-                            <Label>Uploaded Files ({uploadedFiles.length}/10)</Label>
-                            <div className="space-y-2">
+                            <Label className="text-sm">Uploaded Files ({uploadedFiles.length}/10)</Label>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
                               {uploadedFiles.map((file, index) => (
                                 <FilePreview 
                                   key={index} 
@@ -885,12 +1156,12 @@ const WorkQueryPage = () => {
                       </div>
 
                       {/* Service Examples (for guidance) */}
-                      <div className="p-4 bg-gray-50 rounded-lg border">
+                      <div className="p-3 md:p-4 bg-gray-50 rounded-lg border">
                         <div className="flex items-center gap-2 mb-2">
-                          <Info className="h-4 w-4 text-blue-600" />
-                          <Label className="font-medium text-gray-900">Service Examples</Label>
+                          <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                          <Label className="font-medium text-gray-900 text-sm">Service Examples</Label>
                         </div>
-                        <p className="text-sm text-gray-600 mb-3">
+                        <p className="text-xs text-gray-600 mb-3">
                           Here are some examples of service IDs/Names you can use:
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -908,8 +1179,8 @@ const WorkQueryPage = () => {
                             >
                               <div className="flex items-center gap-2">
                                 <ServiceIcon type={service.type} />
-                                <div>
-                                  <div className="font-medium">{service.id}</div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{service.id}</div>
                                   <div className="text-muted-foreground truncate">{service.name}</div>
                                 </div>
                               </div>
@@ -922,54 +1193,56 @@ const WorkQueryPage = () => {
                       </div>
 
                       {/* Supervisor Info Display */}
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="p-3 md:p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="h-4 w-4 text-blue-600" />
-                          <Label className="font-semibold text-blue-900">Supervisor Information</Label>
+                          <Label className="font-semibold text-blue-900 text-sm">Supervisor Information</Label>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm">
                           <div>
                             <div className="text-blue-800 font-medium">Name</div>
-                            <div>{currentSupervisor.name}</div>
+                            <div className="truncate">{currentSupervisor.name}</div>
                           </div>
                           <div>
                             <div className="text-blue-800 font-medium">ID</div>
-                            <div className="font-mono text-xs">{currentSupervisor.id}</div>
+                            <div className="font-mono text-xs truncate">{currentSupervisor.id}</div>
                           </div>
                           {currentSupervisor.department && (
                             <div>
                               <div className="text-blue-800 font-medium">Department</div>
-                              <div>{currentSupervisor.department}</div>
+                              <div className="truncate">{currentSupervisor.department}</div>
                             </div>
                           )}
                           {currentSupervisor.site && (
                             <div>
                               <div className="text-blue-800 font-medium">Site</div>
-                              <div>{currentSupervisor.site}</div>
+                              <div className="truncate">{currentSupervisor.site}</div>
                             </div>
                           )}
                         </div>
                         {currentSupervisor.email && (
-                          <div className="mt-2 text-xs text-blue-700 flex items-center">
-                            <Mail className="h-3 w-3 mr-1" />
-                            {currentSupervisor.email}
+                          <div className="mt-2 text-xs text-blue-700 flex items-center gap-1">
+                            <Mail className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{currentSupervisor.email}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Submit Button */}
-                      <DialogFooter className="gap-2">
+                      <DialogFooter className="gap-2 flex-col sm:flex-row">
                         <Button 
                           type="button" 
                           variant="outline" 
                           onClick={() => setIsCreateDialogOpen(false)}
                           disabled={workQueryLoading.creating}
+                          className="w-full sm:w-auto text-sm"
                         >
                           Cancel
                         </Button>
                         <Button 
                           type="submit" 
                           disabled={workQueryLoading.creating}
+                          className="w-full sm:w-auto text-sm"
                         >
                           {workQueryLoading.creating ? (
                             <>
@@ -986,26 +1259,26 @@ const WorkQueryPage = () => {
             </div>
           </CardHeader>
           
-          <CardContent>
-            {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="space-y-2">
-                <Label>Search</Label>
+          <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+            {/* Filters - Mobile Optimized */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
+              <div className="space-y-1 md:space-y-2">
+                <Label className="text-xs md:text-sm">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search queries..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 text-sm"
                   />
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <Label>Status</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label className="text-xs md:text-sm">Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="All Status">
                       {statusFilter === "all" ? "All Status" : statuses.find(s => s.value === statusFilter)?.label || statusFilter}
                     </SelectValue>
@@ -1015,12 +1288,12 @@ const WorkQueryPage = () => {
                     {statuses.map(status => (
                       <SelectItem key={status.value} value={status.value}>
                         <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${
+                          <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
                             status.value === 'pending' ? 'bg-yellow-500' :
                             status.value === 'in-progress' ? 'bg-blue-500' :
                             status.value === 'resolved' ? 'bg-green-500' : 'bg-red-500'
                           }`} />
-                          <span>{status.label}</span>
+                          <span className="text-sm">{status.label}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -1028,10 +1301,10 @@ const WorkQueryPage = () => {
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label>Priority</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label className="text-xs md:text-sm">Priority</Label>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue placeholder="All Priorities">
                       {priorityFilter === "all" ? "All Priorities" : priorities.find(p => p.value === priorityFilter)?.label || priorityFilter}
                     </SelectValue>
@@ -1041,12 +1314,12 @@ const WorkQueryPage = () => {
                     {priorities.map(priority => (
                       <SelectItem key={priority.value} value={priority.value}>
                         <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full ${
+                          <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${
                             priority.value === 'low' ? 'bg-green-500' :
                             priority.value === 'medium' ? 'bg-yellow-500' :
                             priority.value === 'high' ? 'bg-orange-500' : 'bg-red-500'
                           }`} />
-                          <span>{priority.label}</span>
+                          <span className="text-sm">{priority.label}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -1055,17 +1328,17 @@ const WorkQueryPage = () => {
               </div>
             </div>
 
-            {/* Queries Table */}
+            {/* Queries Table - Mobile Optimized */}
             {workQueryLoading.queries ? (
-              <div className="text-center py-12">
+              <div className="text-center py-8 md:py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-4 text-muted-foreground">Loading work queries...</p>
+                <p className="mt-4 text-sm md:text-base text-muted-foreground">Loading work queries...</p>
               </div>
             ) : filteredQueries.length === 0 ? (
-              <div className="text-center py-12 border rounded-lg">
-                <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium">No queries found</h3>
-                <p className="text-muted-foreground">
+              <div className="text-center py-8 md:py-12 border rounded-lg">
+                <MessageCircle className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-base md:text-lg font-medium">No queries found</h3>
+                <p className="text-sm text-muted-foreground px-4">
                   {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' 
                     ? "No work queries match your current filters." 
                     : "No work queries have been created yet."}
@@ -1073,55 +1346,46 @@ const WorkQueryPage = () => {
               </div>
             ) : (
               <>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Query ID</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredQueries.map((query) => (
-                        <TableRow key={query._id}>
-                          <TableCell className="font-mono text-sm">
-                            {query.queryId}
-                          </TableCell>
-                          <TableCell>
-                            <div className="max-w-xs">
-                              <div className="font-medium truncate">{query.title}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {query.description.substring(0, 50)}...
+                {/* Mobile View - Card Grid */}
+                {isMobileView ? (
+                  <div className="space-y-3">
+                    {filteredQueries.map((query) => (
+                      <Card key={query._id} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            {/* Header */}
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-mono text-xs text-gray-500">{query.queryId}</div>
+                                <div className="font-medium text-sm mt-1">{query.title}</div>
                               </div>
+                              <PriorityBadge priority={query.priority} />
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="max-w-xs">
-                              <div className="font-medium text-sm">{query.serviceId}</div>
+
+                            {/* Description Preview */}
+                            <div className="text-xs text-gray-600 line-clamp-2">
+                              {query.description}
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <PriorityBadge priority={query.priority} />
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={query.status} />
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              {formatDate(query.createdAt)}
+
+                            {/* Service Info */}
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              <span className="truncate">{query.serviceId}</span>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex justify-end gap-2">
+
+                            {/* Status and Date */}
+                            <div className="flex items-center justify-between">
+                              <StatusBadge status={query.status} />
+                              <span className="text-xs text-gray-500">{formatDate(query.createdAt)}</span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="grid grid-cols-2 gap-2 pt-2">
                               <Button 
                                 size="sm" 
                                 variant="outline"
                                 onClick={() => handleViewQuery(query)}
+                                className="w-full"
                               >
                                 <Eye className="h-3 w-3 mr-1" />
                                 View
@@ -1136,22 +1400,23 @@ const WorkQueryPage = () => {
                                       (query.status === 'in-progress' || query.status === 'resolved') ||
                                       workQueryLoading.deleting
                                     }
+                                    className="w-full"
                                   >
                                     <Trash2 className="h-3 w-3 mr-1" />
                                     Delete
                                   </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent>
+                                <AlertDialogContent className="w-[90%] max-w-md">
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Delete Work Query</AlertDialogTitle>
                                     <AlertDialogDescription>
                                       Are you sure you want to delete this work query? This action cannot be undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                                    <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
                                     <AlertDialogAction
-                                      className="bg-red-600 hover:bg-red-700"
+                                      className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
                                       onClick={() => handleDeleteQuery(query._id, query.title)}
                                     >
                                       Delete
@@ -1160,71 +1425,166 @@ const WorkQueryPage = () => {
                                 </AlertDialogContent>
                               </AlertDialog>
                             </div>
-                          </TableCell>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  /* Desktop View - Table */
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="whitespace-nowrap">Query ID</TableHead>
+                          <TableHead className="whitespace-nowrap">Title</TableHead>
+                          <TableHead className="whitespace-nowrap">Service</TableHead>
+                          <TableHead className="whitespace-nowrap">Priority</TableHead>
+                          <TableHead className="whitespace-nowrap">Status</TableHead>
+                          <TableHead className="whitespace-nowrap">Created</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredQueries.map((query) => (
+                          <TableRow key={query._id}>
+                            <TableCell className="font-mono text-sm whitespace-nowrap">
+                              {query.queryId}
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-xs">
+                                <div className="font-medium truncate">{query.title}</div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {query.description.substring(0, 50)}...
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-xs">
+                                <div className="font-medium text-sm truncate">{query.serviceId}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <PriorityBadge priority={query.priority} />
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={query.status} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm whitespace-nowrap">
+                                {formatDate(query.createdAt)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleViewQuery(query)}
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View
+                                </Button>
+                                
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      size="sm" 
+                                      variant="destructive"
+                                      disabled={
+                                        (query.status === 'in-progress' || query.status === 'resolved') ||
+                                        workQueryLoading.deleting
+                                      }
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Delete
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Work Query</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete this work query? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-red-600 hover:bg-red-700"
+                                        onClick={() => handleDeleteQuery(query._id, query.title)}
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
 
-                {/* View Query Details Dialog */}
+                {/* View Query Details Dialog - Mobile Optimized */}
                 <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
                     {selectedQueryForView && (
                       <>
                         <DialogHeader>
-                          <DialogTitle>Query Details - {selectedQueryForView.queryId}</DialogTitle>
+                          <DialogTitle className="text-lg">Query Details - {selectedQueryForView.queryId}</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-6">
+                        <div className="space-y-4 md:space-y-6">
                           {/* Query Information */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                             <div>
-                              <Label className="font-semibold">Title</Label>
-                              <p className="mt-1">{selectedQueryForView.title}</p>
+                              <Label className="font-semibold text-sm">Title</Label>
+                              <p className="mt-1 text-sm">{selectedQueryForView.title}</p>
                             </div>
                             <div>
-                              <Label className="font-semibold">Service</Label>
+                              <Label className="font-semibold text-sm">Service</Label>
                               <div className="mt-1">
-                                <div className="font-medium">{selectedQueryForView.serviceId}</div>
+                                <div className="font-medium text-sm">{selectedQueryForView.serviceId}</div>
                               </div>
                             </div>
                             <div>
-                              <Label className="font-semibold">Priority</Label>
+                              <Label className="font-semibold text-sm">Priority</Label>
                               <div className="mt-1">
                                 <PriorityBadge priority={selectedQueryForView.priority} />
                               </div>
                             </div>
                             <div>
-                              <Label className="font-semibold">Status</Label>
+                              <Label className="font-semibold text-sm">Status</Label>
                               <div className="mt-1">
                                 <StatusBadge status={selectedQueryForView.status} />
                               </div>
                             </div>
                             <div>
-                              <Label className="font-semibold">Category</Label>
-                              <p className="mt-1">
+                              <Label className="font-semibold text-sm">Category</Label>
+                              <p className="mt-1 text-sm">
                                 {categories.find(c => c.value === selectedQueryForView.category)?.label || selectedQueryForView.category}
                               </p>
                             </div>
                             <div>
-                              <Label className="font-semibold">Created</Label>
-                              <p className="mt-1">{formatDate(selectedQueryForView.createdAt)}</p>
+                              <Label className="font-semibold text-sm">Created</Label>
+                              <p className="mt-1 text-sm">{formatDate(selectedQueryForView.createdAt)}</p>
                             </div>
                           </div>
 
                           {/* Supervisor Information */}
-                          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="p-3 md:p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <div className="flex items-center gap-2 mb-2">
                               <User className="h-5 w-5 text-blue-600" />
-                              <Label className="font-semibold text-blue-900">Reported By</Label>
+                              <Label className="font-semibold text-blue-900 text-sm">Reported By</Label>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div>
-                                <div className="text-sm text-blue-800 font-medium">Supervisor</div>
+                                <div className="text-xs text-blue-800 font-medium">Supervisor</div>
                                 <div className="text-sm">{selectedQueryForView.reportedBy?.name || selectedQueryForView.supervisorName}</div>
                               </div>
                               <div>
-                                <div className="text-sm text-blue-800 font-medium">Role</div>
+                                <div className="text-xs text-blue-800 font-medium">Role</div>
                                 <div className="text-sm">{selectedQueryForView.reportedBy?.role || 'Supervisor'}</div>
                               </div>
                             </div>
@@ -1232,7 +1592,7 @@ const WorkQueryPage = () => {
 
                           {/* Description */}
                           <div>
-                            <Label className="font-semibold">Description</Label>
+                            <Label className="font-semibold text-sm">Description</Label>
                             <p className="mt-1 text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
                               {selectedQueryForView.description}
                             </p>
@@ -1241,26 +1601,27 @@ const WorkQueryPage = () => {
                           {/* Proof Files */}
                           {selectedQueryForView.proofFiles.length > 0 && (
                             <div>
-                              <Label className="font-semibold">Supporting Evidence ({selectedQueryForView.proofFiles.length})</Label>
+                              <Label className="font-semibold text-sm">Supporting Evidence ({selectedQueryForView.proofFiles.length})</Label>
                               <div className="grid gap-2 mt-2">
                                 {selectedQueryForView.proofFiles.map((file, index) => (
-                                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                                    <div className="flex items-center gap-3">
-                                      <div className="p-2 bg-gray-100 rounded-lg">
+                                  <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
                                         <FileIcon type={file.type} />
                                       </div>
-                                      <div>
-                                        <div className="font-medium">{file.name}</div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-sm truncate">{file.name}</div>
                                         <div className="text-xs text-muted-foreground">
                                           {file.size} • {formatDate(file.uploadDate)}
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 w-full sm:w-auto justify-end">
                                       <Button 
                                         size="sm" 
                                         variant="outline"
                                         onClick={() => previewFile(file.url)}
+                                        className="flex-1 sm:flex-none"
                                       >
                                         <Eye className="h-3 w-3 mr-1" />
                                         View
@@ -1269,6 +1630,7 @@ const WorkQueryPage = () => {
                                         size="sm" 
                                         variant="outline"
                                         onClick={() => downloadFile(file.url, file.name)}
+                                        className="flex-1 sm:flex-none"
                                       >
                                         <Download className="h-3 w-3 mr-1" />
                                         Download
@@ -1282,8 +1644,8 @@ const WorkQueryPage = () => {
 
                           {/* Superadmin Response */}
                           {selectedQueryForView.superadminResponse && (
-                            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                              <Label className="font-semibold text-green-900">Superadmin Response</Label>
+                            <div className="p-3 md:p-4 bg-green-50 rounded-lg border border-green-200">
+                              <Label className="font-semibold text-green-900 text-sm">Superadmin Response</Label>
                               <p className="mt-1 text-sm text-green-800 whitespace-pre-wrap">
                                 {selectedQueryForView.superadminResponse}
                               </p>
@@ -1300,32 +1662,33 @@ const WorkQueryPage = () => {
                   </DialogContent>
                 </Dialog>
 
-                {/* Pagination */}
+                {/* Pagination - Mobile Optimized */}
                 {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-6">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} queries
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+                    <div className="text-xs md:text-sm text-muted-foreground order-2 sm:order-1">
+                      Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => changePage(pagination.page - 1)}
                         disabled={pagination.page === 1}
+                        className="text-sm"
                       >
                         Previous
                       </Button>
                       <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        {Array.from({ length: Math.min(3, pagination.totalPages) }, (_, i) => {
                           let pageNum;
-                          if (pagination.totalPages <= 5) {
+                          if (pagination.totalPages <= 3) {
                             pageNum = i + 1;
-                          } else if (pagination.page <= 3) {
+                          } else if (pagination.page <= 2) {
                             pageNum = i + 1;
-                          } else if (pagination.page >= pagination.totalPages - 2) {
-                            pageNum = pagination.totalPages - 4 + i;
+                          } else if (pagination.page >= pagination.totalPages - 1) {
+                            pageNum = pagination.totalPages - 2 + i;
                           } else {
-                            pageNum = pagination.page - 2 + i;
+                            pageNum = pagination.page - 1 + i;
                           }
                           return (
                             <Button
@@ -1333,6 +1696,7 @@ const WorkQueryPage = () => {
                               variant={pagination.page === pageNum ? "default" : "outline"}
                               size="sm"
                               onClick={() => changePage(pageNum)}
+                              className="w-8 h-8 p-0 text-sm"
                             >
                               {pageNum}
                             </Button>
@@ -1344,6 +1708,7 @@ const WorkQueryPage = () => {
                         size="sm"
                         onClick={() => changePage(pagination.page + 1)}
                         disabled={pagination.page === pagination.totalPages}
+                        className="text-sm"
                       >
                         Next
                       </Button>

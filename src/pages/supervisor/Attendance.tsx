@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, CheckCircle, XCircle, Clock, Users, BarChart3, Download, CalendarDays, LogIn, LogOut, ChevronLeft, ChevronRight, FileSpreadsheet, Crown, RefreshCw, AlertCircle, Search, FileText, Loader2, MapPin, Shield, Building, Target, AlertTriangle, UserCheck, UserX, UserMinus, Info, Mail, Edit, Save } from "lucide-react";
+import { Calendar, CheckCircle, XCircle, Clock, Users, BarChart3, Download, CalendarDays, LogIn, LogOut, ChevronLeft, ChevronRight, FileSpreadsheet, Crown, RefreshCw, AlertCircle, Search, FileText, Loader2, MapPin, Shield, Building, Target, AlertTriangle, UserCheck, UserX, UserMinus, Info, Mail, Edit, Save, MoreVertical, Menu, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +14,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useRole } from "@/context/RoleContext";
+import { useOutletContext } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import axios from "axios";
 
 // API URL
 const API_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:5001/api' 
+  ? `http://${window.location.hostname}:5001/api` 
   : '/api';
 
 // Types from your backend
@@ -182,10 +189,339 @@ interface StatusUpdateData {
   remarks: string;
 }
 
+// Mobile responsive employee attendance card
+const MobileEmployeeAttendanceCard = ({
+  employee,
+  attendanceRecord,
+  onCheckIn,
+  onCheckOut,
+  onBreakIn,
+  onBreakOut,
+  onManual,
+  onStatusUpdate,
+  formatTimeForDisplay,
+  formatHours,
+  getStatusBadge,
+  getStatusIcon,
+  supervisorSites,
+  updatingStatus
+}: {
+  employee: Employee;
+  attendanceRecord: AttendanceRecord | undefined;
+  onCheckIn: (employee: Employee) => void;
+  onCheckOut: (employee: Employee) => void;
+  onBreakIn: (employee: Employee) => void;
+  onBreakOut: (employee: Employee) => void;
+  onManual: (employee: Employee) => void;
+  onStatusUpdate: (employee: Employee, record: AttendanceRecord | null) => void;
+  formatTimeForDisplay: (time: string | null) => string;
+  formatHours: (hours: number) => string;
+  getStatusBadge: (status: string) => string;
+  getStatusIcon: (status: string) => JSX.Element | null;
+  supervisorSites: Site[];
+  updatingStatus: boolean;
+}) => {
+  return (
+    <Card className="mb-4 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h3 className="font-semibold text-base">{employee.name}</h3>
+            <p className="text-xs text-muted-foreground">ID: {employee.employeeId}</p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onManual(employee)}>
+                <FileText className="h-4 w-4 mr-2" /> Manual Entry
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onStatusUpdate(employee, attendanceRecord || null)}>
+                <Edit className="h-4 w-4 mr-2" /> Update Status
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Department</p>
+            <p className="text-sm font-medium">{employee.department}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Site</p>
+            <Badge variant="outline" className="text-xs mt-1 max-w-full truncate">
+              {employee.siteName || 'Not Assigned'}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Attendance Details */}
+        {attendanceRecord ? (
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 bg-gray-50 rounded">
+                <p className="text-xs text-muted-foreground">Check In</p>
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  <LogIn className="h-3 w-3" />
+                  {formatTimeForDisplay(attendanceRecord.checkInTime)}
+                </div>
+              </div>
+              <div className="p-2 bg-gray-50 rounded">
+                <p className="text-xs text-muted-foreground">Check Out</p>
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  <LogOut className="h-3 w-3" />
+                  {formatTimeForDisplay(attendanceRecord.checkOutTime)}
+                </div>
+              </div>
+              <div className="p-2 bg-gray-50 rounded">
+                <p className="text-xs text-muted-foreground">Break In</p>
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  <Clock className="h-3 w-3" />
+                  {formatTimeForDisplay(attendanceRecord.breakStartTime)}
+                </div>
+              </div>
+              <div className="p-2 bg-gray-50 rounded">
+                <p className="text-xs text-muted-foreground">Break Out</p>
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  <Clock className="h-3 w-3" />
+                  {formatTimeForDisplay(attendanceRecord.breakEndTime)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Hours</p>
+                <p className="text-sm font-bold">{formatHours(attendanceRecord.totalHours)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className={getStatusBadge(attendanceRecord.status)}>
+                  {getStatusIcon(attendanceRecord.status)}
+                  {attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => onStatusUpdate(employee, attendanceRecord)}
+                  disabled={updatingStatus}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {attendanceRecord.isCheckedIn ? (
+                <>
+                  {attendanceRecord.isOnBreak ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onBreakOut(employee)}
+                      className="w-full"
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      End Break
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onBreakIn(employee)}
+                      className="w-full"
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Start Break
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onCheckOut(employee)}
+                    className="w-full"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Check Out
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCheckIn(employee)}
+                  className="w-full col-span-2"
+                  disabled={!!attendanceRecord?.checkOutTime}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Check In
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="py-4 text-center">
+            <Badge variant="outline" className="mb-3">No Record</Badge>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onCheckIn(employee)}
+                className="w-full"
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                Check In
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onManual(employee)}
+                className="w-full"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Manual
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mt-2 w-full"
+              onClick={() => onStatusUpdate(employee, null)}
+              disabled={updatingStatus}
+            >
+              <Edit className="mr-2 h-4 w-4" />
+              Update Status
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive supervisor attendance card
+const MobileSupervisorAttendanceCard = ({
+  record,
+  formatTimeForDisplay,
+  getStatusBadge
+}: {
+  record: SupervisorAttendanceRecord;
+  formatTimeForDisplay: (time: string | null) => string;
+  getStatusBadge: (status: string) => string;
+}) => {
+  return (
+    <Card className="mb-3">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{record.date}</span>
+          </div>
+          <Badge className={getStatusBadge(record.status.toLowerCase())}>
+            {record.status}
+          </Badge>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Check In</p>
+            <div className="flex items-center gap-1 text-sm">
+              <LogIn className="h-3 w-3" />
+              {record.checkInTime || "-"}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Check Out</p>
+            <div className="flex items-center gap-1 text-sm">
+              <LogOut className="h-3 w-3" />
+              {record.checkOutTime || "-"}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Hours</p>
+            <p className="text-sm font-bold">{record.hours.toFixed(2)} hrs</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Break</p>
+            <p className="text-sm">{record.breakTime.toFixed(2)} hrs</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive weekly summary card
+const MobileWeeklySummaryCard = ({
+  summary,
+  getStatusBadge,
+  getStatusIcon
+}: {
+  summary: WeeklyAttendanceSummary;
+  getStatusBadge: (status: string) => string;
+  getStatusIcon: (status: string) => JSX.Element | null;
+}) => {
+  return (
+    <Card className="mb-3">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h4 className="font-semibold">{summary.employeeName}</h4>
+            <p className="text-xs text-muted-foreground">ID: {summary.employeeId}</p>
+          </div>
+          <Badge className={getStatusBadge(summary.overallStatus)}>
+            {getStatusIcon(summary.overallStatus)}
+            {summary.overallStatus.charAt(0).toUpperCase() + summary.overallStatus.slice(1)}
+          </Badge>
+        </div>
+        
+        <p className="text-xs text-muted-foreground mb-2">{summary.department}</p>
+        
+        <div className="grid grid-cols-5 gap-2 text-center">
+          <div>
+            <p className="text-xs text-muted-foreground">P</p>
+            <p className="text-sm font-bold text-green-600">{summary.daysPresent}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">A</p>
+            <p className="text-sm font-bold text-red-600">{summary.daysAbsent}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">HD</p>
+            <p className="text-sm font-bold text-yellow-600">{summary.daysHalfDay}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">L</p>
+            <p className="text-sm font-bold text-blue-600">{summary.daysLeave}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">WO</p>
+            <p className="text-sm font-bold text-purple-600">{summary.daysWeeklyOff}</p>
+          </div>
+        </div>
+        
+        <div className="mt-3 pt-2 border-t flex justify-between">
+          <span className="text-sm">Total Hours:</span>
+          <span className="text-sm font-bold">{summary.totalHours.toFixed(2)} hrs</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const Attendance = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const { user: currentUser, isAuthenticated } = useRole();
   const [activeTab, setActiveTab] = useState("my-attendance");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
   
   // Current supervisor info from RoleContext
   const [currentSupervisor, setCurrentSupervisor] = useState({
@@ -259,15 +595,23 @@ const Attendance = () => {
   const [selectedYear, setSelectedYear] = useState<number>(2024);
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
 
-  // Helper function to normalize site names for comparison
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Helper function to normalize site names for comparison - MODIFIED FOR EXACT MATCHING
   const normalizeSiteName = useCallback((siteName: string | null | undefined): string => {
     if (!siteName) return '';
-    return siteName
-      .toString()
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/[^a-z0-9\s]/g, '');
+    // Only trim and convert to lowercase, no special character removal
+    return siteName.toString().toLowerCase().trim();
   }, []);
 
   // Update current supervisor when currentUser changes
@@ -424,19 +768,29 @@ const Attendance = () => {
       
       setAllSites(transformedSites);
       
-      // Filter sites based on task assignments
+      // Filter sites based on task assignments - EXACT MATCH ONLY
       let supervisorSiteList: Site[] = [];
       
       if (taskSiteNames.length > 0) {
-        // Match sites by name from tasks
-        supervisorSiteList = transformedSites.filter(site => 
-          taskSiteNames.some(taskSiteName => 
-            site.name === taskSiteName || 
+        // Match sites by exact name from tasks - NO PARTIAL MATCHES
+        supervisorSiteList = transformedSites.filter(site => {
+          // Check exact match with site name
+          const exactNameMatch = taskSiteNames.some(taskSiteName => 
+            site.name === taskSiteName
+          );
+          
+          // Check exact match with normalized names
+          const exactNormalizedMatch = taskSiteNames.some(taskSiteName => 
             normalizeSiteName(site.name) === normalizeSiteName(taskSiteName)
-          ) || taskSiteIds.includes(site._id)
-        );
+          );
+          
+          // Check ID match
+          const idMatch = taskSiteIds.includes(site._id);
+          
+          return exactNameMatch || exactNormalizedMatch || idMatch;
+        });
         
-        console.log(`✅ Matched ${supervisorSiteList.length} sites from task assignments`);
+        console.log(`✅ Matched ${supervisorSiteList.length} sites from task assignments (exact matches only)`);
       } else {
         console.log("⚠️ No sites found from tasks - supervisor has no assigned tasks");
       }
@@ -522,31 +876,34 @@ const Attendance = () => {
         console.log(`📊 Total employees from API: ${allEmployees.length}`);
         console.log("📍 Supervisor's task-assigned sites:", supervisorSiteNameList);
         
-        // Filter employees by supervisor's task-assigned sites ONLY
-        const supervisorSiteNormalizedNames = supervisorSiteNameList.map(name => normalizeSiteName(name));
-        
+        // IMPORTANT FIX: Filter employees by supervisor's task-assigned sites using EXACT MATCH ONLY
+        // No partial matches, no "includes" matching
         fetchedEmployees = allEmployees.filter((emp: Employee) => {
           const employeeSite = emp.siteName || '';
-          const employeeSiteNormalized = normalizeSiteName(employeeSite);
           
-          // Check if employee's site matches any of supervisor's sites from tasks
-          const matchesExactName = supervisorSiteNameList.includes(employeeSite);
-          const matchesNormalizedName = supervisorSiteNormalizedNames.includes(employeeSiteNormalized);
-          const matchesPartial = supervisorSiteNormalizedNames.some(siteNorm => 
-            employeeSiteNormalized.includes(siteNorm) || 
-            siteNorm.includes(employeeSiteNormalized)
+          // EXACT MATCH ONLY - compare the full site name
+          const exactMatch = supervisorSiteNameList.some(siteName => 
+            siteName === employeeSite
           );
           
-          const matches = matchesExactName || matchesNormalizedName || matchesPartial;
+          // Normalized exact match (case insensitive, trimmed)
+          const normalizedExactMatch = supervisorSiteNameList.some(siteName => 
+            normalizeSiteName(siteName) === normalizeSiteName(employeeSite)
+          );
+          
+          // Only match if it's an exact match - NO PARTIAL MATCHES
+          const matches = exactMatch || normalizedExactMatch;
           
           if (matches) {
-            console.log(`✅ Employee ${emp.name} (${emp.employeeId}) matches site: ${employeeSite}`);
+            console.log(`✅ Employee ${emp.name} (${emp.employeeId}) matches site: "${employeeSite}" exactly with supervisor site: "${supervisorSiteNameList.find(s => normalizeSiteName(s) === normalizeSiteName(employeeSite))}"`);
+          } else {
+            console.log(`❌ Employee ${emp.name} site: "${employeeSite}" does NOT exactly match any supervisor site: [${supervisorSiteNameList.join(', ')}]`);
           }
           
           return matches;
         });
         
-        console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites`);
+        console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites (exact matches only)`);
         
         // Log which sites have employees
         const siteCount: Record<string, number> = {};
@@ -1396,14 +1753,14 @@ const Attendance = () => {
       employeeName: employee.name,
       attendanceId: attendanceRecord?._id || '',
       currentStatus: attendanceRecord?.status || 'absent',
-      newStatus: attendanceRecord?.status || 'present',
+      newStatus: (attendanceRecord?.status as 'present' | 'absent' | 'half-day' | 'leave' | 'weekly-off') || 'present',
       date: selectedDate,
       remarks: attendanceRecord?.remarks || ''
     });
     setStatusUpdateDialogOpen(true);
   };
 
-  // Submit status update - FIXED BACKEND INTEGRATION
+  // Submit status update
   const submitStatusUpdate = async () => {
     if (!selectedEmployeeForStatusUpdate) return;
 
@@ -1656,7 +2013,7 @@ const Attendance = () => {
   // Check if user is a supervisor
   if (!isAuthenticated || !currentUser) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
@@ -1668,7 +2025,7 @@ const Attendance = () => {
 
   if (currentUser.role !== "supervisor") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
@@ -1696,75 +2053,81 @@ const Attendance = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader title="Attendance Management" />
+      <DashboardHeader 
+        title="Attendance Management" 
+        onMenuClick={onMenuClick}
+      />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
         {/* Supervisor Info Card */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  {currentSupervisor.name}
+                  <Shield className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="truncate">{currentSupervisor.name}</span>
                 </h3>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="default" className="text-sm capitalize">
+                  <Badge variant="default" className="text-xs md:text-sm capitalize">
                     <Crown className="h-3 w-3 mr-1" />
                     {currentUser.role}
                   </Badge>
                   {supervisorSites.length > 0 ? (
-                    <Badge variant="outline" className="text-sm">
-                      <Building className="h-3 w-3 mr-1" />
-                      Task-Assigned Sites: {supervisorSites.length}
+                    <Badge variant="outline" className="text-xs md:text-sm max-w-full">
+                      <Building className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">
+                        Task-Assigned Sites: {supervisorSites.length}
+                      </span>
                     </Badge>
                   ) : (
-                    <Badge variant="destructive" className="text-sm">
+                    <Badge variant="destructive" className="text-xs md:text-sm">
                       <AlertTriangle className="h-3 w-3 mr-1" />
                       No Task-Assigned Sites
                     </Badge>
                   )}
                   {currentSupervisor.email && (
-                    <Badge variant="outline" className="text-sm">
-                      <Mail className="h-3 w-3 mr-1" />
-                      {currentSupervisor.email}
+                    <Badge variant="outline" className="text-xs md:text-sm max-w-full">
+                      <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{currentSupervisor.email}</span>
                     </Badge>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex gap-2">
+              
+              <div className="flex flex-col items-start md:items-end gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={() => setShowDebug(!showDebug)}
                     className="text-xs"
                   >
                     <Info className="h-3 w-3 mr-1" />
-                    Debug
+                    {!isMobileView && "Debug"}
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={() => setShowFilters(!showFilters)}
                     className="text-xs"
                   >
-                    <Search className="h-3 w-3 mr-1" />
-                    Filters
+                    <Filter className="h-3 w-3 mr-1" />
+                    {!isMobileView && "Filters"}
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={handleRefresh}
                     disabled={loadingEmployees || loadingAttendance}
                     className="text-xs"
                   >
                     <RefreshCw className={`h-3 w-3 mr-1 ${loadingEmployees ? 'animate-spin' : ''}`} />
-                    Refresh
+                    {!isMobileView && "Refresh"}
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -1778,9 +2141,9 @@ const Attendance = () => {
         {/* Debug Info */}
         {showDebug && debugInfo && (
           <Card className="bg-black/5 border-muted">
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <h4 className="font-semibold mb-2">Debug Information</h4>
-              <pre className="text-xs bg-black/10 p-4 rounded overflow-auto max-h-96">
+              <pre className="text-xs bg-black/10 p-3 md:p-4 rounded overflow-auto max-h-96">
                 {JSON.stringify(debugInfo, null, 2)}
               </pre>
             </CardContent>
@@ -1790,19 +2153,19 @@ const Attendance = () => {
         {/* Task-Assigned Sites Info */}
         {supervisorSites.length > 0 ? (
           <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-start gap-3">
-                <Target className="h-5 w-5 text-primary mt-0.5" />
-                <div>
+                <Target className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
                   <h4 className="font-semibold">Sites from Your Task Assignments</h4>
                   <p className="text-sm text-muted-foreground mb-2">
                     You have tasks assigned at these sites. Showing employees from these sites only.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {supervisorSites.map(site => (
-                      <Badge key={site._id} variant="outline" className="bg-white">
+                      <Badge key={site._id} variant="outline" className="bg-white text-xs">
                         {site.name}
-                        {site.clientName && <span className="ml-1 text-muted-foreground">({site.clientName})</span>}
+                        {site.clientName && <span className="ml-1 text-muted-foreground hidden sm:inline">({site.clientName})</span>}
                       </Badge>
                     ))}
                   </div>
@@ -1812,9 +2175,9 @@ const Attendance = () => {
           </Card>
         ) : (
           <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <h4 className="font-semibold text-yellow-800">No Task-Assigned Sites Found</h4>
                   <p className="text-sm text-yellow-700">
@@ -1829,8 +2192,8 @@ const Attendance = () => {
         {/* Filters */}
         {showFilters && (
           <Card>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="p-4 md:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Search</label>
                   <div className="relative">
@@ -1853,7 +2216,9 @@ const Attendance = () => {
                     <SelectContent>
                       <SelectItem value="all">All Sites</SelectItem>
                       {siteOptions.map(site => (
-                        <SelectItem key={site} value={site}>{site}</SelectItem>
+                        <SelectItem key={site} value={site} className="truncate">
+                          {site}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1890,7 +2255,7 @@ const Attendance = () => {
 
         {apiError && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
+            <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
             <div>
               <p className="font-medium text-yellow-800">Note</p>
               <p className="text-sm text-yellow-700">{apiError}</p>
@@ -1899,18 +2264,21 @@ const Attendance = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
-            <TabsTrigger value="my-attendance" className="flex items-center gap-2">
-              <Crown className="h-4 w-4" />
-              My Attendance
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 h-auto">
+            <TabsTrigger value="my-attendance" className="text-sm md:text-base py-2">
+              <Crown className="h-4 w-4 mr-2" />
+              <span className="hidden xs:inline">My Attendance</span>
+              <span className="xs:hidden">Mine</span>
             </TabsTrigger>
-            <TabsTrigger value="employee-attendance" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Team Attendance
+            <TabsTrigger value="employee-attendance" className="text-sm md:text-base py-2">
+              <Users className="h-4 w-4 mr-2" />
+              <span className="hidden xs:inline">Team Attendance</span>
+              <span className="xs:hidden">Team</span>
             </TabsTrigger>
-            <TabsTrigger value="weekly-register" className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              Weekly Register
+            <TabsTrigger value="weekly-register" className="text-sm md:text-base py-2">
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              <span className="hidden xs:inline">Weekly Register</span>
+              <span className="xs:hidden">Weekly</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1927,7 +2295,7 @@ const Attendance = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <h3 className="font-medium">Current Status</h3>
                     <div className="grid grid-cols-2 gap-4">
@@ -1965,36 +2333,44 @@ const Attendance = () => {
                         onClick={handleCheckIn}
                         disabled={currentStatus?.isCheckedIn}
                         className="h-12"
+                        size={isMobileView ? "sm" : "default"}
                       >
                         <LogIn className="mr-2 h-5 w-5" />
-                        Check In
+                        {!isMobileView && "Check In"}
+                        {isMobileView && "In"}
                       </Button>
                       <Button 
                         onClick={handleCheckOut}
                         disabled={!currentStatus?.isCheckedIn}
                         variant="outline"
                         className="h-12"
+                        size={isMobileView ? "sm" : "default"}
                       >
                         <LogOut className="mr-2 h-5 w-5" />
-                        Check Out
+                        {!isMobileView && "Check Out"}
+                        {isMobileView && "Out"}
                       </Button>
                       <Button 
                         onClick={handleBreakIn}
                         disabled={!currentStatus?.isCheckedIn || currentStatus?.isOnBreak}
                         variant="secondary"
                         className="h-12"
+                        size={isMobileView ? "sm" : "default"}
                       >
                         <Clock className="mr-2 h-5 w-5" />
-                        Start Break
+                        {!isMobileView && "Start Break"}
+                        {isMobileView && "Break"}
                       </Button>
                       <Button 
                         onClick={handleBreakOut}
                         disabled={!currentStatus?.isOnBreak}
                         variant="secondary"
                         className="h-12"
+                        size={isMobileView ? "sm" : "default"}
                       >
                         <Clock className="mr-2 h-5 w-5" />
-                        End Break
+                        {!isMobileView && "End Break"}
+                        {isMobileView && "End"}
                       </Button>
                     </div>
                     <div className="pt-4">
@@ -2002,6 +2378,7 @@ const Attendance = () => {
                         onClick={handleRefresh}
                         variant="outline"
                         className="w-full"
+                        size={isMobileView ? "sm" : "default"}
                       >
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Refresh Status
@@ -2013,7 +2390,7 @@ const Attendance = () => {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
                   <div>
@@ -2040,128 +2417,146 @@ const Attendance = () => {
                     <strong>Note:</strong> Showing only your attendance records. You are viewing: <strong>{currentSupervisor.name}</strong>
                   </p>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Shift</TableHead>
-                      <TableHead>Check In</TableHead>
-                      <TableHead>Check Out</TableHead>
-                      <TableHead>Break In</TableHead>
-                      <TableHead>Break Out</TableHead>
-                      <TableHead className="text-right">Hours</TableHead>
-                      <TableHead className="text-right">Break Time</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                
+                {isMobileView ? (
+                  <div className="space-y-3">
                     {sortedAttendanceData.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="font-medium">{record.date}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
-                            {record.shift}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <LogIn className="h-4 w-4 text-muted-foreground" />
-                            {record.checkInTime || "-"}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <LogOut className="h-4 w-4 text-muted-foreground" />
-                            {record.checkOutTime || "-"}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            {record.breakStartTime || "-"}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            {record.breakEndTime || "-"}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {record.hours.toFixed(2)} hrs
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {record.breakTime.toFixed(2)} hrs
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusBadge(record.status.toLowerCase())}>
-                            {record.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+                      <MobileSupervisorAttendanceCard
+                        key={record.id}
+                        record={record}
+                        formatTimeForDisplay={formatTimeForDisplay}
+                        getStatusBadge={getStatusBadge}
+                      />
                     ))}
                     
                     {sortedAttendanceData.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          No attendance records found for you.
-                        </TableCell>
-                      </TableRow>
+                      <div className="text-center py-8 text-muted-foreground">
+                        No attendance records found for you.
+                      </div>
                     )}
-                  </TableBody>
-                </Table>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Shift</TableHead>
+                          <TableHead>Check In</TableHead>
+                          <TableHead>Check Out</TableHead>
+                          <TableHead>Break In</TableHead>
+                          <TableHead>Break Out</TableHead>
+                          <TableHead className="text-right">Hours</TableHead>
+                          <TableHead className="text-right">Break Time</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedAttendanceData.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-medium whitespace-nowrap">{record.date}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200 whitespace-nowrap">
+                                {record.shift}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                <LogIn className="h-4 w-4 text-muted-foreground" />
+                                {record.checkInTime || "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                <LogOut className="h-4 w-4 text-muted-foreground" />
+                                {record.checkOutTime || "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                {record.breakStartTime || "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 whitespace-nowrap">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                {record.breakEndTime || "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium whitespace-nowrap">
+                              {record.hours.toFixed(2)} hrs
+                            </TableCell>
+                            <TableCell className="text-right font-medium whitespace-nowrap">
+                              {record.breakTime.toFixed(2)} hrs
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${getStatusBadge(record.status.toLowerCase())} whitespace-nowrap`}>
+                                {record.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        
+                        {sortedAttendanceData.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                              No attendance records found for you.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Employee Attendance Tab */}
           <TabsContent value="employee-attendance" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                <CardHeader className="p-3 md:p-6">
+                  <CardTitle className="text-xs md:text-sm font-medium">Total Employees</CardTitle>
+                  <CardContent className="p-0 pt-2">
+                    <div className="text-xl md:text-2xl font-bold">{stats.totalEmployees}</div>
+                    <p className="text-xs text-muted-foreground">From task-assigned sites</p>
+                  </CardContent>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalEmployees}</div>
-                  <p className="text-xs text-muted-foreground">From task-assigned sites</p>
-                </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-green-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <CardTitle className="text-xs md:text-sm font-medium">Present Today</CardTitle>
+                  <CardContent className="p-0 pt-2">
+                    <div className="text-xl md:text-2xl font-bold text-green-600">{stats.presentCount}</div>
+                    <p className="text-xs text-muted-foreground">Checked in: {stats.checkedInCount}</p>
+                  </CardContent>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{stats.presentCount}</div>
-                  <p className="text-xs text-muted-foreground">Checked in: {stats.checkedInCount}</p>
-                </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Absent Today</CardTitle>
-                  <XCircle className="h-4 w-4 text-red-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <CardTitle className="text-xs md:text-sm font-medium">Absent Today</CardTitle>
+                  <CardContent className="p-0 pt-2">
+                    <div className="text-xl md:text-2xl font-bold text-red-600">{stats.absentCount}</div>
+                    <p className="text-xs text-muted-foreground">Employees absent</p>
+                  </CardContent>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{stats.absentCount}</div>
-                  <p className="text-xs text-muted-foreground">Employees absent</p>
-                </CardContent>
               </Card>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Attendance Rate</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                <CardHeader className="p-3 md:p-6">
+                  <CardTitle className="text-xs md:text-sm font-medium">Attendance Rate</CardTitle>
+                  <CardContent className="p-0 pt-2">
+                    <div className="text-xl md:text-2xl font-bold text-blue-600">{stats.attendanceRate}%</div>
+                    <p className="text-xs text-muted-foreground">Overall rate</p>
+                  </CardContent>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{stats.attendanceRate}%</div>
-                  <p className="text-xs text-muted-foreground">Overall rate</p>
-                </CardContent>
               </Card>
             </div>
 
             <Card>
               <CardHeader>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-5 w-5" />
                     <div>
@@ -2171,16 +2566,16 @@ const Attendance = () => {
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="attendance-date" className="text-sm">Date:</Label>
+                      <Label htmlFor="attendance-date" className="text-sm whitespace-nowrap">Date:</Label>
                       <Input
                         id="attendance-date"
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-40"
+                        className="w-32 sm:w-40"
                       />
                     </div>
-                    <Button onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
+                    <Button onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])} size={isMobileView ? "sm" : "default"}>
                       Today
                     </Button>
                   </div>
@@ -2193,15 +2588,15 @@ const Attendance = () => {
                     <span className="ml-2">Loading data...</span>
                   </div>
                 ) : filteredEmployees.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No employees found for your task-assigned sites</p>
+                  <div className="text-center py-8 md:py-12">
+                    <Users className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-sm md:text-base text-muted-foreground">No employees found for your task-assigned sites</p>
                     {supervisorSites.length > 0 ? (
                       <div className="mt-4">
                         <p className="text-sm text-muted-foreground mb-2">Your task-assigned sites:</p>
                         <div className="flex flex-wrap justify-center gap-2">
                           {supervisorSites.map(site => (
-                            <Badge key={site._id} variant="outline">
+                            <Badge key={site._id} variant="outline" className="text-xs">
                               {site.name}
                             </Badge>
                           ))}
@@ -2212,7 +2607,7 @@ const Attendance = () => {
                       </div>
                     ) : (
                       <div>
-                        <p className="text-muted-foreground">You don't have any sites assigned through tasks.</p>
+                        <p className="text-sm text-muted-foreground">You don't have any sites assigned through tasks.</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           Please contact your administrator to assign you to tasks.
                         </p>
@@ -2222,6 +2617,7 @@ const Attendance = () => {
                       variant="outline"
                       onClick={handleRefresh}
                       className="mt-4"
+                      size={isMobileView ? "sm" : "default"}
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
@@ -2229,180 +2625,212 @@ const Attendance = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Employee</TableHead>
-                              <TableHead>Department</TableHead>
-                              <TableHead>Site</TableHead>
-                              <TableHead>Check In</TableHead>
-                              <TableHead>Check Out</TableHead>
-                              <TableHead>Break In</TableHead>
-                              <TableHead>Break Out</TableHead>
-                              <TableHead className="text-right">Hours</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredEmployees.map((employee) => {
-                              const attendanceRecord = getEmployeeAttendanceRecord(employee._id);
-                              
-                              return (
-                                <TableRow key={employee._id}>
-                                  <TableCell>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{employee.name}</span>
-                                      <span className="text-sm text-muted-foreground">{employee.employeeId}</span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>{employee.department}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="max-w-[150px] truncate">
-                                      {employee.siteName || 'Not Assigned'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {attendanceRecord?.checkInTime ? (
-                                      <div className="flex items-center gap-2">
-                                        <LogIn className="h-4 w-4 text-muted-foreground" />
-                                        {formatTimeForDisplay(attendanceRecord.checkInTime)}
+                    {isMobileView ? (
+                      <div className="space-y-4">
+                        {filteredEmployees.map((employee) => {
+                          const attendanceRecord = getEmployeeAttendanceRecord(employee._id);
+                          return (
+                            <MobileEmployeeAttendanceCard
+                              key={employee._id}
+                              employee={employee}
+                              attendanceRecord={attendanceRecord}
+                              onCheckIn={handleEmployeeCheckIn}
+                              onCheckOut={handleEmployeeCheckOut}
+                              onBreakIn={handleEmployeeBreakIn}
+                              onBreakOut={handleEmployeeBreakOut}
+                              onManual={handleManualAttendance}
+                              onStatusUpdate={handleStatusUpdate}
+                              formatTimeForDisplay={formatTimeForDisplay}
+                              formatHours={formatHours}
+                              getStatusBadge={getStatusBadge}
+                              getStatusIcon={getStatusIcon}
+                              supervisorSites={supervisorSites}
+                              updatingStatus={updatingStatus}
+                            />
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="whitespace-nowrap">Employee</TableHead>
+                                <TableHead className="whitespace-nowrap">Department</TableHead>
+                                <TableHead className="whitespace-nowrap">Site</TableHead>
+                                <TableHead className="whitespace-nowrap">Check In</TableHead>
+                                <TableHead className="whitespace-nowrap">Check Out</TableHead>
+                                <TableHead className="whitespace-nowrap">Break In</TableHead>
+                                <TableHead className="whitespace-nowrap">Break Out</TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Hours</TableHead>
+                                <TableHead className="whitespace-nowrap">Status</TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredEmployees.map((employee) => {
+                                const attendanceRecord = getEmployeeAttendanceRecord(employee._id);
+                                
+                                return (
+                                  <TableRow key={employee._id}>
+                                    <TableCell>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{employee.name}</span>
+                                        <span className="text-sm text-muted-foreground">{employee.employeeId}</span>
                                       </div>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {attendanceRecord?.checkOutTime ? (
-                                      <div className="flex items-center gap-2">
-                                        <LogOut className="h-4 w-4 text-muted-foreground" />
-                                        {formatTimeForDisplay(attendanceRecord.checkOutTime)}
-                                      </div>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {attendanceRecord?.breakStartTime ? (
-                                      <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                        {formatTimeForDisplay(attendanceRecord.breakStartTime)}
-                                      </div>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {attendanceRecord?.breakEndTime ? (
-                                      <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                        {formatTimeForDisplay(attendanceRecord.breakEndTime)}
-                                      </div>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right font-medium">
-                                    {attendanceRecord?.totalHours ? formatHours(attendanceRecord.totalHours) : "-"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      {attendanceRecord ? (
-                                        <Badge className={getStatusBadge(attendanceRecord.status)}>
-                                          {getStatusIcon(attendanceRecord.status)}
-                                          {attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">{employee.department}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="max-w-[150px] truncate">
+                                        {employee.siteName || 'Not Assigned'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      {attendanceRecord?.checkInTime ? (
+                                        <div className="flex items-center gap-2">
+                                          <LogIn className="h-4 w-4 text-muted-foreground" />
+                                          {formatTimeForDisplay(attendanceRecord.checkInTime)}
+                                        </div>
                                       ) : (
-                                        <Badge variant="outline">No Record</Badge>
+                                        "-"
                                       )}
-                                      {/* Status Update Button */}
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-6 w-6 p-0"
-                                        onClick={() => handleStatusUpdate(employee, attendanceRecord || null)}
-                                        title="Update Status"
-                                        disabled={updatingStatus}
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
-                                      {attendanceRecord?.isCheckedIn ? (
-                                        <>
-                                          {attendanceRecord.isOnBreak ? (
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      {attendanceRecord?.checkOutTime ? (
+                                        <div className="flex items-center gap-2">
+                                          <LogOut className="h-4 w-4 text-muted-foreground" />
+                                          {formatTimeForDisplay(attendanceRecord.checkOutTime)}
+                                        </div>
+                                      ) : (
+                                        "-"
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      {attendanceRecord?.breakStartTime ? (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="h-4 w-4 text-muted-foreground" />
+                                          {formatTimeForDisplay(attendanceRecord.breakStartTime)}
+                                        </div>
+                                      ) : (
+                                        "-"
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      {attendanceRecord?.breakEndTime ? (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="h-4 w-4 text-muted-foreground" />
+                                          {formatTimeForDisplay(attendanceRecord.breakEndTime)}
+                                        </div>
+                                      ) : (
+                                        "-"
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium whitespace-nowrap">
+                                      {attendanceRecord?.totalHours ? formatHours(attendanceRecord.totalHours) : "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        {attendanceRecord ? (
+                                          <Badge className={getStatusBadge(attendanceRecord.status)}>
+                                            {getStatusIcon(attendanceRecord.status)}
+                                            {attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline">No Record</Badge>
+                                        )}
+                                        {/* Status Update Button */}
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0"
+                                          onClick={() => handleStatusUpdate(employee, attendanceRecord || null)}
+                                          title="Update Status"
+                                          disabled={updatingStatus}
+                                        >
+                                          <Edit className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-2">
+                                        {attendanceRecord?.isCheckedIn ? (
+                                          <>
+                                            {attendanceRecord.isOnBreak ? (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleEmployeeBreakOut(employee)}
+                                                className="whitespace-nowrap"
+                                              >
+                                                End Break
+                                              </Button>
+                                            ) : (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleEmployeeBreakIn(employee)}
+                                                className="whitespace-nowrap"
+                                              >
+                                                Start Break
+                                              </Button>
+                                            )}
                                             <Button
                                               size="sm"
                                               variant="outline"
-                                              onClick={() => handleEmployeeBreakOut(employee)}
+                                              onClick={() => handleEmployeeCheckOut(employee)}
+                                              className="whitespace-nowrap"
                                             >
-                                              End Break
+                                              Check Out
                                             </Button>
-                                          ) : (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => handleEmployeeBreakIn(employee)}
-                                            >
-                                              Start Break
-                                            </Button>
-                                          )}
+                                          </>
+                                        ) : (
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            onClick={() => handleEmployeeCheckOut(employee)}
+                                            onClick={() => handleEmployeeCheckIn(employee)}
+                                            disabled={!!attendanceRecord?.checkOutTime}
+                                            className="whitespace-nowrap"
                                           >
-                                            Check Out
+                                            Check In
                                           </Button>
-                                        </>
-                                      ) : (
+                                        )}
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          onClick={() => handleEmployeeCheckIn(employee)}
-                                          disabled={!!attendanceRecord?.checkOutTime}
+                                          onClick={() => handleManualAttendance(employee)}
+                                          className="whitespace-nowrap"
                                         >
-                                          Check In
+                                          <FileText className="h-4 w-4 mr-1" />
+                                          Manual
                                         </Button>
-                                      )}
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleManualAttendance(employee)}
-                                      >
-                                        <FileText className="h-4 w-4 mr-1" />
-                                        Manual
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">Half Day</div>
-                        <div className="text-2xl font-bold text-yellow-600">{stats.halfDayCount}</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-6">
+                      <div className="p-3 md:p-4 border rounded-lg">
+                        <div className="text-xs md:text-sm text-muted-foreground">Half Day</div>
+                        <div className="text-lg md:text-2xl font-bold text-yellow-600">{stats.halfDayCount}</div>
                       </div>
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">On Leave</div>
-                        <div className="text-2xl font-bold text-blue-600">{stats.leaveCount}</div>
+                      <div className="p-3 md:p-4 border rounded-lg">
+                        <div className="text-xs md:text-sm text-muted-foreground">On Leave</div>
+                        <div className="text-lg md:text-2xl font-bold text-blue-600">{stats.leaveCount}</div>
                       </div>
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">Weekly Off</div>
-                        <div className="text-2xl font-bold text-purple-600">{stats.weeklyOffCount}</div>
+                      <div className="p-3 md:p-4 border rounded-lg">
+                        <div className="text-xs md:text-sm text-muted-foreground">Weekly Off</div>
+                        <div className="text-lg md:text-2xl font-bold text-purple-600">{stats.weeklyOffCount}</div>
                       </div>
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">Total Hours</div>
-                        <div className="text-2xl font-bold">
+                      <div className="p-3 md:p-4 border rounded-lg">
+                        <div className="text-xs md:text-sm text-muted-foreground">Total Hours</div>
+                        <div className="text-lg md:text-2xl font-bold">
                           {attendanceRecords.reduce((sum, record) => sum + record.totalHours, 0).toFixed(2)} hrs
                         </div>
                       </div>
@@ -2422,16 +2850,16 @@ const Attendance = () => {
                     <CardTitle>Weekly Attendance Register</CardTitle>
                     <CardDescription>Team-wise weekly attendance summary</CardDescription>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={handlePreviousWeek}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <div className="text-center min-w-[200px]">
-                        <div className="font-medium">
+                        <div className="font-medium text-sm md:text-base">
                           Week {selectedWeek}, {new Date(selectedYear, selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           {weekDates[0].toLocaleDateString()} - {weekDates[6].toLocaleDateString()}
                         </div>
                       </div>
@@ -2440,13 +2868,14 @@ const Attendance = () => {
                       </Button>
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={() => toast.success("Report exported!")}>
+                      <Button onClick={() => toast.success("Report exported!")} size={isMobileView ? "sm" : "default"}>
                         <Download className="mr-2 h-4 w-4" />
-                        Export Report
+                        {!isMobileView && "Export Report"}
+                        {isMobileView && "Export"}
                       </Button>
-                      <Button variant="outline" onClick={handleRefresh}>
+                      <Button variant="outline" onClick={handleRefresh} size={isMobileView ? "sm" : "default"}>
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Refresh
+                        {!isMobileView && "Refresh"}
                       </Button>
                     </div>
                   </div>
@@ -2493,94 +2922,113 @@ const Attendance = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Employee</TableHead>
-                              <TableHead>Employee ID</TableHead>
-                              <TableHead>Department</TableHead>
-                              <TableHead>Present</TableHead>
-                              <TableHead>Absent</TableHead>
-                              <TableHead>Half Day</TableHead>
-                              <TableHead>Leave</TableHead>
-                              <TableHead>Weekly Off</TableHead>
-                              <TableHead className="text-right">Total Hours</TableHead>
-                              <TableHead>Overall Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {weeklySummaries.length > 0 ? (
-                              weeklySummaries.map((summary) => (
-                                <TableRow key={summary.employeeId}>
-                                  <TableCell className="font-medium">
-                                    {summary.employeeName}
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className="text-sm text-muted-foreground">{summary.employeeId}</span>
-                                  </TableCell>
-                                  <TableCell>{summary.department}</TableCell>
-                                  <TableCell>
-                                    <div className="text-green-600 font-medium">{summary.daysPresent}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="text-red-600 font-medium">{summary.daysAbsent}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="text-yellow-600 font-medium">{summary.daysHalfDay}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="text-blue-600 font-medium">{summary.daysLeave}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="text-purple-600 font-medium">{summary.daysWeeklyOff}</div>
-                                  </TableCell>
-                                  <TableCell className="text-right font-medium">
-                                    {summary.totalHours.toFixed(2)} hrs
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge className={getStatusBadge(summary.overallStatus)}>
-                                      {getStatusIcon(summary.overallStatus)}
-                                      {summary.overallStatus.charAt(0).toUpperCase() + summary.overallStatus.slice(1)}
-                                    </Badge>
+                    {isMobileView ? (
+                      <div className="space-y-4">
+                        {weeklySummaries.length > 0 ? (
+                          weeklySummaries.map((summary) => (
+                            <MobileWeeklySummaryCard
+                              key={summary.employeeId}
+                              summary={summary}
+                              getStatusBadge={getStatusBadge}
+                              getStatusIcon={getStatusIcon}
+                            />
+                          ))
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            No weekly attendance data available.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="whitespace-nowrap">Employee</TableHead>
+                                <TableHead className="whitespace-nowrap">Employee ID</TableHead>
+                                <TableHead className="whitespace-nowrap">Department</TableHead>
+                                <TableHead className="whitespace-nowrap">Present</TableHead>
+                                <TableHead className="whitespace-nowrap">Absent</TableHead>
+                                <TableHead className="whitespace-nowrap">Half Day</TableHead>
+                                <TableHead className="whitespace-nowrap">Leave</TableHead>
+                                <TableHead className="whitespace-nowrap">Weekly Off</TableHead>
+                                <TableHead className="text-right whitespace-nowrap">Total Hours</TableHead>
+                                <TableHead className="whitespace-nowrap">Overall Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {weeklySummaries.length > 0 ? (
+                                weeklySummaries.map((summary) => (
+                                  <TableRow key={summary.employeeId}>
+                                    <TableCell className="font-medium whitespace-nowrap">
+                                      {summary.employeeName}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <span className="text-sm text-muted-foreground">{summary.employeeId}</span>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">{summary.department}</TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <div className="text-green-600 font-medium">{summary.daysPresent}</div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <div className="text-red-600 font-medium">{summary.daysAbsent}</div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <div className="text-yellow-600 font-medium">{summary.daysHalfDay}</div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <div className="text-blue-600 font-medium">{summary.daysLeave}</div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <div className="text-purple-600 font-medium">{summary.daysWeeklyOff}</div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium whitespace-nowrap">
+                                      {summary.totalHours.toFixed(2)} hrs
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      <Badge className={getStatusBadge(summary.overallStatus)}>
+                                        {getStatusIcon(summary.overallStatus)}
+                                        {summary.overallStatus.charAt(0).toUpperCase() + summary.overallStatus.slice(1)}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                                    No weekly attendance data available.
                                   </TableCell>
                                 </TableRow>
-                              ))
-                            ) : (
-                              <TableRow>
-                                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                                  No weekly attendance data available.
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-6">
                       <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">Weekly Present Rate</CardTitle>
+                        <CardHeader className="pb-2 p-3 md:p-6">
+                          <CardTitle className="text-xs md:text-sm font-medium">Weekly Present Rate</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-green-600">
+                        <CardContent className="p-3 md:p-6 pt-0">
+                          <div className="text-lg md:text-2xl font-bold text-green-600">
                             {(() => {
                               const totalDays = weeklySummaries.reduce((sum, s) => sum + s.daysPresent + s.daysAbsent + s.daysHalfDay + s.daysLeave + s.daysWeeklyOff, 0);
                               const presentDays = weeklySummaries.reduce((sum, s) => sum + s.daysPresent, 0);
                               return totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
                             })()}%
                           </div>
-                          <div className="text-sm text-muted-foreground">Average attendance rate</div>
+                          <div className="text-xs text-muted-foreground">Average attendance rate</div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">Best Attendance</CardTitle>
+                        <CardHeader className="pb-2 p-3 md:p-6">
+                          <CardTitle className="text-xs md:text-sm font-medium">Best Attendance</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
+                        <CardContent className="p-3 md:p-6 pt-0">
+                          <div className="text-lg md:text-2xl font-bold">
                             {(() => {
                               const bestEmp = weeklySummaries.reduce((best, emp) => 
                                 emp.daysPresent > best.daysPresent ? emp : best
@@ -2588,7 +3036,7 @@ const Attendance = () => {
                               return `${bestEmp.daysPresent}/7`;
                             })()}
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-xs text-muted-foreground truncate">
                             {weeklySummaries.reduce((best, emp) => 
                               emp.daysPresent > best.daysPresent ? emp : best
                             , weeklySummaries[0] || { daysPresent: 0, employeeName: 'N/A' }).employeeName || "N/A"}
@@ -2596,25 +3044,25 @@ const Attendance = () => {
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">Total Working Hours</CardTitle>
+                        <CardHeader className="pb-2 p-3 md:p-6">
+                          <CardTitle className="text-xs md:text-sm font-medium">Total Working Hours</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
+                        <CardContent className="p-3 md:p-6 pt-0">
+                          <div className="text-lg md:text-2xl font-bold">
                             {weeklySummaries.reduce((sum, emp) => sum + emp.totalHours, 0).toFixed(2)} hrs
                           </div>
-                          <div className="text-sm text-muted-foreground">Weekly total</div>
+                          <div className="text-xs text-muted-foreground">Weekly total</div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">Full Attendance</CardTitle>
+                        <CardHeader className="pb-2 p-3 md:p-6">
+                          <CardTitle className="text-xs md:text-sm font-medium">Full Attendance</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
+                        <CardContent className="p-3 md:p-6 pt-0">
+                          <div className="text-lg md:text-2xl font-bold">
                             {weeklySummaries.filter(emp => emp.daysPresent === 7).length}
                           </div>
-                          <div className="text-sm text-muted-foreground">Employees with 7/7</div>
+                          <div className="text-xs text-muted-foreground">Employees with 7/7</div>
                         </CardContent>
                       </Card>
                     </div>
@@ -2628,7 +3076,7 @@ const Attendance = () => {
 
       {/* Manual Attendance Dialog */}
       <Dialog open={manualAttendanceDialogOpen} onOpenChange={setManualAttendanceDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manual Attendance Entry</DialogTitle>
             <DialogDescription>
@@ -2721,7 +3169,7 @@ const Attendance = () => {
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setManualAttendanceDialogOpen(false)}>
               Cancel
             </Button>
@@ -2734,7 +3182,7 @@ const Attendance = () => {
 
       {/* Status Update Dialog */}
       <Dialog open={statusUpdateDialogOpen} onOpenChange={setStatusUpdateDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Update Attendance Status</DialogTitle>
             <DialogDescription>
@@ -2820,7 +3268,7 @@ const Attendance = () => {
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setStatusUpdateDialogOpen(false)} disabled={updatingStatus}>
               Cancel
             </Button>

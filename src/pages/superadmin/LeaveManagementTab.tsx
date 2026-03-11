@@ -23,7 +23,9 @@ import {
   Check,
   X,
   Shield,
-  Crown
+  Crown,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 import { LeaveRequest } from "./types";
@@ -171,6 +173,9 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Mobile view state for table
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // SIMPLIFIED: Fetch supervisor and employee leaves
   const fetchSupervisorEmployeeLeaves = async (page = 1) => {
@@ -558,18 +563,20 @@ const fetchManagerAdminLeaves = async (page = 1) => {
   const getRequestTypeBadge = (leave: ApiLeaveRequest | ApiManagerLeaveRequest | ApiAdminLeaveRequest) => {
     if (isAdminLeave(leave)) {
       return (
-        <Badge variant="default" className="bg-purple-600">
-          <Crown className="h-3 w-3 mr-1" />
-          Admin
+        <Badge variant="default" className="bg-purple-600 text-xs sm:text-sm">
+          <Crown className="h-3 w-3 mr-1 inline-block" />
+          <span className="hidden sm:inline">Admin</span>
+          <span className="sm:hidden">A</span>
         </Badge>
       );
     }
     
     if (isManagerLeave(leave)) {
       return (
-        <Badge variant="default" className="bg-blue-600">
-          <Shield className="h-3 w-3 mr-1" />
-          Manager
+        <Badge variant="default" className="bg-blue-600 text-xs sm:text-sm">
+          <Shield className="h-3 w-3 mr-1 inline-block" />
+          <span className="hidden sm:inline">Manager</span>
+          <span className="sm:hidden">M</span>
         </Badge>
       );
     }
@@ -581,18 +588,20 @@ const fetchManagerAdminLeaves = async (page = 1) => {
     
     if (isSupervisor) {
       return (
-        <Badge variant="default" className="bg-green-600">
-          <User className="h-3 w-3 mr-1" />
-          Supervisor
+        <Badge variant="default" className="bg-green-600 text-xs sm:text-sm">
+          <User className="h-3 w-3 mr-1 inline-block" />
+          <span className="hidden sm:inline">Supervisor</span>
+          <span className="sm:hidden">S</span>
         </Badge>
       );
     }
     
     // Default to employee
     return (
-      <Badge variant="default" className="bg-gray-600">
-        <Users className="h-3 w-3 mr-1" />
-        Employee
+      <Badge variant="default" className="bg-gray-600 text-xs sm:text-sm">
+        <Users className="h-3 w-3 mr-1 inline-block" />
+        <span className="hidden sm:inline">Employee</span>
+        <span className="sm:hidden">E</span>
       </Badge>
     );
   };
@@ -694,95 +703,230 @@ const fetchManagerAdminLeaves = async (page = 1) => {
     return leave.department || 'N/A';
   };
 
+  // Toggle row expansion on mobile
+  const toggleRowExpansion = (id: string) => {
+    setExpandedRow(expandedRow === id ? null : id);
+  };
+
+  // Render mobile card view for a leave request
+  const renderMobileLeaveCard = (leave: ApiLeaveRequest | ApiManagerLeaveRequest | ApiAdminLeaveRequest) => {
+    const isExpanded = expandedRow === (leave._id || leave.id);
+    const leaveId = leave._id || leave.id || '';
+    
+    return (
+      <div key={leaveId} className="border rounded-lg p-4 mb-3 bg-white shadow-sm">
+        {/* Header with basic info */}
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {getRequestTypeBadge(leave)}
+            <Badge variant={getStatusColor(leave.status)} className="capitalize text-xs">
+              {leave.status}
+            </Badge>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => toggleRowExpansion(leaveId)}
+          >
+            {isExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+        </div>
+        
+        {/* Always visible info */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{getDisplayName(leave)}</p>
+              <p className="text-xs text-muted-foreground">ID: {getDisplayId(leave)}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Building className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm truncate">{getDisplayDepartment(leave)}</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm">{formatDate(leave.fromDate)} - {formatDate(leave.toDate)}</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm">{leave.totalDays} days</span>
+          </div>
+        </div>
+        
+        {/* Expandable section with actions */}
+        {isExpanded && (
+          <div className="mt-4 pt-3 border-t space-y-3">
+            <div className="text-sm">
+              <span className="font-medium">Leave Type:</span>{" "}
+              <Badge variant="outline" className="capitalize ml-1">
+                {leave.leaveType}
+              </Badge>
+            </div>
+            
+            <div className="text-sm">
+              <span className="font-medium">Applied by:</span> {leave.appliedBy || 'N/A'}
+            </div>
+            
+            {leave.reason && (
+              <div className="text-sm">
+                <span className="font-medium">Reason:</span>
+                <p className="mt-1 text-muted-foreground bg-muted/30 p-2 rounded">
+                  {leave.reason.length > 100 
+                    ? `${leave.reason.substring(0, 100)}...` 
+                    : leave.reason}
+                </p>
+              </div>
+            )}
+            
+            <div className="flex flex-col gap-2 mt-2">
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleViewDetails(leave)}
+                className="w-full"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </Button>
+              
+              {leave.status === "pending" && (
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    onClick={() => handleLeaveAction(leave, "approved")}
+                    disabled={isUpdating}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    {isUpdating && selectedLeave && (selectedLeave._id || selectedLeave.id) === leaveId ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Check className="mr-1 h-3 w-3" />
+                    )}
+                    Approve
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    onClick={() => handleLeaveAction(leave, "rejected")}
+                    disabled={isUpdating}
+                    className="flex-1"
+                  >
+                    {isUpdating && selectedLeave && (selectedLeave._id || selectedLeave.id) === leaveId ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <X className="mr-1 h-3 w-3" />
+                    )}
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Tabs for switching between leave types */}
       <Tabs defaultValue="supervisor-employee" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="supervisor-employee" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Supervisor & Employee Leaves
-            <Badge variant="secondary" className="ml-2">
+          <TabsTrigger value="supervisor-employee" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span className="hidden xs:inline">Supervisor & Employee</span>
+            <span className="xs:hidden">S&E</span>
+            <Badge variant="secondary" className="ml-0 sm:ml-2 text-xs">
               {supervisorEmployeeStats.total}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value="manager-admin" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Manager & Admin Leaves
-            <Badge variant="secondary" className="ml-2">
+          <TabsTrigger value="manager-admin" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-1 sm:px-3">
+            <Shield className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+            <span className="hidden xs:inline">Manager & Admin</span>
+            <span className="xs:hidden">M&A</span>
+            <Badge variant="secondary" className="ml-0 sm:ml-2 text-xs">
               {managerAdminStats.total}
             </Badge>
           </TabsTrigger>
         </TabsList>
 
         {/* Supervisor/Employee Leaves Tab Content */}
-        <TabsContent value="supervisor-employee" className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-5">
+        <TabsContent value="supervisor-employee" className="space-y-4 sm:space-y-6">
+          {/* Stats Cards - Responsive grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
             <StatCard 
-              title="Total Requests" 
+              title="Total" 
               value={supervisorEmployeeStats.total}
-              icon={<Users className="h-4 w-4" />}
+              icon={<Users className="h-3 w-3 sm:h-4 sm:w-4" />}
+              className="text-xs sm:text-sm"
             />
             <StatCard 
               title="Pending" 
               value={supervisorEmployeeStats.pending} 
-              className="text-yellow-600" 
-              icon={<AlertCircle className="h-4 w-4" />}
+              className="text-yellow-600 text-xs sm:text-sm" 
+              icon={<AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
             <StatCard 
               title="Approved" 
               value={supervisorEmployeeStats.approved} 
-              className="text-green-600" 
-              icon={<CheckCircle className="h-4 w-4" />}
+              className="text-green-600 text-xs sm:text-sm" 
+              icon={<CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
             <StatCard 
               title="Rejected" 
               value={supervisorEmployeeStats.rejected} 
-              className="text-red-600" 
-              icon={<XCircle className="h-4 w-4" />}
+              className="text-red-600 text-xs sm:text-sm" 
+              icon={<XCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
             <StatCard 
               title="Cancelled" 
               value={supervisorEmployeeStats.cancelled} 
-              className="text-gray-600" 
-              icon={<XCircle className="h-4 w-4" />}
+              className="text-gray-600 text-xs sm:text-sm col-span-2 sm:col-span-1" 
+              icon={<XCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
           </div>
         </TabsContent>
 
         {/* Manager/Admin Leaves Tab Content */}
-        <TabsContent value="manager-admin" className="space-y-6">
-          {/* Stats Cards for Manager/Admin Leaves */}
-          <div className="grid gap-4 md:grid-cols-5">
+        <TabsContent value="manager-admin" className="space-y-4 sm:space-y-6">
+          {/* Stats Cards for Manager/Admin Leaves - Responsive grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
             <StatCard 
-              title="Total Requests" 
+              title="Total" 
               value={managerAdminStats.total}
-              icon={<Shield className="h-4 w-4" />}
+              icon={<Shield className="h-3 w-3 sm:h-4 sm:w-4" />}
+              className="text-xs sm:text-sm"
             />
             <StatCard 
               title="Pending" 
               value={managerAdminStats.pending} 
-              className="text-yellow-600" 
-              icon={<AlertCircle className="h-4 w-4" />}
+              className="text-yellow-600 text-xs sm:text-sm" 
+              icon={<AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
             <StatCard 
               title="Approved" 
               value={managerAdminStats.approved} 
-              className="text-green-600" 
-              icon={<CheckCircle className="h-4 w-4" />}
+              className="text-green-600 text-xs sm:text-sm" 
+              icon={<CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
             <StatCard 
               title="Rejected" 
               value={managerAdminStats.rejected} 
-              className="text-red-600" 
-              icon={<XCircle className="h-4 w-4" />}
+              className="text-red-600 text-xs sm:text-sm" 
+              icon={<XCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
             <StatCard 
               title="Cancelled" 
               value={managerAdminStats.cancelled} 
-              className="text-gray-600" 
-              icon={<XCircle className="h-4 w-4" />}
+              className="text-gray-600 text-xs sm:text-sm col-span-2 sm:col-span-1" 
+              icon={<XCircle className="h-3 w-3 sm:h-4 sm:w-4" />}
             />
           </div>
         </TabsContent>
@@ -790,39 +934,42 @@ const fetchManagerAdminLeaves = async (page = 1) => {
 
       {/* Filters Card */}
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle>
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+            <CardTitle className="text-sm sm:text-base">
               {activeTab === "supervisor-employee" 
                 ? "Supervisor & Employee Leave Requests" 
                 : "Manager & Admin Leave Requests"}
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleRefresh}
                 disabled={isLoading}
+                className="flex-1 sm:flex-initial text-xs sm:text-sm h-8 sm:h-9"
               >
                 {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                 ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
+                  <RefreshCw className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                 )}
-                Refresh
+                <span className="hidden xs:inline">Refresh</span>
+                <span className="xs:hidden">Sync</span>
               </Button>
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleClearFilters}
+                className="flex-1 sm:flex-initial text-xs sm:text-sm h-8 sm:h-9"
               >
-                Clear Filters
+                Clear
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+          <div className="space-y-3 sm:space-y-4">
             <form onSubmit={handleSearch} className="flex gap-2">
               <Input
                 placeholder={
@@ -832,19 +979,19 @@ const fetchManagerAdminLeaves = async (page = 1) => {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm h-8 sm:h-10"
               />
-              <Button type="submit">
-                <Search className="h-4 w-4" />
+              <Button type="submit" size="sm" className="h-8 sm:h-10 px-2 sm:px-4">
+                <Search className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </form>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {activeTab === "supervisor-employee" && (
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="department" className="text-xs sm:text-sm">Department</Label>
                   <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
                     <SelectContent>
@@ -862,10 +1009,10 @@ const fetchManagerAdminLeaves = async (page = 1) => {
               )}
 
               {activeTab === "manager-admin" && (
-                <div className="space-y-2">
-                  <Label htmlFor="department">Manager Department</Label>
+                <div className="space-y-1 sm:space-y-2">
+                  <Label htmlFor="department" className="text-xs sm:text-sm">Manager Department</Label>
                   <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
                     <SelectContent>
@@ -881,10 +1028,10 @@ const fetchManagerAdminLeaves = async (page = 1) => {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+              <div className="space-y-1 sm:space-y-2">
+                <Label htmlFor="status" className="text-xs sm:text-sm">Status</Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="Select Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -901,95 +1048,96 @@ const fetchManagerAdminLeaves = async (page = 1) => {
         </CardContent>
       </Card>
 
-      {/* Leave Requests Table */}
+      {/* Leave Requests Table/Cards */}
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle>
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+            <CardTitle className="text-sm sm:text-base">
               {activeTab === "supervisor-employee" 
                 ? "Supervisor & Employee Leave Requests" 
                 : "Manager & Admin Leave Requests"}
             </CardTitle>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               Showing {getCurrentLeaves().length} of {totalItems} requests
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-6 sm:py-8">
+              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-muted-foreground" />
             </div>
           ) : getCurrentLeaves().length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-medium text-lg mb-2">No Leave Requests Found</h3>
-              <p className="text-muted-foreground">
+            <div className="text-center py-6 sm:py-8">
+              <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
+              <h3 className="font-medium text-base sm:text-lg mb-1 sm:mb-2">No Leave Requests Found</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Try adjusting your filters or search criteria
               </p>
             </div>
           ) : (
             <>
-              <div className="rounded-md border">
+              {/* Desktop Table View - Hidden on mobile */}
+              <div className="hidden md:block rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Request Type</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Leave Type</TableHead>
-                      <TableHead>Dates</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Request Type</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Department</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Leave Type</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Dates</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Status</TableHead>
+                      <TableHead className="text-right text-xs sm:text-sm">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {getCurrentLeaves().map((leave) => (
                       <TableRow key={leave._id || leave.id}>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           {getRequestTypeBadge(leave)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           <div className="flex flex-col">
                             <span className="font-medium">{getDisplayName(leave)}</span>
                             <span className="text-xs text-muted-foreground">
                               ID: {getDisplayId(leave)}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              Applied by: {leave.appliedBy || 'N/A'}
+                              By: {leave.appliedBy || 'N/A'}
                             </span>
                             {isManagerLeave(leave) && (
                               <span className="text-xs text-blue-600 font-medium">
-                                Manager Leave
+                                Manager
                               </span>
                             )}
                             {isAdminLeave(leave) && (
                               <span className="text-xs text-purple-600 font-medium">
-                                Admin Leave
+                                Admin
                               </span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           <div className="flex items-center gap-2">
-                            <Building className="h-4 w-4 text-muted-foreground" />
-                            {getDisplayDepartment(leave)}
+                            <Building className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate max-w-[100px]">{getDisplayDepartment(leave)}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
+                        <TableCell className="text-xs sm:text-sm">
+                          <Badge variant="outline" className="capitalize text-xs">
                             {leave.leaveType}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{formatDate(leave.fromDate)}</span>
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span>{formatDate(leave.fromDate)}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{formatDate(leave.toDate)}</span>
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span>{formatDate(leave.toDate)}</span>
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {leave.totalDays} days
@@ -997,18 +1145,19 @@ const fetchManagerAdminLeaves = async (page = 1) => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusColor(leave.status)} className="capitalize">
+                          <Badge variant={getStatusColor(leave.status)} className="capitalize text-xs">
                             {leave.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1 sm:gap-2">
                             <Button 
                               size="sm" 
                               variant="outline"
                               onClick={() => handleViewDetails(leave)}
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                         
                             {leave.status === "pending" && (
@@ -1018,26 +1167,28 @@ const fetchManagerAdminLeaves = async (page = 1) => {
                                   variant="default"
                                   onClick={() => handleLeaveAction(leave, "approved")}
                                   disabled={isUpdating}
+                                  className="h-7 sm:h-8 px-1 sm:px-2 text-xs"
                                 >
                                   {isUpdating && selectedLeave && (selectedLeave._id || selectedLeave.id) === (leave._id || leave.id) ? (
-                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    <Loader2 className="mr-0 sm:mr-1 h-3 w-3 animate-spin" />
                                   ) : (
-                                    <Check className="mr-1 h-3 w-3" />
+                                    <Check className="mr-0 sm:mr-1 h-3 w-3" />
                                   )}
-                                  Approve
+                                  <span className="hidden sm:inline">Approve</span>
                                 </Button>
                                 <Button 
                                   size="sm" 
                                   variant="destructive"
                                   onClick={() => handleLeaveAction(leave, "rejected")}
                                   disabled={isUpdating}
+                                  className="h-7 sm:h-8 px-1 sm:px-2 text-xs"
                                 >
                                   {isUpdating && selectedLeave && (selectedLeave._id || selectedLeave.id) === (leave._id || leave.id) ? (
-                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    <Loader2 className="mr-0 sm:mr-1 h-3 w-3 animate-spin" />
                                   ) : (
-                                    <X className="mr-1 h-3 w-3" />
+                                    <X className="mr-0 sm:mr-1 h-3 w-3" />
                                   )}
-                                  Reject
+                                  <span className="hidden sm:inline">Reject</span>
                                 </Button>
                               </>
                             )}
@@ -1049,8 +1200,13 @@ const fetchManagerAdminLeaves = async (page = 1) => {
                 </Table>
               </div>
 
+              {/* Mobile Card View - Visible only on mobile */}
+              <div className="md:hidden space-y-3">
+                {getCurrentLeaves().map((leave) => renderMobileLeaveCard(leave))}
+              </div>
+
               {totalPages > 1 && (
-                <div className="mt-4">
+                <div className="mt-4 sm:mt-6">
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
@@ -1066,11 +1222,11 @@ const fetchManagerAdminLeaves = async (page = 1) => {
         </CardContent>
       </Card>
 
-      {/* View Leave Details Dialog */}
+      {/* View Leave Details Dialog - Made responsive */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto p-3 sm:p-6">
+          <DialogHeader className="space-y-1 sm:space-y-2">
+            <DialogTitle className="text-base sm:text-lg">
               {selectedLeave && isAdminLeave(selectedLeave) 
                 ? "Admin Leave Request Details" 
                 : selectedLeave && isManagerLeave(selectedLeave)
@@ -1080,44 +1236,46 @@ const fetchManagerAdminLeaves = async (page = 1) => {
           </DialogHeader>
           
           {selectedLeave && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Header with basic info */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-muted/50 rounded-lg">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-medium text-lg">{getDisplayName(selectedLeave)}</h3>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-1 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium text-sm sm:text-base">{getDisplayName(selectedLeave)}</h3>
                     {getRequestTypeBadge(selectedLeave)}
-                    <Badge variant={getStatusColor(selectedLeave.status)} className="capitalize">
+                    <Badge variant={getStatusColor(selectedLeave.status)} className="capitalize text-xs">
                       {selectedLeave.status}
                     </Badge>
                     {isManagerLeave(selectedLeave) && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
                         Manager
                       </Badge>
                     )}
                     {isAdminLeave(selectedLeave) && (
-                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
                         Admin
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground">
                     <span>ID: {getDisplayId(selectedLeave)}</span>
+                    <span className="hidden sm:inline">•</span>
                     <span>Dept: {getDisplayDepartment(selectedLeave)}</span>
-                    <span>Applied by: {selectedLeave.appliedBy || 'N/A'}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>By: {selectedLeave.appliedBy || 'N/A'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Leave Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
+                    <h4 className="font-medium text-sm sm:text-base mb-2 flex items-center gap-2">
+                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                       Leave Dates
                     </h4>
-                    <div className="space-y-2">
+                    <div className="space-y-2 text-xs sm:text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">From Date:</span>
                         <span className="font-medium">{formatDate(selectedLeave.fromDate)}</span>
@@ -1141,9 +1299,9 @@ const fetchManagerAdminLeaves = async (page = 1) => {
 
                   {/* Manager Specific Info */}
                   {isManagerLeave(selectedLeave) && (
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-blue-800 mb-2">Manager Information</h4>
-                      <div className="space-y-2 text-sm">
+                    <div className="bg-blue-50 p-3 sm:p-4 rounded-lg">
+                      <h4 className="font-medium text-blue-800 text-xs sm:text-sm mb-2">Manager Information</h4>
+                      <div className="space-y-1 text-xs">
                         <div className="flex justify-between">
                           <span className="text-blue-700">Manager ID:</span>
                           <span className="font-medium">{getDisplayId(selectedLeave)}</span>
@@ -1163,13 +1321,13 @@ const fetchManagerAdminLeaves = async (page = 1) => {
                   )}
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <h4 className="font-medium mb-2">Leave Information</h4>
-                    <div className="space-y-2">
+                    <h4 className="font-medium text-sm sm:text-base mb-2">Leave Information</h4>
+                    <div className="space-y-2 text-xs sm:text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Leave Type:</span>
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="outline" className="capitalize text-xs">
                           {selectedLeave.leaveType}
                         </Badge>
                       </div>
@@ -1211,10 +1369,10 @@ const fetchManagerAdminLeaves = async (page = 1) => {
               </div>
 
               {/* Reason Section */}
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div>
-                  <h4 className="font-medium mb-2">Reason for Leave</h4>
-                  <div className="p-3 bg-muted/30 rounded-lg">
+                  <h4 className="font-medium text-sm sm:text-base mb-2">Reason for Leave</h4>
+                  <div className="p-2 sm:p-3 bg-muted/30 rounded-lg text-xs sm:text-sm">
                     {selectedLeave.reason || 'No reason provided'}
                   </div>
                 </div>
@@ -1222,50 +1380,50 @@ const fetchManagerAdminLeaves = async (page = 1) => {
 
               {/* Action Buttons for Pending Requests */}
               {selectedLeave.status === "pending" && (
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4 border-t">
                   <div>
-                    <Label htmlFor="remarks">Remarks (Optional)</Label>
+                    <Label htmlFor="remarks" className="text-xs sm:text-sm">Remarks (Optional)</Label>
                     <Textarea
                       id="remarks"
                       placeholder="Add remarks for approval/rejection..."
                       value={remarks}
                       onChange={(e) => setRemarks(e.target.value)}
-                      className="mt-1"
+                      className="mt-1 text-xs sm:text-sm min-h-[80px] sm:min-h-[100px]"
                     />
                   </div>
                   
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <Button 
                       variant="outline" 
-                      className="flex-1"
+                      className="w-full sm:flex-1 order-3 sm:order-1 text-xs sm:text-sm h-8 sm:h-10"
                       onClick={() => setViewDialogOpen(false)}
                     >
                       Cancel
                     </Button>
                     <Button 
                       variant="destructive" 
-                      className="flex-1"
+                      className="w-full sm:flex-1 order-2 text-xs sm:text-sm h-8 sm:h-10"
                       onClick={() => handleLeaveAction(selectedLeave, "rejected")}
                       disabled={isUpdating}
                     >
                       {isUpdating ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                       ) : (
-                        <X className="mr-2 h-4 w-4" />
+                        <X className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                       )}
-                      Reject Request
+                      Reject
                     </Button>
                     <Button 
-                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      className="w-full sm:flex-1 order-1 sm:order-3 bg-green-600 hover:bg-green-700 text-xs sm:text-sm h-8 sm:h-10"
                       onClick={() => handleLeaveAction(selectedLeave, "approved")}
                       disabled={isUpdating}
                     >
                       {isUpdating ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                       ) : (
-                        <Check className="mr-2 h-4 w-4" />
+                        <Check className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                       )}
-                      Approve Request
+                      Approve
                     </Button>
                   </div>
                 </div>

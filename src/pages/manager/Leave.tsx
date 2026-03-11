@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { DashboardSidebar } from "@/components/shared/DashboardSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,7 @@ import {
   Zap, Wifi, WifiOff, Layers, PieChart, BarChart3, CalendarDays,
   Users2, UserCheck, UserX, Clock4, Target, BellRing, History,
   Sparkles, Star, Award, Rocket, ShieldCheck, ShieldAlert,
-  LineChart, DownloadCloud, CloudOff, Cloud, FileSpreadsheet
+  LineChart, DownloadCloud, CloudOff, Cloud, FileSpreadsheet, Menu
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -136,6 +137,7 @@ const API_URL = `http://${window.location.hostname}:5001/api`;
 
 const ManagerLeave = () => {
   const { user: authUser, isAuthenticated } = useRole();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
@@ -164,6 +166,7 @@ const ManagerLeave = () => {
   const [commentText, setCommentText] = useState("");
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [exportOptions, setExportOptions] = useState({
     includeManagerLeaves: true,
@@ -1457,165 +1460,220 @@ const ManagerLeave = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardHeader 
-        title="Leave Management - Manager" 
-        subtitle={`Welcome, ${managerInfo.name}! Manage team leaves and apply for your own leaves`}
-      />
+    <>
+      {/* Mobile Sidebar - Only visible on mobile */}
+      <div className="lg:hidden">
+        <DashboardSidebar 
+          mobileOpen={mobileOpen}
+          onMobileClose={() => setMobileOpen(false)}
+        />
+      </div>
       
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
-      >
-        {/* Online Status Bar */}
-        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-          <div className="flex items-center space-x-3">
-            <Badge variant={isOnline ? "default" : "destructive"}>
-              {isOnline ? (
-                <Wifi className="h-3 w-3 mr-1" />
-              ) : (
-                <WifiOff className="h-3 w-3 mr-1" />
+      {/* Main Content - Same for all devices */}
+      <div className="min-h-screen bg-background">
+        <DashboardHeader 
+          title="Leave Management - Manager" 
+          subtitle={`Welcome, ${managerInfo.name}! Manage team leaves and apply for your own leaves`}
+          onMenuClick={() => setMobileOpen(true)}
+        />
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 sm:p-6 space-y-4 sm:space-y-6"
+        >
+          {/* Online Status Bar - Mobile Responsive */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-muted/50 rounded-lg gap-3">
+            <div className="flex items-center space-x-3">
+              <Badge variant={isOnline ? "default" : "destructive"} className="flex items-center">
+                {isOnline ? (
+                  <Wifi className="h-3 w-3 mr-1" />
+                ) : (
+                  <WifiOff className="h-3 w-3 mr-1" />
+                )}
+                <span className="hidden xs:inline">{isOnline ? "Online" : "Offline"}</span>
+              </Badge>
+              {pendingActions.length > 0 && (
+                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 flex items-center">
+                  <CloudOff className="h-3 w-3 mr-1" />
+                  {pendingActions.length} pending
+                </Badge>
               )}
-              {isOnline ? "Online" : "Offline"}
-            </Badge>
-            {pendingActions.length > 0 && (
-              <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                <CloudOff className="h-3 w-3 mr-1" />
-                {pendingActions.length} pending
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center space-x-4">
-            {/* Manager Info Badge */}
-            <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1 rounded-lg">
-              <User className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">{managerInfo.name}</span>
-              <Badge variant="outline" className="text-xs">
-                {managerInfo.department || "No Department"}
-              </Badge>
-              <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300">
-                Manager
-              </Badge>
             </div>
-          </div>
-        </div>
-
-        {/* Statistics Cards with Icons */}
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-                  <div className="text-sm text-muted-foreground">Total</div>
-                </div>
-                <Users2 className="h-8 w-8 text-blue-400" />
+            
+            {/* Mobile Menu Button - Only visible on mobile */}
+            <div className="flex items-center justify-between sm:hidden">
+              <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1 rounded-lg">
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium truncate max-w-[120px]">{managerInfo.name}</span>
               </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-                  <div className="text-sm text-muted-foreground">Pending</div>
-                </div>
-                <Clock4 className="h-8 w-8 text-yellow-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-                  <div className="text-sm text-muted-foreground">Approved</div>
-                </div>
-                <UserCheck className="h-8 w-8 text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-                  <div className="text-sm text-muted-foreground">Rejected</div>
-                </div>
-                <UserX className="h-8 w-8 text-red-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-purple-600">{myLeaves.length}</div>
-                  <div className="text-sm text-muted-foreground">My Leaves</div>
-                </div>
-                <User className="h-8 w-8 text-purple-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-orange-600">{stats.urgent}</div>
-                  <div className="text-sm text-muted-foreground">Urgent</div>
-                </div>
-                <AlertTriangle className="h-8 w-8 text-orange-400" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-pink-600">{stats.escalated}</div>
-                  <div className="text-sm text-muted-foreground">Escalated</div>
-                </div>
-                <ShieldAlert className="h-8 w-8 text-pink-400" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Leave Balance Card */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center">
-              <Award className="h-5 w-5 mr-2" />
-              Your Leave Balance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
-              {Object.entries(leaveBalance).map(([type, days]) => (
-                <div key={type} className="text-center p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                  <div className="text-2xl font-bold text-primary">{days}</div>
-                  <div className="text-sm text-muted-foreground capitalize">{type} Days</div>
-                </div>
-              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="ml-2"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Main Controls - Updated Layout */}
-        <div className="space-y-4">
-          {/* First Row: Department and Site Selectors with Refresh Buttons */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="space-y-1">
-                <Label className="text-sm">Department</Label>
-                <div className="flex items-center space-x-2">
+            {/* Desktop Manager Info */}
+            <div className="hidden sm:flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1 rounded-lg">
+                <User className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">{managerInfo.name}</span>
+                <Badge variant="outline" className="text-xs">
+                  {managerInfo.department || "No Department"}
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300">
+                  Manager
+                </Badge>
+              </div>
+            </div>
+
+            {/* Mobile Menu Dropdown */}
+            <AnimatePresence>
+              {showMobileMenu && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="sm:hidden overflow-hidden"
+                >
+                  <div className="pt-3 space-y-2 border-t mt-2">
+                    <div className="flex flex-col space-y-2">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Department: </span>
+                        <span className="font-medium">{managerInfo.department || "Not set"}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Site: </span>
+                        <span className="font-medium">{selectedSite?.name || managerInfo.site || "Main Site"}</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs bg-purple-100 text-purple-800 border-purple-300 w-fit">
+                        Manager
+                      </Badge>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Statistics Cards - Mobile Responsive Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-4">
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-blue-600">{stats.total}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Total</div>
+                  </div>
+                  <Users2 className="h-5 w-5 sm:h-8 sm:w-8 text-blue-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-yellow-600">{stats.pending}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Pending</div>
+                  </div>
+                  <Clock4 className="h-5 w-5 sm:h-8 sm:w-8 text-yellow-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-green-600">{stats.approved}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Approved</div>
+                  </div>
+                  <UserCheck className="h-5 w-5 sm:h-8 sm:w-8 text-green-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-red-600">{stats.rejected}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Rejected</div>
+                  </div>
+                  <UserX className="h-5 w-5 sm:h-8 sm:w-8 text-red-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-purple-600">{myLeaves.length}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">My Leaves</div>
+                  </div>
+                  <User className="h-5 w-5 sm:h-8 sm:w-8 text-purple-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-orange-600">{stats.urgent}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Urgent</div>
+                  </div>
+                  <AlertTriangle className="h-5 w-5 sm:h-8 sm:w-8 text-orange-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-md transition-shadow col-span-2 sm:col-span-1">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg sm:text-2xl font-bold text-pink-600">{stats.escalated}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">Escalated</div>
+                  </div>
+                  <ShieldAlert className="h-5 w-5 sm:h-8 sm:w-8 text-pink-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Leave Balance Card - Mobile Responsive */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base sm:text-lg flex items-center">
+                <Award className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                Your Leave Balance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
+                {Object.entries(leaveBalance).map(([type, days]) => (
+                  <div key={type} className="text-center p-2 sm:p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                    <div className="text-base sm:text-2xl font-bold text-primary">{days}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground capitalize truncate">{type}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Main Controls - Mobile Responsive */}
+          <div className="space-y-3 sm:space-y-4">
+            {/* First Row: Department and Site Selectors */}
+            <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full">
+                <div className="space-y-1 w-full sm:w-auto">
+                  <Label className="text-xs sm:text-sm">Department</Label>
                   <Select
                     value={managerDepartment}
                     onValueChange={setManagerDepartment}
                     disabled={availableDepartments.length === 0}
                   >
-                    <SelectTrigger className="w-64">
+                    <SelectTrigger className="w-full sm:w-64">
                       <SelectValue placeholder="Select Department" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1623,8 +1681,8 @@ const ManagerLeave = () => {
                         availableDepartments.map((dept) => (
                           <SelectItem key={dept} value={dept}>
                             <div className="flex items-center">
-                              <Building className="mr-2 h-4 w-4" />
-                              {dept}
+                              <Building className="mr-2 h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{dept}</span>
                             </div>
                           </SelectItem>
                         ))
@@ -1636,1263 +1694,1241 @@ const ManagerLeave = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              
-              <div className="space-y-1">
-                <Label className="text-sm">Site</Label>
-                <Select 
-                  value={selectedSite?._id || "all"} 
-                  onValueChange={(value) => {
-                    if (value === "all") {
-                      setSelectedSite(null);
-                    } else {
-                      const site = availableSites.find(s => s._id === value);
-                      setSelectedSite(site || null);
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select Site">
-                      {selectedSite ? selectedSite.name : "All Sites"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sites</SelectItem>
-                    {availableSites.map((site) => (
-                      <SelectItem key={site._id} value={site._id}>
-                        <div className="flex items-center">
-                          <MapPin className="mr-2 h-4 w-4" />
-                          <div className="flex-1">
-                            <div className="font-medium">{site.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {site.clientName} • {site.location}
-                            </div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedSite && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Managers: {selectedSite.managerCount || 0} • Supervisors: {selectedSite.supervisorCount || 0} • Status: {selectedSite.status}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    fetchLeaveRequests();
-                    fetchEmployees();
-                    fetchMyLeaves();
-                  }}
-                  className="h-9"
-                  disabled={isLoading || isLoadingEmployees}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh All
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={fetchSitesFromTaskService}
-                  className="h-9"
-                  disabled={isLoading}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh Sites
-                </Button>
-              </div>
-            </div>
-            
-         
-          </div>
-
-          {/* Second Row: Apply for Leave and Export Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t">
-            <div className="flex items-center gap-2">
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-purple-600 hover:bg-purple-700">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Apply for My Leave
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Apply for Your Leave</DialogTitle>
-                    <div className="text-sm text-muted-foreground">
-                      Manager: <span className="font-medium">{managerInfo.name}</span>
-                    </div>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmitManagerLeave} className="space-y-4">
-                    {/* Manager Info Display */}
-                    <div className="bg-muted/30 p-3 rounded-lg space-y-2">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <span className="text-sm text-muted-foreground">Manager Name:</span>
-                          <div className="font-medium">{managerInfo.name}</div>
-                        </div>
-                        <div>
-                          <span className="text-sm text-muted-foreground">Department:</span>
-                          <div className="font-medium">{managerInfo.department || managerDepartment}</div>
-                        </div>
-                        <div>
-                          <span className="text-sm text-muted-foreground">Contact:</span>
-                          <div className="font-medium">{managerInfo.contactNumber || "Not set"}</div>
-                        </div>
-                        <div>
-                          <span className="text-sm text-muted-foreground">Site:</span>
-                          <div className="font-medium">{managerInfo.site || "Main Site"}</div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Leave Balance Display */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center">
-                          <Award className="h-4 w-4 text-blue-600 mr-2" />
-                          <span className="text-sm font-medium text-blue-800">Available Leave Balance</span>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        {Object.entries(leaveBalance).map(([type, days]) => (
-                          <div key={type} className="text-center p-2 bg-white rounded">
-                            <div className="font-semibold text-blue-700">{days}</div>
-                            <div className="text-blue-600 capitalize">{type}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="leaveType">Leave Type *</Label>
-                      <Select
-                        value={formData.leaveType}
-                        onValueChange={(value) => handleInputChange('leaveType', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select leave type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="casual">Casual Leave ({leaveBalance.casual} days left)</SelectItem>
-                          <SelectItem value="sick">Sick Leave ({leaveBalance.sick} days left)</SelectItem>
-                          <SelectItem value="annual">Annual Leave ({leaveBalance.annual} days left)</SelectItem>
-                          <SelectItem value="maternity">Maternity Leave ({leaveBalance.maternity} days left)</SelectItem>
-                          <SelectItem value="paternity">Paternity Leave ({leaveBalance.paternity} days left)</SelectItem>
-                          <SelectItem value="bereavement">Bereavement Leave ({leaveBalance.bereavement} days left)</SelectItem>
-                          <SelectItem value="other">Other ({leaveBalance.other} days left)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="fromDate">Start Date *</Label>
-                        <Input
-                          id="fromDate"
-                          type="date"
-                          value={formData.fromDate}
-                          onChange={(e) => handleInputChange('fromDate', e.target.value)}
-                          required
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="toDate">End Date *</Label>
-                        <Input
-                          id="toDate"
-                          type="date"
-                          value={formData.toDate}
-                          onChange={(e) => handleInputChange('toDate', e.target.value)}
-                          required
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="priority">Priority</Label>
-                      <Select
-                        value={formData.priority}
-                        onValueChange={(value) => handleInputChange('priority', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select priority" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="handoverTo">Handover To (Optional)</Label>
-                      <Input
-                        id="handoverTo"
-                        value={formData.handoverTo}
-                        onChange={(e) => handleInputChange('handoverTo', e.target.value)}
-                        placeholder="Name of person handling your responsibilities"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="reason">Reason for Leave *</Label>
-                      <Textarea
-                        id="reason"
-                        value={formData.reason}
-                        onChange={(e) => handleInputChange('reason', e.target.value)}
-                        placeholder="Enter detailed reason for leave"
-                        rows={4}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="handoverRemarks">Handover Remarks (Optional)</Label>
-                      <Textarea
-                        id="handoverRemarks"
-                        value={formData.handoverRemarks}
-                        onChange={(e) => handleInputChange('handoverRemarks', e.target.value)}
-                        placeholder="Any special instructions or remarks"
-                        rows={3}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-end space-x-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={isSubmitting} className="bg-purple-600 hover:bg-purple-700">
-                        {isSubmitting && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Submit Manager Leave
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              {/* Export Button with Options */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
-                    Export
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[400px]">
-                  <DialogHeader>
-                    <DialogTitle>Export Options</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Export Format</Label>
-                      <Select
-                        value={exportOptions.format}
-                        onValueChange={(value: 'csv' | 'excel' | 'pdf') => 
-                          setExportOptions(prev => ({ ...prev, format: value }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="csv">CSV</SelectItem>
-                          <SelectItem value="excel">Excel</SelectItem>
-                          <SelectItem value="pdf">PDF Report</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="includeManagerLeaves"
-                          checked={exportOptions.includeManagerLeaves}
-                          onCheckedChange={(checked) => 
-                            setExportOptions(prev => ({ ...prev, includeManagerLeaves: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="includeManagerLeaves">Include Manager Leaves</Label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="includeComments"
-                          checked={exportOptions.includeComments}
-                          onCheckedChange={(checked) => 
-                            setExportOptions(prev => ({ ...prev, includeComments: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="includeComments">Include Comments</Label>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id="includeAttachments"
-                          checked={exportOptions.includeAttachments}
-                          onCheckedChange={(checked) => 
-                            setExportOptions(prev => ({ ...prev, includeAttachments: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="includeAttachments">Include Attachment Info</Label>
-                      </div>
-                    </div>
-                    
-                    <Button onClick={handleExport} className="w-full">
-                      <DownloadCloud className="mr-2 h-4 w-4" />
-                      Export Data
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </div>
-
-        {/* Advanced Filters */}
-        <AnimatePresence>
-          {showAdvancedFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <Card>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label>Date Range</Label>
-                      <div className="flex space-x-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-start">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {dateRange.from ? format(dateRange.from, 'PPP') : 'From'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={dateRange.from}
-                              onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-start">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {dateRange.to ? format(dateRange.to, 'PPP') : 'To'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={dateRange.to}
-                              onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Priority</Label>
-                      <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All Priorities" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Priorities</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="low">Low</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Leave Type</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All Types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="casual">Casual Leave</SelectItem>
-                          <SelectItem value="sick">Sick Leave</SelectItem>
-                          <SelectItem value="annual">Annual Leave</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="flex items-end space-x-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setDateRange({});
-                          setPriorityFilter('all');
-                        }}
-                        className="w-full"
-                      >
-                        Clear Filters
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Toggle Advanced Filters */}
-        <div className="flex justify-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="text-muted-foreground"
-          >
-            {showAdvancedFilters ? (
-              <ChevronUp className="h-4 w-4 mr-1" />
-            ) : (
-              <ChevronDown className="h-4 w-4 mr-1" />
-            )}
-            {showAdvancedFilters ? 'Hide' : 'Show'} Advanced Filters
-          </Button>
-        </div>
-
-        {/* Tabs for Team Leaves and My Leaves */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="team-leaves">
-              <Users className="mr-2 h-4 w-4" />
-              Team Leaves
-            </TabsTrigger>
-            <TabsTrigger value="my-leaves">
-              <User className="mr-2 h-4 w-4" />
-              My Leaves
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Team Leaves Tab */}
-          <TabsContent value="team-leaves" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                  <div>
-                    <CardTitle>
-                      Team Leave Requests - {managerDepartment || "Select Department"}
-                      {selectedSite && ` • ${selectedSite.name}`}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {filteredLeaves.length} requests • {employees.length} employees
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {selectedLeaves.length > 0 && (
-                      <div className="flex items-center gap-2 mr-4">
-                        <Badge variant="outline" className="bg-blue-50">
-                          {selectedLeaves.length} selected
-                        </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setBulkDialogOpen(true)}
-                          disabled={!isOnline}
-                        >
-                          <CheckSquare className="h-4 w-4 mr-1" />
-                          Bulk Actions
-                        </Button>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant={filter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant={filter === 'pending' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('pending')}
-                      >
-                        Pending
-                      </Button>
-                      <Button
-                        variant={filter === 'approved' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('approved')}
-                      >
-                        Approved
-                      </Button>
-                      <Button
-                        variant={filter === 'rejected' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('rejected')}
-                      >
-                        Rejected
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {!managerDepartment ? (
-                  <div className="text-center py-8">
-                    <Building className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="font-medium text-lg mb-2">Select a Department</h3>
-                    <p className="text-muted-foreground">
-                      Please select a department to view team leave requests
-                    </p>
-                  </div>
-                ) : isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : filteredLeaves.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="flex flex-col items-center">
-                      <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="font-medium text-lg mb-2">No Team Leave Requests</h3>
-                      <p className="text-muted-foreground mb-4">
-                        No team leave requests found for {managerDepartment} department
-                        {selectedSite && ` at ${selectedSite.name}`}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Select All Checkbox */}
-                    <div className="flex items-center space-x-2 p-2 border rounded-lg">
-                      <Checkbox
-                        id="select-all"
-                        checked={selectedLeaves.length === filteredLeaves.length && filteredLeaves.length > 0}
-                        onCheckedChange={selectAllLeaves}
-                      />
-                      <Label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
-                        Select all {filteredLeaves.length} requests
-                      </Label>
-                    </div>
-
-                    {/* Leave Requests List */}
-                    {filteredLeaves.map((leave) => {
-                      const leaveKey = getLeaveKey(leave);
-                      const isSelected = selectedLeaves.includes(leave._id || leave.id || '');
-                      
-                      return (
-                        <motion.div
-                          key={leaveKey}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`p-4 border rounded-lg space-y-3 hover:border-primary/50 transition-colors ${isSelected ? 'bg-blue-50 border-blue-300' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleLeaveSelection(leave._id || leave.id || '')}
-                            />
-                            
-                            <div className="flex-1">
-                              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                                <div className="space-y-1 flex-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="font-medium">{leave.employeeName}</h3>
-                                    <Badge variant={getStatusBadgeVariant(leave.status)}>
-                                      {leave.status.toUpperCase()}
-                                    </Badge>
-                                    {leave.priority && leave.priority !== 'medium' && (
-                                      <Badge variant={getPriorityBadgeVariant(leave.priority)}>
-                                        {leave.priority.toUpperCase()}
-                                      </Badge>
-                                    )}
-                                    {leave.escalationLevel && leave.escalationLevel > 0 && (
-                                      <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                                        <ShieldAlert className="h-3 w-3 mr-1" />
-                                        Escalated
-                                      </Badge>
-                                    )}
-                                    {selectedSite && (
-                                      <Badge variant="outline" className="text-xs">
-                                        <MapPin className="h-3 w-3 mr-1" />
-                                        {selectedSite.name}
-                                        {selectedSite.clientName && ` • ${selectedSite.clientName}`}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    <CalendarIcon className="inline mr-1 h-3 w-3" />
-                                    {formatDate(leave.fromDate)} to {formatDate(leave.toDate)} ({leave.totalDays} days)
-                                  </p>
-                                  <div className="flex items-center gap-4 text-sm flex-wrap">
-                                    <span className="text-muted-foreground flex items-center">
-                                      <FileText className="mr-1 h-3 w-3" />
-                                      <span className="font-medium capitalize">{leave.leaveType} Leave</span>
-                                    </span>
-                                    <span className="text-muted-foreground flex items-center">
-                                      <Hash className="mr-1 h-3 w-3" />
-                                      {leave.employeeId}
-                                    </span>
-                                    <span className="text-muted-foreground flex items-center">
-                                      <Building className="mr-1 h-3 w-3" />
-                                      {leave.department}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleViewLeave(leave)}
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  {leave.status === 'pending' && (
-                                    <>
-                                      <Button
-                                        variant="default"
-                                        size="sm"
-                                        onClick={() => handleApproveLeave(leave._id || leave.id || '')}
-                                        className="bg-green-600 hover:bg-green-700"
-                                        disabled={!isOnline}
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => handleRejectLeave(leave._id || leave.id || '')}
-                                        disabled={!isOnline}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="pt-2 border-t mt-2">
-                                <p className="text-sm">
-                                  <span className="font-medium">Reason:</span> {leave.reason}
-                                </p>
-                                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                                  <span>Contact: {leave.contactNumber}</span>
-                                  <span>Applied: {formatDate(leave.createdAt)}</span>
-                                </div>
+                
+                <div className="space-y-1 w-full sm:w-auto">
+                  <Label className="text-xs sm:text-sm">Site</Label>
+                  <Select 
+                    value={selectedSite?._id || "all"} 
+                    onValueChange={(value) => {
+                      if (value === "all") {
+                        setSelectedSite(null);
+                      } else {
+                        const site = availableSites.find(s => s._id === value);
+                        setSelectedSite(site || null);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Select Site">
+                        {selectedSite ? selectedSite.name : "All Sites"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sites</SelectItem>
+                      {availableSites.map((site) => (
+                        <SelectItem key={site._id} value={site._id}>
+                          <div className="flex items-center">
+                            <MapPin className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{site.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {site.clientName} • {site.location}
                               </div>
                             </div>
                           </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* My Leaves Tab */}
-          <TabsContent value="my-leaves" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                  <div>
-                    <CardTitle>
-                      My Leave Requests
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {filteredMyLeaves.length} of your personal leave requests
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                      {filteredMyLeaves.length} personal requests
-                    </Badge>
-                    <div className="flex gap-2">
-                      <Button
-                        variant={myLeavesFilter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setMyLeavesFilter('all')}
-                        className={myLeavesFilter === 'all' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant={myLeavesFilter === 'pending' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setMyLeavesFilter('pending')}
-                        className={myLeavesFilter === 'pending' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-                      >
-                        Pending
-                      </Button>
-                      <Button
-                        variant={myLeavesFilter === 'approved' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setMyLeavesFilter('approved')}
-                        className={myLeavesFilter === 'approved' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-                      >
-                        Approved
-                      </Button>
-                      <Button
-                        variant={myLeavesFilter === 'rejected' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setMyLeavesFilter('rejected')}
-                        className={myLeavesFilter === 'rejected' ? 'bg-purple-600 hover:bg-purple-700' : ''}
-                      >
-                        Rejected
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {filteredMyLeaves.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="flex flex-col items-center">
-                      <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="font-medium text-lg mb-2">No Personal Leave Requests</h3>
-                      <p className="text-muted-foreground mb-4">
-                        You haven't applied for any personal leaves yet
-                      </p>
-                      <Button onClick={() => setDialogOpen(true)} className="bg-purple-600 hover:bg-purple-700">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Apply for My Leave
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredMyLeaves.map((leave) => {
-                      const leaveKey = getLeaveKey(leave);
-                      return (
-                        <motion.div
-                          key={leaveKey}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 border rounded-lg space-y-3 hover:border-purple-300 transition-colors bg-purple-50/50"
-                        >
-                          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                            <div className="space-y-1 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-medium">Your Leave Request</h3>
-                                <Badge variant={getStatusBadgeVariant(leave.status)}>
-                                  {leave.status.toUpperCase()}
-                                </Badge>
-                                <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
-                                  Manager Leave
-                                </Badge>
-                                {leave.priority && leave.priority !== 'medium' && (
-                                  <Badge variant={getPriorityBadgeVariant(leave.priority)}>
-                                    {leave.priority.toUpperCase()}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                <CalendarIcon className="inline mr-1 h-3 w-3" />
-                                {formatDate(leave.fromDate)} to {formatDate(leave.toDate)} ({leave.totalDays} days)
-                              </p>
-                              <div className="flex items-center gap-4 text-sm flex-wrap">
-                                <span className="text-muted-foreground flex items-center">
-                                  <FileText className="mr-1 h-3 w-3" />
-                                  <span className="font-medium capitalize">{leave.leaveType} Leave</span>
-                                </span>
-                                <span className="text-muted-foreground flex items-center">
-                                  <Building className="mr-1 h-3 w-3" />
-                                  {leave.department}
-                                </span>
-                                <span className="text-muted-foreground flex items-center">
-                                  <Clock className="mr-1 h-3 w-3" />
-                                  Applied on {formatDate(leave.createdAt)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewLeave(leave)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="pt-2 border-t">
-                            <p className="text-sm">
-                              <span className="font-medium">Reason:</span> {leave.reason}
-                            </p>
-                            {leave.handoverTo && (
-                              <p className="text-sm mt-1">
-                                <span className="font-medium">Handover to:</span> {leave.handoverTo}
-                              </p>
-                            )}
-                            {leave.status === 'approved' && leave.approvedBy && (
-                              <div className="mt-2 text-xs text-green-600">
-                                Approved by {leave.approvedBy} on {formatDate(leave.approvedAt || '')}
-                              </div>
-                            )}
-                            {leave.status === 'rejected' && leave.rejectedBy && (
-                              <div className="mt-2 text-xs text-red-600">
-                                Rejected by {leave.rejectedBy} on {formatDate(leave.rejectedAt || '')}
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* View Leave Dialog */}
-        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Leave Request Details</DialogTitle>
-              {selectedLeave?.isManagerLeave && (
-                <div className="text-sm text-purple-600">
-                  ⓘ This is a manager's personal leave request
-                </div>
-              )}
-            </DialogHeader>
-            {selectedLeave && (
-              <div className="space-y-6">
-                {/* Employee Information */}
-                <div className={`p-4 rounded-lg space-y-3 ${selectedLeave.isManagerLeave ? 'bg-purple-50 border border-purple-200' : 'bg-muted/50'}`}>
-                  <h3 className="font-medium text-lg flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    {selectedLeave.isManagerLeave ? 'Manager Information' : 'Employee Information'}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <User className="h-4 w-4" />
-                        <span>{selectedLeave.isManagerLeave ? 'Manager Name' : 'Employee Name'}</span>
-                      </div>
-                      <div className="font-medium">{selectedLeave.employeeName}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Hash className="h-4 w-4" />
-                        <span>{selectedLeave.isManagerLeave ? 'Manager ID' : 'Employee ID'}</span>
-                      </div>
-                      <div className="font-medium">{selectedLeave.employeeId}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Building className="h-4 w-4" />
-                        <span>Department</span>
-                      </div>
-                      <div className="font-medium">{selectedLeave.department}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Contact Number</div>
-                      <div className="font-medium">{selectedLeave.contactNumber}</div>
-                    </div>
-                    {selectedSite && (
-                      <div className="space-y-2 md:col-span-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          <span>Site</span>
-                        </div>
-                        <div className="font-medium">
-                          {selectedSite.name}
-                          {selectedSite.clientName && ` (${selectedSite.clientName})`}
-                          {selectedSite.location && ` - ${selectedSite.location}`}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Leave Details */}
-                <div className="space-y-4">
-                  <h3 className="font-medium text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Leave Details
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Leave Type</div>
-                      <div className="font-medium capitalize">{selectedLeave.leaveType} Leave</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Status</div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant={getStatusBadgeVariant(selectedLeave.status)}>
-                          {selectedLeave.status.toUpperCase()}
-                        </Badge>
-                        {selectedLeave.priority && selectedLeave.priority !== 'medium' && (
-                          <Badge variant={getPriorityBadgeVariant(selectedLeave.priority)}>
-                            {selectedLeave.priority.toUpperCase()}
-                          </Badge>
-                        )}
-                        {selectedLeave.isManagerLeave && (
-                          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                            Manager Leave
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CalendarIcon className="h-4 w-4" />
-                        <span>From Date</span>
-                      </div>
-                      <div className="font-medium">{formatDate(selectedLeave.fromDate)}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CalendarIcon className="h-4 w-4" />
-                        <span>To Date</span>
-                      </div>
-                      <div className="font-medium">{formatDate(selectedLeave.toDate)}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>Total Days</span>
-                      </div>
-                      <div className="font-medium">{selectedLeave.totalDays} days</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Applied By</div>
-                      <div className="font-medium">{selectedLeave.appliedBy}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">Reason</div>
-                    <div className="p-3 bg-muted/30 rounded-lg">
-                      {selectedLeave.reason}
-                    </div>
-                  </div>
-                  
-                  {selectedLeave.handoverTo && (
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Handover Information</div>
-                      <div className="p-3 bg-blue-50 rounded-lg">
-                        <div className="font-medium">Handover to: {selectedLeave.handoverTo}</div>
-                        {selectedLeave.handoverRemarks && (
-                          <div className="text-sm mt-1">{selectedLeave.handoverRemarks}</div>
-                        )}
-                      </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedSite && (
+                    <div className="text-xs text-muted-foreground mt-1 hidden sm:block">
+                      Managers: {selectedSite.managerCount || 0} • Supervisors: {selectedSite.supervisorCount || 0}
                     </div>
                   )}
-                  
-                  <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">Application Date</div>
-                    <div className="font-medium">{formatDateTime(selectedLeave.createdAt)}</div>
-                  </div>
                 </div>
-
-                {/* Comments Section */}
-                <div className="space-y-4">
-                  <h3 className="font-medium text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Comments & Discussion
-                  </h3>
-                  
-                  <div className="space-y-3 max-h-60 overflow-y-auto p-3 border rounded-lg">
-                    {selectedLeave.comments && selectedLeave.comments.length > 0 ? (
-                      selectedLeave.comments.map((comment) => (
-                        <div key={comment.id} className="p-3 bg-muted/30 rounded-lg">
-                          <div className="flex flex-col md:flex-row md:justify-between md:items-start">
-                            <div className="font-medium">{comment.userName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {formatDateTime(comment.timestamp)}
-                            </div>
-                          </div>
-                          <div className="mt-1 text-sm">{comment.comment}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {comment.userRole} • {comment.isManager ? 'Manager' : 'Employee'}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No comments yet
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Textarea
-                      placeholder="Add a comment..."
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      rows={3}
-                    />
-                    <Button 
-                      onClick={handleAddComment} 
-                      disabled={!commentText.trim() || isAddingComment}
-                      className="w-full"
-                    >
-                      {isAddingComment ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      Add Comment
-                    </Button>
-                  </div>
+                
+                <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      fetchLeaveRequests();
+                      fetchEmployees();
+                      fetchMyLeaves();
+                    }}
+                    className="h-8 sm:h-9 flex-1 sm:flex-none"
+                    disabled={isLoading || isLoadingEmployees}
+                  >
+                    <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="sm:inline">Refresh</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={fetchSitesFromTaskService}
+                    className="h-8 sm:h-9 flex-1 sm:flex-none"
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="sm:inline">Sites</span>
+                  </Button>
                 </div>
-
-                {/* Action Buttons - Only for team leaves */}
-                {selectedLeave.status === 'pending' && !selectedLeave.isManagerLeave && (
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => setViewDialogOpen(false)}
-                    >
-                      Close
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      className="flex-1"
-                      onClick={() => handleRejectLeave(selectedLeave._id || selectedLeave.id || '')}
-                      disabled={!isOnline}
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Reject Request
-                    </Button>
-                    <Button 
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleApproveLeave(selectedLeave._id || selectedLeave.id || '')}
-                      disabled={!isOnline}
-                    >
-                      <Check className="mr-2 h-4 w-4" />
-                      Approve Request
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Bulk Actions Dialog */}
-        <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Bulk Actions</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                You have selected {selectedLeaves.length} leave request(s).
-              </div>
-              <div className="flex flex-col gap-2">
-                <Button 
-                  onClick={() => handleBulkAction('approve')}
-                  className="bg-green-600 hover:bg-green-700"
-                  disabled={!isOnline}
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Approve All Selected
-                </Button>
-                <Button 
-                  onClick={() => handleBulkAction('reject')}
-                  variant="destructive"
-                  disabled={!isOnline}
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Reject All Selected
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedLeaves([]);
-                    setBulkDialogOpen(false);
-                  }}
-                >
-                  Cancel
-                </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
 
-        {/* Calendar View Dialog */}
-        <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Leave Calendar View</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Calendar
-                mode="single"
-                selected={calendarDate}
-                onSelect={(date) => date && setCalendarDate(date)}
-                className="rounded-md border"
-              />
-              
-              <div className="space-y-2">
-                <h4 className="font-medium">Leaves for {format(calendarDate, 'MMMM yyyy')}</h4>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {getCalendarEventsForMonth()
-                    .filter(day => day.events.length > 0)
-                    .map(day => (
-                      <div key={day.date.toISOString()} className="p-2 border rounded">
-                        <div className="font-medium">{format(day.date, 'MMM d')}</div>
-                        <div className="space-y-1 mt-1">
-                          {day.events.map(event => (
-                            <div key={event.id} className="text-sm p-1 rounded bg-muted">
-                              {event.title} • {event.status}
+            {/* Second Row: Apply for Leave and Export Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 sm:pt-4 border-t">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto">
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>Apply for My Leave</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg">Apply for Your Leave</DialogTitle>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
+                        Manager: <span className="font-medium">{managerInfo.name}</span>
+                      </div>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmitManagerLeave} className="space-y-3 sm:space-y-4">
+                      {/* Manager Info Display */}
+                      <div className="bg-muted/30 p-2 sm:p-3 rounded-lg space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                          <div>
+                            <span className="text-xs text-muted-foreground">Manager Name:</span>
+                            <div className="text-sm font-medium truncate">{managerInfo.name}</div>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Department:</span>
+                            <div className="text-sm font-medium truncate">{managerInfo.department || managerDepartment}</div>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Contact:</span>
+                            <div className="text-sm font-medium truncate">{managerInfo.contactNumber || "Not set"}</div>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted-foreground">Site:</span>
+                            <div className="text-sm font-medium truncate">{managerInfo.site || "Main Site"}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Leave Balance Display */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center">
+                            <Award className="h-4 w-4 text-blue-600 mr-2" />
+                            <span className="text-xs sm:text-sm font-medium text-blue-800">Available Leave Balance</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                          {Object.entries(leaveBalance).map(([type, days]) => (
+                            <div key={type} className="text-center p-2 bg-white rounded">
+                              <div className="font-semibold text-blue-700">{days}</div>
+                              <div className="text-blue-600 capitalize truncate">{type}</div>
                             </div>
                           ))}
                         </div>
                       </div>
-                    ))}
-                </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="leaveType" className="text-sm">Leave Type *</Label>
+                        <Select
+                          value={formData.leaveType}
+                          onValueChange={(value) => handleInputChange('leaveType', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select leave type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="casual">Casual Leave ({leaveBalance.casual} days left)</SelectItem>
+                            <SelectItem value="sick">Sick Leave ({leaveBalance.sick} days left)</SelectItem>
+                            <SelectItem value="annual">Annual Leave ({leaveBalance.annual} days left)</SelectItem>
+                            <SelectItem value="maternity">Maternity Leave ({leaveBalance.maternity} days left)</SelectItem>
+                            <SelectItem value="paternity">Paternity Leave ({leaveBalance.paternity} days left)</SelectItem>
+                            <SelectItem value="bereavement">Bereavement Leave ({leaveBalance.bereavement} days left)</SelectItem>
+                            <SelectItem value="other">Other ({leaveBalance.other} days left)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="fromDate" className="text-sm">Start Date *</Label>
+                          <Input
+                            id="fromDate"
+                            type="date"
+                            value={formData.fromDate}
+                            onChange={(e) => handleInputChange('fromDate', e.target.value)}
+                            required
+                            className="w-full"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="toDate" className="text-sm">End Date *</Label>
+                          <Input
+                            id="toDate"
+                            type="date"
+                            value={formData.toDate}
+                            onChange={(e) => handleInputChange('toDate', e.target.value)}
+                            required
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="priority" className="text-sm">Priority</Label>
+                        <Select
+                          value={formData.priority}
+                          onValueChange={(value) => handleInputChange('priority', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                            <SelectItem value="urgent">Urgent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="handoverTo" className="text-sm">Handover To (Optional)</Label>
+                        <Input
+                          id="handoverTo"
+                          value={formData.handoverTo}
+                          onChange={(e) => handleInputChange('handoverTo', e.target.value)}
+                          placeholder="Name of person handling your responsibilities"
+                          className="w-full"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="reason" className="text-sm">Reason for Leave *</Label>
+                        <Textarea
+                          id="reason"
+                          value={formData.reason}
+                          onChange={(e) => handleInputChange('reason', e.target.value)}
+                          placeholder="Enter detailed reason for leave"
+                          rows={4}
+                          required
+                          className="w-full"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="handoverRemarks" className="text-sm">Handover Remarks (Optional)</Label>
+                        <Textarea
+                          id="handoverRemarks"
+                          value={formData.handoverRemarks}
+                          onChange={(e) => handleInputChange('handoverRemarks', e.target.value)}
+                          placeholder="Any special instructions or remarks"
+                          rows={3}
+                          className="w-full"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setDialogOpen(false)}
+                          className="w-full sm:w-auto"
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isSubmitting} className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto">
+                          {isSubmitting && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Submit Leave
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Export Button with Options */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full sm:w-auto">
+                      <Download className="mr-2 h-4 w-4" />
+                      <span>Export</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[400px] p-4 sm:p-6">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg">Export Options</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Export Format</Label>
+                        <Select
+                          value={exportOptions.format}
+                          onValueChange={(value: 'csv' | 'excel' | 'pdf') => 
+                            setExportOptions(prev => ({ ...prev, format: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="csv">CSV</SelectItem>
+                            <SelectItem value="excel">Excel</SelectItem>
+                            <SelectItem value="pdf">PDF Report</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="includeManagerLeaves"
+                            checked={exportOptions.includeManagerLeaves}
+                            onCheckedChange={(checked) => 
+                              setExportOptions(prev => ({ ...prev, includeManagerLeaves: !!checked }))
+                            }
+                          />
+                          <Label htmlFor="includeManagerLeaves" className="text-sm">Include Manager Leaves</Label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="includeComments"
+                            checked={exportOptions.includeComments}
+                            onCheckedChange={(checked) => 
+                              setExportOptions(prev => ({ ...prev, includeComments: !!checked }))
+                            }
+                          />
+                          <Label htmlFor="includeComments" className="text-sm">Include Comments</Label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="includeAttachments"
+                            checked={exportOptions.includeAttachments}
+                            onCheckedChange={(checked) => 
+                              setExportOptions(prev => ({ ...prev, includeAttachments: !!checked }))
+                            }
+                          />
+                          <Label htmlFor="includeAttachments" className="text-sm">Include Attachment Info</Label>
+                        </div>
+                      </div>
+                      
+                      <Button onClick={handleExport} className="w-full">
+                        <DownloadCloud className="mr-2 h-4 w-4" />
+                        Export Data
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
 
-        {/* Analytics Dialog */}
-        <Dialog open={analyticsDialogOpen} onOpenChange={setAnalyticsDialogOpen}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Leave Analytics Dashboard</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Advanced Filters */}
+          <AnimatePresence>
+            {showAdvancedFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Monthly Trend</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {analytics.monthlyTrend.length > 0 ? (
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                       <div className="space-y-2">
-                        {analytics.monthlyTrend.map(item => (
-                          <div key={item.month} className="flex justify-between">
-                            <span>{item.month}</span>
-                            <span className="font-medium">{item.leaves} leaves</span>
-                          </div>
-                        ))}
+                        <Label className="text-sm">Date Range</Label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-sm">
+                                <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{dateRange.from ? format(dateRange.from, 'PP') : 'From'}</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={dateRange.from}
+                                onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start text-sm">
+                                <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{dateRange.to ? format(dateRange.to, 'PP') : 'To'}</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={dateRange.to}
+                                onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No data available
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm">Priority</Label>
+                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Priorities" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Priorities</SelectItem>
+                            <SelectItem value="urgent">Urgent</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="low">Low</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm">Leave Type</Label>
+                        <Select>
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Types" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            <SelectItem value="casual">Casual Leave</SelectItem>
+                            <SelectItem value="sick">Sick Leave</SelectItem>
+                            <SelectItem value="annual">Annual Leave</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="flex items-end space-x-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setDateRange({});
+                            setPriorityFilter('all');
+                          }}
+                          className="w-full text-sm"
+                        >
+                          Clear Filters
+                        </Button>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Leave Type Distribution</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {analytics.leaveTypeDistribution.length > 0 ? (
-                      <div className="space-y-2">
-                        {analytics.leaveTypeDistribution.map(item => (
-                          <div key={item.type} className="flex justify-between">
-                            <span className="capitalize">{item.type}</span>
-                            <span className="font-medium">{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No data available
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-              
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Toggle Advanced Filters */}
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="text-muted-foreground text-sm"
+            >
+              {showAdvancedFilters ? (
+                <ChevronUp className="h-4 w-4 mr-1" />
+              ) : (
+                <ChevronDown className="h-4 w-4 mr-1" />
+              )}
+              {showAdvancedFilters ? 'Hide' : 'Show'} Advanced Filters
+            </Button>
+          </div>
+
+          {/* Tabs for Team Leaves and My Leaves */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="team-leaves" className="text-xs sm:text-sm">
+                <Users className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span>Team Leaves</span>
+              </TabsTrigger>
+              <TabsTrigger value="my-leaves" className="text-xs sm:text-sm">
+                <User className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span>My Leaves</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Team Leaves Tab */}
+            <TabsContent value="team-leaves" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Approval Time Statistics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {analytics.approvalTime.average.toFixed(1)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">Avg Days</div>
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div>
+                      <CardTitle className="text-base sm:text-lg">
+                        Team Leave Requests
+                      </CardTitle>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                        {filteredLeaves.length} requests • {employees.length} employees
+                        {selectedSite && ` • ${selectedSite.name}`}
+                      </p>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {analytics.approvalTime.min}
+                    <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center gap-2">
+                      {selectedLeaves.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-blue-50 text-xs">
+                            {selectedLeaves.length} selected
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkDialogOpen(true)}
+                            disabled={!isOnline}
+                            className="text-xs h-8"
+                          >
+                            <CheckSquare className="h-3 w-3 mr-1" />
+                            Bulk
+                          </Button>
+                        </div>
+                      )}
+                      
+                      <div className="flex flex-wrap gap-1 sm:gap-2">
+                        <Button
+                          variant={filter === 'all' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFilter('all')}
+                          className="text-xs h-8 px-2 sm:px-3"
+                        >
+                          All
+                        </Button>
+                        <Button
+                          variant={filter === 'pending' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFilter('pending')}
+                          className="text-xs h-8 px-2 sm:px-3"
+                        >
+                          Pending
+                        </Button>
+                        <Button
+                          variant={filter === 'approved' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFilter('approved')}
+                          className="text-xs h-8 px-2 sm:px-3"
+                        >
+                          Approved
+                        </Button>
+                        <Button
+                          variant={filter === 'rejected' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFilter('rejected')}
+                          className="text-xs h-8 px-2 sm:px-3"
+                        >
+                          Rejected
+                        </Button>
                       </div>
-                      <div className="text-sm text-muted-foreground">Min Days</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">
-                        {analytics.approvalTime.max}
-                      </div>
-                      <div className="text-sm text-muted-foreground">Max Days</div>
                     </div>
                   </div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  {!managerDepartment ? (
+                    <div className="text-center py-6 sm:py-8">
+                      <Building className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="font-medium text-base sm:text-lg mb-2">Select a Department</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Please select a department to view team leave requests
+                      </p>
+                    </div>
+                  ) : isLoading ? (
+                    <div className="flex items-center justify-center py-6 sm:py-8">
+                      <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : filteredLeaves.length === 0 ? (
+                    <div className="text-center py-6 sm:py-8">
+                      <div className="flex flex-col items-center">
+                        <Users className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-4" />
+                        <h3 className="font-medium text-base sm:text-lg mb-2">No Team Leave Requests</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                          No team leave requests found for {managerDepartment} department
+                          {selectedSite && ` at ${selectedSite.name}`}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Select All Checkbox */}
+                      <div className="flex items-center space-x-2 p-2 border rounded-lg">
+                        <Checkbox
+                          id="select-all"
+                          checked={selectedLeaves.length === filteredLeaves.length && filteredLeaves.length > 0}
+                          onCheckedChange={selectAllLeaves}
+                        />
+                        <Label htmlFor="select-all" className="text-xs sm:text-sm font-medium cursor-pointer">
+                          Select all {filteredLeaves.length} requests
+                        </Label>
+                      </div>
+
+                      {/* Leave Requests List */}
+                      {filteredLeaves.map((leave) => {
+                        const leaveKey = getLeaveKey(leave);
+                        const isSelected = selectedLeaves.includes(leave._id || leave.id || '');
+                        
+                        return (
+                          <motion.div
+                            key={leaveKey}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`p-3 sm:p-4 border rounded-lg space-y-3 hover:border-primary/50 transition-colors ${isSelected ? 'bg-blue-50 border-blue-300' : ''}`}
+                          >
+                            <div className="flex items-start gap-2 sm:gap-3">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleLeaveSelection(leave._id || leave.id || '')}
+                                className="mt-1"
+                              />
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                  <div className="space-y-1 flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h3 className="font-medium text-sm sm:text-base truncate max-w-[150px] sm:max-w-none">
+                                        {leave.employeeName}
+                                      </h3>
+                                      <Badge variant={getStatusBadgeVariant(leave.status)} className="text-xs">
+                                        {leave.status}
+                                      </Badge>
+                                      {leave.priority && leave.priority !== 'medium' && (
+                                        <Badge variant={getPriorityBadgeVariant(leave.priority)} className="text-xs">
+                                          {leave.priority}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">
+                                      <CalendarIcon className="inline mr-1 h-3 w-3" />
+                                      {formatDate(leave.fromDate)} to {formatDate(leave.toDate)} ({leave.totalDays}d)
+                                    </p>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs">
+                                      <span className="text-muted-foreground flex items-center">
+                                        <FileText className="mr-1 h-3 w-3" />
+                                        <span className="capitalize truncate">{leave.leaveType}</span>
+                                      </span>
+                                      <span className="text-muted-foreground flex items-center">
+                                        <Building className="mr-1 h-3 w-3" />
+                                        <span className="truncate">{leave.department}</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 mt-2 sm:mt-0">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleViewLeave(leave)}
+                                      className="h-8 px-2"
+                                    >
+                                      <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                                    </Button>
+                                    {leave.status === 'pending' && (
+                                      <>
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          onClick={() => handleApproveLeave(leave._id || leave.id || '')}
+                                          className="bg-green-600 hover:bg-green-700 h-8 px-2"
+                                          disabled={!isOnline}
+                                        >
+                                          <Check className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() => handleRejectLeave(leave._id || leave.id || '')}
+                                          className="h-8 px-2"
+                                          disabled={!isOnline}
+                                        >
+                                          <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="pt-2 border-t mt-2">
+                                  <p className="text-xs sm:text-sm">
+                                    <span className="font-medium">Reason:</span> {leave.reason}
+                                  </p>
+                                  <div className="flex flex-col sm:flex-row justify-between mt-2 text-xs text-muted-foreground gap-1">
+                                    <span>Contact: {leave.contactNumber}</span>
+                                    <span>Applied: {formatDate(leave.createdAt)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </TabsContent>
 
-        {/* Delegation Dialog */}
-        <Dialog open={delegationDialogOpen} onOpenChange={setDelegationDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delegation Settings</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              {delegation && delegation.isActive ? (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center">
-                    <ShieldCheck className="h-5 w-5 text-green-600 mr-2" />
-                    <span className="font-medium">Delegation Active</span>
+            {/* My Leaves Tab */}
+            <TabsContent value="my-leaves" className="space-y-4">
+              <Card>
+                <CardHeader className="p-4 sm:p-6">
+                  <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center gap-4">
+                    <div>
+                      <CardTitle className="text-base sm:text-lg">
+                        My Leave Requests
+                      </CardTitle>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                        {filteredMyLeaves.length} of your personal leave requests
+                      </p>
+                    </div>
+                    <div className="flex flex-col space-y-2 sm:space-y-0 sm:flex-row sm:items-center gap-2">
+                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 text-xs w-fit">
+                        {filteredMyLeaves.length} personal
+                      </Badge>
+                      <div className="flex flex-wrap gap-1 sm:gap-2">
+                        <Button
+                          variant={myLeavesFilter === 'all' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setMyLeavesFilter('all')}
+                          className={`text-xs h-8 px-2 sm:px-3 ${myLeavesFilter === 'all' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                        >
+                          All
+                        </Button>
+                        <Button
+                          variant={myLeavesFilter === 'pending' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setMyLeavesFilter('pending')}
+                          className={`text-xs h-8 px-2 sm:px-3 ${myLeavesFilter === 'pending' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                        >
+                          Pending
+                        </Button>
+                        <Button
+                          variant={myLeavesFilter === 'approved' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setMyLeavesFilter('approved')}
+                          className={`text-xs h-8 px-2 sm:px-3 ${myLeavesFilter === 'approved' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                        >
+                          Approved
+                        </Button>
+                        <Button
+                          variant={myLeavesFilter === 'rejected' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setMyLeavesFilter('rejected')}
+                          className={`text-xs h-8 px-2 sm:px-3 ${myLeavesFilter === 'rejected' ? 'bg-purple-600 hover:bg-purple-700' : ''}`}
+                        >
+                          Rejected
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-2 space-y-1">
-                    <div>To: {delegation.employeeName}</div>
-                    <div>From: {formatDate(delegation.fromDate)}</div>
-                    <div>To: {formatDate(delegation.toDate)}</div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  {filteredMyLeaves.length === 0 ? (
+                    <div className="text-center py-6 sm:py-8">
+                      <div className="flex flex-col items-center">
+                        <FileText className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-4" />
+                        <h3 className="font-medium text-base sm:text-lg mb-2">No Personal Leave Requests</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                          You haven't applied for any personal leaves yet
+                        </p>
+                        <Button onClick={() => setDialogOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-sm h-9">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Apply for My Leave
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredMyLeaves.map((leave) => {
+                        const leaveKey = getLeaveKey(leave);
+                        return (
+                          <motion.div
+                            key={leaveKey}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-3 sm:p-4 border rounded-lg space-y-3 hover:border-purple-300 transition-colors bg-purple-50/50"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                              <div className="space-y-1 flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="font-medium text-sm sm:text-base">Your Leave Request</h3>
+                                  <Badge variant={getStatusBadgeVariant(leave.status)} className="text-xs">
+                                    {leave.status}
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
+                                    Manager
+                                  </Badge>
+                                </div>
+                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                  <CalendarIcon className="inline mr-1 h-3 w-3" />
+                                  {formatDate(leave.fromDate)} to {formatDate(leave.toDate)} ({leave.totalDays}d)
+                                </p>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs">
+                                  <span className="text-muted-foreground flex items-center">
+                                    <FileText className="mr-1 h-3 w-3" />
+                                    <span className="capitalize">{leave.leaveType}</span>
+                                  </span>
+                                  <span className="text-muted-foreground flex items-center">
+                                    <Building className="mr-1 h-3 w-3" />
+                                    <span className="truncate">{leave.department}</span>
+                                  </span>
+                                  <span className="text-muted-foreground flex items-center">
+                                    <Clock className="mr-1 h-3 w-3" />
+                                    {formatDate(leave.createdAt)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-2 sm:mt-0">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleViewLeave(leave)}
+                                  className="h-8 px-2"
+                                >
+                                  <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="pt-2 border-t">
+                              <p className="text-xs sm:text-sm">
+                                <span className="font-medium">Reason:</span> {leave.reason}
+                              </p>
+                              {leave.handoverTo && (
+                                <p className="text-xs sm:text-sm mt-1">
+                                  <span className="font-medium">Handover to:</span> {leave.handoverTo}
+                                </p>
+                              )}
+                              {leave.status === 'approved' && leave.approvedBy && (
+                                <div className="mt-2 text-xs text-green-600">
+                                  Approved by {leave.approvedBy} on {formatDate(leave.approvedAt || '')}
+                                </div>
+                              )}
+                              {leave.status === 'rejected' && leave.rejectedBy && (
+                                <div className="mt-2 text-xs text-red-600">
+                                  Rejected by {leave.rejectedBy} on {formatDate(leave.rejectedAt || '')}
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* View Leave Dialog */}
+          <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle className="text-lg">Leave Request Details</DialogTitle>
+                {selectedLeave?.isManagerLeave && (
+                  <div className="text-xs sm:text-sm text-purple-600">
+                    ⓘ This is a manager's personal leave request
                   </div>
-                  <Button variant="outline" className="w-full mt-3">
-                    End Delegation
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">No Active Delegation</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    You can delegate your approval authority to another employee for a specific period.
-                  </p>
-                  <Button>
-                    <User className="mr-2 h-4 w-4" />
-                    Setup Delegation
-                  </Button>
+                )}
+              </DialogHeader>
+              {selectedLeave && (
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Employee Information */}
+                  <div className={`p-3 sm:p-4 rounded-lg space-y-3 ${selectedLeave.isManagerLeave ? 'bg-purple-50 border border-purple-200' : 'bg-muted/50'}`}>
+                    <h3 className="font-medium text-base sm:text-lg flex items-center gap-2">
+                      <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                      {selectedLeave.isManagerLeave ? 'Manager Information' : 'Employee Information'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <User className="h-3 w-3" />
+                          <span>{selectedLeave.isManagerLeave ? 'Manager' : 'Employee'}</span>
+                        </div>
+                        <div className="text-sm font-medium break-words">{selectedLeave.employeeName}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Hash className="h-3 w-3" />
+                          <span>ID</span>
+                        </div>
+                        <div className="text-sm font-medium break-words">{selectedLeave.employeeId}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Building className="h-3 w-3" />
+                          <span>Department</span>
+                        </div>
+                        <div className="text-sm font-medium break-words">{selectedLeave.department}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Contact</div>
+                        <div className="text-sm font-medium break-words">{selectedLeave.contactNumber}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Leave Details */}
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="font-medium text-base sm:text-lg flex items-center gap-2">
+                      <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Leave Details
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Leave Type</div>
+                        <div className="text-sm font-medium capitalize break-words">{selectedLeave.leaveType}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Status</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant={getStatusBadgeVariant(selectedLeave.status)} className="text-xs">
+                            {selectedLeave.status}
+                          </Badge>
+                          {selectedLeave.priority && selectedLeave.priority !== 'medium' && (
+                            <Badge variant={getPriorityBadgeVariant(selectedLeave.priority)} className="text-xs">
+                              {selectedLeave.priority}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <CalendarIcon className="h-3 w-3" />
+                          <span>From Date</span>
+                        </div>
+                        <div className="text-sm font-medium">{formatDate(selectedLeave.fromDate)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <CalendarIcon className="h-3 w-3" />
+                          <span>To Date</span>
+                        </div>
+                        <div className="text-sm font-medium">{formatDate(selectedLeave.toDate)}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>Total Days</span>
+                        </div>
+                        <div className="text-sm font-medium">{selectedLeave.totalDays} days</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Applied By</div>
+                        <div className="text-sm font-medium break-words">{selectedLeave.appliedBy}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Reason</div>
+                      <div className="p-2 sm:p-3 bg-muted/30 rounded-lg text-sm break-words">
+                        {selectedLeave.reason}
+                      </div>
+                    </div>
+                    
+                    {selectedLeave.handoverTo && (
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Handover Information</div>
+                        <div className="p-2 sm:p-3 bg-blue-50 rounded-lg">
+                          <div className="text-sm font-medium break-words">Handover to: {selectedLeave.handoverTo}</div>
+                          {selectedLeave.handoverRemarks && (
+                            <div className="text-xs sm:text-sm mt-1 break-words">{selectedLeave.handoverRemarks}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Application Date</div>
+                      <div className="text-sm font-medium">{formatDateTime(selectedLeave.createdAt)}</div>
+                    </div>
+                  </div>
+
+                  {/* Comments Section */}
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="font-medium text-base sm:text-lg flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Comments & Discussion
+                    </h3>
+                    
+                    <div className="space-y-3 max-h-40 sm:max-h-60 overflow-y-auto p-3 border rounded-lg">
+                      {selectedLeave.comments && selectedLeave.comments.length > 0 ? (
+                        selectedLeave.comments.map((comment) => (
+                          <div key={comment.id} className="p-2 sm:p-3 bg-muted/30 rounded-lg">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1">
+                              <div className="font-medium text-sm">{comment.userName}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatDateTime(comment.timestamp)}
+                              </div>
+                            </div>
+                            <div className="mt-1 text-xs sm:text-sm break-words">{comment.comment}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {comment.userRole} • {comment.isManager ? 'Manager' : 'Employee'}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground text-sm">
+                          No comments yet
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Textarea
+                        placeholder="Add a comment..."
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        rows={3}
+                        className="w-full text-sm"
+                      />
+                      <Button 
+                        onClick={handleAddComment} 
+                        disabled={!commentText.trim() || isAddingComment}
+                        className="w-full text-sm"
+                      >
+                        {isAddingComment ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-2" />
+                        )}
+                        Add Comment
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons - Only for team leaves */}
+                  {selectedLeave.status === 'pending' && !selectedLeave.isManagerLeave && (
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                      <Button 
+                        variant="outline" 
+                        className="w-full sm:flex-1 text-sm"
+                        onClick={() => setViewDialogOpen(false)}
+                      >
+                        Close
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        className="w-full sm:flex-1 text-sm"
+                        onClick={() => handleRejectLeave(selectedLeave._id || selectedLeave.id || '')}
+                        disabled={!isOnline}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Reject
+                      </Button>
+                      <Button 
+                        className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 text-sm"
+                        onClick={() => handleApproveLeave(selectedLeave._id || selectedLeave.id || '')}
+                        disabled={!isOnline}
+                      >
+                        <Check className="mr-2 h-4 w-4" />
+                        Approve
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </motion.div>
-    </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Bulk Actions Dialog */}
+          <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+            <DialogContent className="p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle className="text-lg">Bulk Actions</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  You have selected {selectedLeaves.length} leave request(s).
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={() => handleBulkAction('approve')}
+                    className="bg-green-600 hover:bg-green-700 w-full text-sm"
+                    disabled={!isOnline}
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Approve All Selected
+                  </Button>
+                  <Button 
+                    onClick={() => handleBulkAction('reject')}
+                    variant="destructive"
+                    className="w-full text-sm"
+                    disabled={!isOnline}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Reject All Selected
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedLeaves([]);
+                      setBulkDialogOpen(false);
+                    }}
+                    className="w-full text-sm"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Calendar View Dialog */}
+          <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
+            <DialogContent className="max-w-4xl p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle className="text-lg">Leave Calendar View</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Calendar
+                  mode="single"
+                  selected={calendarDate}
+                  onSelect={(date) => date && setCalendarDate(date)}
+                  className="rounded-md border w-full"
+                />
+                
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Leaves for {format(calendarDate, 'MMMM yyyy')}</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {getCalendarEventsForMonth()
+                      .filter(day => day.events.length > 0)
+                      .map(day => (
+                        <div key={day.date.toISOString()} className="p-2 border rounded">
+                          <div className="font-medium text-sm">{format(day.date, 'MMM d')}</div>
+                          <div className="space-y-1 mt-1">
+                            {day.events.map(event => (
+                              <div key={event.id} className="text-xs p-1 rounded bg-muted break-words">
+                                {event.title} • {event.status}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Analytics Dialog */}
+          <Dialog open={analyticsDialogOpen} onOpenChange={setAnalyticsDialogOpen}>
+            <DialogContent className="max-w-4xl p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle className="text-lg">Leave Analytics Dashboard</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 sm:space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <Card>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-sm">Monthly Trend</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4">
+                      {analytics.monthlyTrend.length > 0 ? (
+                        <div className="space-y-2">
+                          {analytics.monthlyTrend.map(item => (
+                            <div key={item.month} className="flex justify-between text-xs sm:text-sm">
+                              <span>{item.month}</span>
+                              <span className="font-medium">{item.leaves} leaves</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground text-sm">
+                          No data available
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-sm">Leave Type Distribution</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4">
+                      {analytics.leaveTypeDistribution.length > 0 ? (
+                        <div className="space-y-2">
+                          {analytics.leaveTypeDistribution.map(item => (
+                            <div key={item.type} className="flex justify-between text-xs sm:text-sm">
+                              <span className="capitalize">{item.type}</span>
+                              <span className="font-medium">{item.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground text-sm">
+                          No data available
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <Card>
+                  <CardHeader className="p-3 sm:p-4">
+                    <CardTitle className="text-sm">Approval Time Statistics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                      <div className="text-center">
+                        <div className="text-base sm:text-2xl font-bold text-green-600">
+                          {analytics.approvalTime.average.toFixed(1)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Avg Days</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base sm:text-2xl font-bold text-blue-600">
+                          {analytics.approvalTime.min}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Min Days</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-base sm:text-2xl font-bold text-red-600">
+                          {analytics.approvalTime.max}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Max Days</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delegation Dialog */}
+          <Dialog open={delegationDialogOpen} onOpenChange={setDelegationDialogOpen}>
+            <DialogContent className="p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle className="text-lg">Delegation Settings</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {delegation && delegation.isActive ? (
+                  <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center">
+                      <ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mr-2" />
+                      <span className="font-medium text-sm">Delegation Active</span>
+                    </div>
+                    <div className="mt-2 space-y-1 text-sm">
+                      <div className="break-words">To: {delegation.employeeName}</div>
+                      <div>From: {formatDate(delegation.fromDate)}</div>
+                      <div>To: {formatDate(delegation.toDate)}</div>
+                    </div>
+                    <Button variant="outline" className="w-full mt-3 text-sm">
+                      End Delegation
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Shield className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-medium text-sm sm:text-base mb-2">No Active Delegation</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                      You can delegate your approval authority to another employee for a specific period.
+                    </p>
+                    <Button size="sm" className="text-sm">
+                      <User className="mr-2 h-4 w-4" />
+                      Setup Delegation
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </motion.div>
+      </div>
+    </>
   );
 };
 

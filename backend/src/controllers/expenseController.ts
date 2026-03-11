@@ -1,150 +1,349 @@
 import { Request, Response } from 'express';
 import Expense, { IExpense } from '../models/Expense';
+import Site from '../models/Site';
+import mongoose from 'mongoose';
 
-// Get all expenses
-export const getAllExpenses = async (req: Request, res: Response) => {
+// Get all expenses with optional filters
+export const getExpenses = async (req: Request, res: Response) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      expenseType,
-      status,
-      site,
-      startDate,
-      endDate,
-      search
-    } = req.query;
-
-    const query: any = {};
-
+    const { siteId, startDate, endDate, category, expenseType } = req.query;
+    
+    // Build filter object
+    const filter: any = {};
+    
+    if (siteId && siteId !== 'all' && mongoose.Types.ObjectId.isValid(siteId as string)) {
+      filter.siteId = siteId;
+    }
+    
+    if (category && category !== 'all') {
+      filter.category = category;
+    }
+    
     if (expenseType && expenseType !== 'all') {
-      query.expenseType = expenseType;
+      filter.expenseType = expenseType;
     }
-
-    if (status) {
-      query.status = status;
-    }
-
-    if (site) {
-      query.site = site;
-    }
-
+    
+    // Date range filter
     if (startDate || endDate) {
-      query.date = {};
+      filter.date = {};
       if (startDate) {
-        query.date.$gte = new Date(startDate as string);
+        filter.date.$gte = new Date(startDate as string);
       }
       if (endDate) {
-        query.date.$lte = new Date(endDate as string);
+        filter.date.$lte = new Date(endDate as string);
       }
     }
-
-    if (search) {
-      query.$or = [
-        { expenseId: { $regex: search, $options: 'i' } },
-        { vendor: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const expenses = await Expense.find(query)
+    
+    const expenses = await Expense.find(filter)
+      .populate('siteId', 'name location clientName')
       .sort({ date: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit))
       .lean();
-
-    const total = await Expense.countDocuments(query);
-
-    res.status(200).json({
+    
+    return res.status(200).json({
       success: true,
-      data: expenses,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / Number(limit))
-      }
+      data: expenses || []
     });
   } catch (error: any) {
-    res.status(500).json({
+    console.error('Error fetching expenses:', error);
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Error fetching expenses'
+      error: error.message || 'Failed to fetch expenses'
     });
   }
 };
 
-// Get single expense
-export const getExpenseById = async (req: Request, res: Response) => {
+// Get expenses by site
+export const getExpensesBySite = async (req: Request, res: Response) => {
   try {
-    const expense = await Expense.findById(req.params.id);
-
-    if (!expense) {
-      return res.status(404).json({
+    const { siteId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(siteId)) {
+      return res.status(400).json({
         success: false,
-        message: 'Expense not found'
+        error: 'Invalid site ID'
       });
     }
-
-    res.status(200).json({
+    
+    const expenses = await Expense.find({ siteId })
+      .populate('siteId', 'name location clientName')
+      .sort({ date: -1 })
+      .lean();
+    
+    return res.status(200).json({
       success: true,
-      data: expense
+      data: expenses || []
     });
   } catch (error: any) {
-    res.status(500).json({
+    console.error('Error fetching site expenses:', error);
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Error fetching expense'
+      error: error.message || 'Failed to fetch site expenses'
+    });
+  }
+};
+
+// Get monthly expenses summary for a site
+export const getMonthlyExpenses = async (req: Request, res: Response) => {
+  try {
+    const { siteId } = req.params;
+    const { year } = req.query;
+    
+    if (!mongoose.Types.ObjectId.isValid(siteId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid site ID'
+      });
+    }
+    
+    // Build date range for the year
+    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+    const startDate = new Date(targetYear, 0, 1);
+    const endDate = new Date(targetYear, 11, 31, 23, 59, 59);
+    
+    const monthlyExpenses = await Expense.aggregate([
+      {
+        $match: {
+          siteId: new mongoose.Types.ObjectId(siteId),
+          date: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            month: { $month: '$date' },
+            year: { $year: '$date' }
+          },
+          totalAmount: { $sum: '$amount' },
+          count: { $sum: 1 },
+          categories: { $addToSet: '$category' }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 }
+      },
+      {
+        $project: {
+          _id: 1,
+          month: '$_id.month',
+          year: '$_id.year',
+          totalAmount: 1,
+          count: 1,
+          categories: 1
+        }
+      }
+    ]);
+    
+    return res.status(200).json({
+      success: true,
+      data: monthlyExpenses || []
+    });
+  } catch (error: any) {
+    console.error('Error fetching monthly expenses:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch monthly expenses'
+    });
+  }
+};
+
+// Get expense summary/stats
+export const getExpenseStats = async (req: Request, res: Response) => {
+  try {
+    const { siteId } = req.query;
+    
+    const matchStage: any = {};
+    if (siteId && siteId !== 'all' && mongoose.Types.ObjectId.isValid(siteId as string)) {
+      matchStage.siteId = new mongoose.Types.ObjectId(siteId as string);
+    }
+    
+    const stats = await Expense.aggregate([
+      { $match: matchStage },
+      {
+        $facet: {
+          totalStats: [
+            {
+              $group: {
+                _id: null,
+                totalExpenses: { $sum: '$amount' },
+                averageExpense: { $avg: '$amount' },
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          byCategory: [
+            {
+              $group: {
+                _id: '$category',
+                total: { $sum: '$amount' },
+                count: { $sum: 1 }
+              }
+            },
+            { $sort: { total: -1 } }
+          ],
+          byExpenseType: [
+            {
+              $group: {
+                _id: '$expenseType',
+                total: { $sum: '$amount' },
+                count: { $sum: 1 }
+              }
+            }
+          ],
+          byMonth: [
+            {
+              $group: {
+                _id: {
+                  year: { $year: '$date' },
+                  month: { $month: '$date' }
+                },
+                total: { $sum: '$amount' }
+              }
+            },
+            { $sort: { '_id.year': -1, '_id.month': -1 } },
+            { $limit: 12 }
+          ]
+        }
+      }
+    ]);
+    
+    const result = stats[0] || {
+      totalStats: [],
+      byCategory: [],
+      byExpenseType: [],
+      byMonth: []
+    };
+    
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    console.error('Error fetching expense stats:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch expense statistics'
     });
   }
 };
 
 // Create new expense
+// Create new expense
 export const createExpense = async (req: Request, res: Response) => {
   try {
-    const {
+    const { siteId, expenseType, category, description, amount, date, vendor, paymentMethod, customFields } = req.body;
+    
+    // Validate required fields
+    if (!siteId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Site ID is required'
+      });
+    }
+    
+    if (!expenseType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Expense type is required'
+      });
+    }
+    
+    if (!category) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category is required'
+      });
+    }
+    
+    if (!description) {
+      return res.status(400).json({
+        success: false,
+        error: 'Description is required'
+      });
+    }
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid amount is required'
+      });
+    }
+    
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        error: 'Vendor is required'
+      });
+    }
+    
+    if (!paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment method is required'
+      });
+    }
+    
+    // Validate site exists
+    if (!mongoose.Types.ObjectId.isValid(siteId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid site ID format'
+      });
+    }
+    
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found'
+      });
+    }
+    
+    // Create expense
+    const expenseData: any = {
+      siteId: new mongoose.Types.ObjectId(siteId),
+      expenseType,
       category,
       description,
-      baseAmount,
-      date,
+      amount: Number(amount),
+      date: date ? new Date(date) : new Date(),
       vendor,
-      paymentMethod,
-      site,
-      expenseType,
-      notes,
-      createdBy = 'system'
-    } = req.body;
-
-    // Calculate GST (18%)
-    const gst = baseAmount * 0.18;
-    const amount = baseAmount + gst;
-
-    const newExpense = new Expense({
-      category,
-      description,
-      baseAmount,
-      gst,
-      amount,
-      date: date || new Date(),
-      status: 'pending',
-      vendor,
-      paymentMethod,
-      site,
-      expenseType,
-      notes,
-      createdBy
-    });
-
-    await newExpense.save();
-
-    res.status(201).json({
+      paymentMethod
+    };
+    
+    // Add custom fields if provided
+    if (customFields && Array.isArray(customFields) && customFields.length > 0) {
+      expenseData.customFields = customFields.filter(
+        (field: any) => field && field.fieldName && field.fieldValue
+      );
+    }
+    
+    const expense = new Expense(expenseData);
+    await expense.save();
+    
+    // IMPORTANT: Populate site details for response
+    const populatedExpense = await Expense.findById(expense._id)
+      .populate('siteId', 'name location clientName')
+      .lean();
+    
+    return res.status(201).json({
       success: true,
       message: 'Expense created successfully',
-      data: newExpense
+      data: populatedExpense
     });
   } catch (error: any) {
-    res.status(400).json({
+    console.error('Error creating expense:', error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err: any) => err.message);
+      return res.status(400).json({
+        success: false,
+        error: messages.join(', ')
+      });
+    }
+    
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Error creating expense'
+      error: error.message || 'Failed to create expense'
     });
   }
 };
@@ -152,67 +351,75 @@ export const createExpense = async (req: Request, res: Response) => {
 // Update expense
 export const updateExpense = async (req: Request, res: Response) => {
   try {
-    const {
-      category,
-      description,
-      baseAmount,
-      date,
-      vendor,
-      paymentMethod,
-      site,
-      expenseType,
-      status,
-      notes
-    } = req.body;
-
-    // Calculate GST if baseAmount is provided
-    let gst, amount;
-    if (baseAmount !== undefined) {
-      gst = baseAmount * 0.18;
-      amount = baseAmount + gst;
-    }
-
-    const updateData: any = {
-      category,
-      description,
-      date,
-      vendor,
-      paymentMethod,
-      site,
-      expenseType,
-      status,
-      notes,
-      updatedAt: new Date()
-    };
-
-    if (baseAmount !== undefined) {
-      updateData.baseAmount = baseAmount;
-      updateData.gst = gst;
-      updateData.amount = amount;
-    }
-
-    const expense = await Expense.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    if (!expense) {
-      return res.status(404).json({
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
         success: false,
-        message: 'Expense not found'
+        error: 'Invalid expense ID'
       });
     }
-
-    res.status(200).json({
+    
+    // Check if expense exists
+    const existingExpense = await Expense.findById(id);
+    if (!existingExpense) {
+      return res.status(404).json({
+        success: false,
+        error: 'Expense not found'
+      });
+    }
+    
+    // Prepare update data
+    const updateData: any = { ...req.body };
+    
+    // Remove fields that shouldn't be updated directly
+    delete updateData._id;
+    delete updateData.id;
+    delete updateData.__v;
+    
+    // Convert amount to number if present
+    if (updateData.amount) {
+      updateData.amount = Number(updateData.amount);
+    }
+    
+    // Convert date if present
+    if (updateData.date) {
+      updateData.date = new Date(updateData.date);
+    }
+    
+    // Handle custom fields
+    if (updateData.customFields && Array.isArray(updateData.customFields)) {
+      updateData.customFields = updateData.customFields.filter(
+        (field: any) => field && field.fieldName && field.fieldValue
+      );
+    }
+    
+    // Update expense
+    const updatedExpense = await Expense.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).populate('siteId', 'name location clientName');
+    
+    return res.status(200).json({
       success: true,
       message: 'Expense updated successfully',
-      data: expense
+      data: updatedExpense
     });
   } catch (error: any) {
-    res.status(400).json({
+    console.error('Error updating expense:', error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err: any) => err.message);
+      return res.status(400).json({
+        success: false,
+        error: messages.join(', ')
+      });
+    }
+    
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Error updating expense'
+      error: error.message || 'Failed to update expense'
     });
   }
 };
@@ -220,218 +427,78 @@ export const updateExpense = async (req: Request, res: Response) => {
 // Delete expense
 export const deleteExpense = async (req: Request, res: Response) => {
   try {
-    const expense = await Expense.findByIdAndDelete(req.params.id);
-
-    if (!expense) {
-      return res.status(404).json({
+    const { id } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
         success: false,
-        message: 'Expense not found'
+        error: 'Invalid expense ID'
       });
     }
-
-    res.status(200).json({
+    
+    const deletedExpense = await Expense.findByIdAndDelete(id);
+    
+    if (!deletedExpense) {
+      return res.status(404).json({
+        success: false,
+        error: 'Expense not found'
+      });
+    }
+    
+    return res.status(200).json({
       success: true,
       message: 'Expense deleted successfully'
     });
   } catch (error: any) {
-    res.status(500).json({
+    console.error('Error deleting expense:', error);
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Error deleting expense'
+      error: error.message || 'Failed to delete expense'
     });
   }
 };
 
-// Update expense status
-export const updateExpenseStatus = async (req: Request, res: Response) => {
+// Bulk delete expenses
+export const bulkDeleteExpenses = async (req: Request, res: Response) => {
   try {
-    const { status } = req.body;
+    const { siteId, startDate, endDate } = req.body;
     
-    if (!['pending', 'approved', 'rejected'].includes(status)) {
+    const filter: any = {};
+    
+    if (siteId && mongoose.Types.ObjectId.isValid(siteId)) {
+      filter.siteId = siteId;
+    }
+    
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) {
+        filter.date.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        filter.date.$lte = new Date(endDate);
+      }
+    }
+    
+    // Don't allow empty filter (would delete all expenses)
+    if (Object.keys(filter).length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status value'
+        error: 'At least one filter criteria is required'
       });
     }
-
-    const expense = await Expense.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status,
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
-
-    if (!expense) {
-      return res.status(404).json({
-        success: false,
-        message: 'Expense not found'
-      });
-    }
-
-    res.status(200).json({
+    
+    const result = await Expense.deleteMany(filter);
+    
+    return res.status(200).json({
       success: true,
-      message: 'Expense status updated successfully',
-      data: expense
+      message: `Deleted ${result.deletedCount} expenses`,
+      deletedCount: result.deletedCount
     });
   } catch (error: any) {
-    res.status(400).json({
+    console.error('Error bulk deleting expenses:', error);
+    return res.status(500).json({
       success: false,
-      message: error.message || 'Error updating expense status'
-    });
-  }
-};
-
-// Get expense statistics
-export const getExpenseStats = async (req: Request, res: Response) => {
-  try {
-    const { period = 'monthly' } = req.query;
-
-    const today = new Date();
-    let startDate: Date;
-
-    if (period === 'weekly') {
-      startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else {
-      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    }
-
-    // Get site-wise expenses
-    const siteStats = await Expense.aggregate([
-      {
-        $match: {
-          status: 'approved',
-          date: { $gte: startDate, $lte: today }
-        }
-      },
-      {
-        $group: {
-          _id: '$site',
-          operational: {
-            $sum: {
-              $cond: [{ $eq: ['$expenseType', 'operational'] }, '$amount', 0]
-            }
-          },
-          office: {
-            $sum: {
-              $cond: [{ $eq: ['$expenseType', 'office'] }, '$amount', 0]
-            }
-          },
-          other: {
-            $sum: {
-              $cond: [{ $eq: ['$expenseType', 'other'] }, '$amount', 0]
-            }
-          },
-          total: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    // Get total expenses by type
-    const typeStats = await Expense.aggregate([
-      {
-        $match: {
-          status: 'approved',
-          date: { $gte: startDate, $lte: today }
-        }
-      },
-      {
-        $group: {
-          _id: '$expenseType',
-          total: { $sum: '$amount' },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get status counts
-    const statusStats = await Expense.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        siteStats,
-        typeStats,
-        statusStats,
-        period: period as string,
-        startDate,
-        endDate: today
-      }
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Error fetching expense statistics'
-    });
-  }
-};
-
-// Get expense summary
-export const getExpenseSummary = async (req: Request, res: Response) => {
-  try {
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    // Monthly total
-    const monthlyTotal = await Expense.aggregate([
-      {
-        $match: {
-          status: 'approved',
-          date: { $gte: firstDayOfMonth, $lte: today }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    // Yearly total
-    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
-    const yearlyTotal = await Expense.aggregate([
-      {
-        $match: {
-          status: 'approved',
-          date: { $gte: firstDayOfYear, $lte: today }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    // Recent expenses
-    const recentExpenses = await Expense.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
-
-    res.status(200).json({
-      success: true,
-      data: {
-        monthlyTotal: monthlyTotal[0]?.total || 0,
-        yearlyTotal: yearlyTotal[0]?.total || 0,
-        pendingCount: await Expense.countDocuments({ status: 'pending' }),
-        recentExpenses
-      }
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Error fetching expense summary'
+      error: error.message || 'Failed to delete expenses'
     });
   }
 };

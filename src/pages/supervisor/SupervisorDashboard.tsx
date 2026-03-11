@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { StatCard } from "@/components/shared/StatCard";
@@ -32,11 +32,106 @@ import {
   Crown,
   Eye,
   Ban,
-  Loader2
+  Loader2,
+  Building,
+  CalendarDays,
+  XCircle,
+  UserX,
+  UserMinus,
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet,
+  Home,
+  Shield,
+  Car,
+  Trash2,
+  Droplets,
+  ShoppingCart,
+  DollarSign,
+  Briefcase,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Target,
+  ExternalLink,
+  UserCheck as UserCheckIcon,
+  UserX as UserXIcon,
+  Calendar as CalendarIcon,
+  Filter
 } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
+import axios from "axios";
 
-// Define types for the data
+// API URL
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? `http://${window.location.hostname}:5001/api` 
+  : '/api';
+
+// Types
+interface Employee {
+  _id: string;
+  employeeId: string;
+  name: string;
+  department: string;
+  position: string;
+  siteName?: string;
+  status: "active" | "inactive" | "left";
+  email?: string;
+  phone?: string;
+}
+
+interface AttendanceRecord {
+  _id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  status: 'present' | 'absent' | 'half-day' | 'leave' | 'weekly-off';
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  breakStartTime?: string | null;
+  breakEndTime?: string | null;
+  totalHours?: number;
+  breakTime?: number;
+  isCheckedIn?: boolean;
+  isOnBreak?: boolean;
+  supervisorId?: string;
+  remarks?: string;
+}
+
+interface Site {
+  _id: string;
+  name: string;
+  clientName?: string;
+  status?: string;
+}
+
+interface Task {
+  _id: string;
+  title: string;
+  description: string;
+  priority: "high" | "medium" | "low";
+  status: "pending" | "in-progress" | "completed" | "cancelled";
+  deadline: string;
+  dueDateTime?: string;
+  siteId: string;
+  siteName: string;
+  clientName?: string;
+  assignedUsers?: Array<{
+    userId: string;
+    name: string;
+    role: string;
+    assignedAt: string;
+    status: string;
+  }>;
+  assignedTo?: string;
+  assignedToName?: string;
+}
+
 interface DashboardStats {
   totalEmployees: number;
   assignedTasks: number;
@@ -64,13 +159,9 @@ interface TeamMember {
   status: string;
 }
 
-interface Task {
-  id: string;
-  title: string;
-  dueDate: string;
-  assignedTo: string;
-  priority: string;
-  progress: number;
+interface SiteEmployeeCount {
+  siteName: string;
+  totalEmployees: number;
 }
 
 interface AttendanceStatus {
@@ -119,13 +210,98 @@ interface ManagerAttendanceData {
   isOnBreak: boolean;
 }
 
+interface AttendanceSummary {
+  totalEmployees: number;
+  presentCount: number;
+  absentCount: number;
+  weeklyOffCount: number;
+  leaveCount: number;
+  halfDayCount: number;
+}
+
 interface OutletContext {
   onMenuClick: () => void;
 }
 
-// API base URL
-const API_URL = `http://${window.location.hostname}:5001/api`;
-// Current supervisor info - Dynamic from localStorage
+// Helper function to format date
+const formatDate = (date: Date | string) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper function to format time for display
+const formatTimeForDisplay = (timestamp: string | null): string => {
+  if (!timestamp || timestamp === "-" || timestamp === "") return "-";
+  
+  try {
+    if (typeof timestamp === 'string' && (timestamp.includes('AM') || timestamp.includes('PM'))) {
+      return timestamp;
+    }
+    
+    if (timestamp.includes('T')) {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: true 
+        });
+      }
+    }
+    
+    const timeParts = timestamp.split(':');
+    if (timeParts.length >= 2) {
+      const hours = parseInt(timeParts[0]);
+      const minutes = timeParts[1];
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes} ${period}`;
+    }
+    
+    return timestamp;
+  } catch (error) {
+    return timestamp || "-";
+  }
+};
+
+// Helper function to format hours
+const formatHours = (hours: number): string => {
+  if (hours < 0) {
+    return "0.00 hrs";
+  }
+  return `${hours.toFixed(2)} hrs`;
+};
+
+// Helper function to normalize site names for comparison - MODIFIED FOR EXACT MATCHING
+const normalizeSiteName = (siteName: string | null | undefined): string => {
+  if (!siteName) return '';
+  // Only trim and convert to lowercase, no special character removal
+  return siteName
+    .toString()
+    .toLowerCase()
+    .trim();
+};
+
+// Helper function to calculate total hours
+const calculateTotalHours = (start: string | null, end: string | null): number => {
+  if (!start || !end) return 0;
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  return (endTime - startTime) / (1000 * 60 * 60);
+};
+
+// Helper function to calculate break time
+const calculateBreakTime = (start: string | null, end: string | null): number => {
+  if (!start || !end) return 0;
+  const startTime = new Date(start).getTime();
+  const endTime = new Date(end).getTime();
+  return (endTime - startTime) / (1000 * 60 * 60);
+};
+
+// Get current supervisor from localStorage
 const getCurrentSupervisor = () => {
   const storedUser = localStorage.getItem("sk_user");
   if (storedUser) {
@@ -134,22 +310,24 @@ const getCurrentSupervisor = () => {
       return {
         id: user._id || user.id || `supervisor-${Date.now()}`,
         name: user.name || user.firstName || 'Supervisor',
-        supervisorId: user.supervisorId || user._id || `supervisor-${Date.now()}`
+        supervisorId: user.supervisorId || user._id || `supervisor-${Date.now()}`,
+        email: user.email || ''
       };
     } catch (e) {
       console.error('Error parsing user:', e);
       return {
         id: `supervisor-${Date.now()}`,
         name: 'Supervisor',
-        supervisorId: `supervisor-${Date.now()}`
+        supervisorId: `supervisor-${Date.now()}`,
+        email: ''
       };
     }
   } else {
-    // Fallback for development
     return {
       id: 'supervisor-001',
       name: 'Supervisor User',
       supervisorId: 'supervisor-001',
+      email: 'supervisor@example.com'
     };
   }
 };
@@ -203,36 +381,52 @@ const generateMockTeam = (): TeamMember[] => [
 
 const generateMockTasks = (): Task[] => [
   {
-    id: '1',
+    _id: '1',
     title: 'Update project documentation',
-    dueDate: '2024-01-15',
-    assignedTo: 'John Doe',
+    description: 'Update the project documentation with latest changes',
     priority: 'high',
-    progress: 75
+    status: 'in-progress',
+    deadline: '2024-01-15',
+    siteId: 'site1',
+    siteName: 'Main Office',
+    clientName: 'Internal',
+    assignedUsers: [{ userId: '1', name: 'John Doe', role: 'Developer', assignedAt: new Date().toISOString(), status: 'assigned' }]
   },
   {
-    id: '2',
+    _id: '2',
     title: 'Fix login authentication bug',
-    dueDate: '2024-01-12',
-    assignedTo: 'Sarah Smith',
+    description: 'Fix the login authentication bug reported by users',
     priority: 'high',
-    progress: 90
+    status: 'in-progress',
+    deadline: '2024-01-12',
+    siteId: 'site1',
+    siteName: 'Main Office',
+    clientName: 'Internal',
+    assignedUsers: [{ userId: '2', name: 'Sarah Smith', role: 'QA', assignedAt: new Date().toISOString(), status: 'assigned' }]
   },
   {
-    id: '3',
+    _id: '3',
     title: 'Design new dashboard layout',
-    dueDate: '2024-01-20',
-    assignedTo: 'Mike Johnson',
+    description: 'Create new dashboard layout designs',
     priority: 'medium',
-    progress: 40
+    status: 'pending',
+    deadline: '2024-01-20',
+    siteId: 'site2',
+    siteName: 'Branch Office',
+    clientName: 'Client A',
+    assignedUsers: [{ userId: '3', name: 'Mike Johnson', role: 'Designer', assignedAt: new Date().toISOString(), status: 'assigned' }]
   },
   {
-    id: '4',
+    _id: '4',
     title: 'Performance optimization',
-    dueDate: '2024-01-18',
-    assignedTo: 'Emily Brown',
+    description: 'Optimize application performance',
     priority: 'low',
-    progress: 20
+    status: 'pending',
+    deadline: '2024-01-18',
+    siteId: 'site2',
+    siteName: 'Branch Office',
+    clientName: 'Client A',
+    assignedUsers: [{ userId: '4', name: 'Emily Brown', role: 'Developer', assignedAt: new Date().toISOString(), status: 'assigned' }]
   }
 ];
 
@@ -240,7 +434,7 @@ const SupervisorDashboard = () => {
   const { onMenuClick } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   
-  // State for data with proper types
+  // State for data
   const [stats, setStats] = useState<DashboardStats>({
     totalEmployees: 0,
     assignedTasks: 0,
@@ -259,14 +453,14 @@ const SupervisorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState<string>('');
   
-  // State for API connection status
+  // State for API connection
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
   
   // Current supervisor state
   const [currentSupervisor, setCurrentSupervisor] = useState(getCurrentSupervisor());
   
-  // Attendance state with proper initial values
+  // Attendance state
   const [attendance, setAttendance] = useState<AttendanceStatus>({
     isCheckedIn: false,
     isOnBreak: false,
@@ -280,98 +474,452 @@ const SupervisorDashboard = () => {
     hasCheckedOutToday: false
   });
 
-  // Manager attendance data state (for displaying manager's current status)
+  // Manager attendance data
   const [managerAttendance, setManagerAttendance] = useState<ManagerAttendanceData | null>(null);
   const [isLoadingManagerAttendance, setIsLoadingManagerAttendance] = useState(false);
 
-  // Supervisor attendance records state
+  // Supervisor attendance records
   const [supervisorAttendanceRecords, setSupervisorAttendanceRecords] = useState<SupervisorAttendanceRecord[]>([]);
 
   // Loading states
   const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  
+  // Site and employee data
+  const [supervisorSites, setSupervisorSites] = useState<Site[]>([]);
+  const [supervisorSiteNames, setSupervisorSiteNames] = useState<string[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [siteEmployeeCounts, setSiteEmployeeCounts] = useState<SiteEmployeeCount[]>([]);
+  
+  // Loading states for data fetching
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [loadingSites, setLoadingSites] = useState(false);
+  
+  // Attendance summary
+  const [summary, setSummary] = useState<AttendanceSummary>({
+    totalEmployees: 0,
+    presentCount: 0,
+    absentCount: 0,
+    weeklyOffCount: 0,
+    leaveCount: 0,
+    halfDayCount: 0
+  });
 
-  // Fetch all data
-  useEffect(() => {
-    loadData();
-    checkBackendConnection();
-  }, []);
-
-  // Load data when backend connection is established
-  useEffect(() => {
-    if (isBackendConnected) {
-      loadAttendanceStatus();
-      loadManagerAttendanceData();
-      loadSupervisorAttendanceRecords();
-    }
-  }, [isBackendConnected]);
+  // Date selection
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Check backend connection
-  const checkBackendConnection = async () => {
+ // Check backend connection - UPDATED VERSION
+const checkBackendConnection = async () => {
+  try {
+    setIsCheckingConnection(true);
+    console.log('🔄 Checking backend connection at:', `${API_URL}`);
+    
+    // Check if we can connect to the server by making a request to employees endpoint
+    // This endpoint definitely exists in your backend
+    const response = await axios.get(`${API_URL}/employees?limit=1`, {
+      timeout: 5000,
+      validateStatus: (status) => status < 500 // Accept any status less than 500
+    });
+    
+    // If we get any response (even 404, 401, 403, etc.), the server is running
+    console.log(`✅ Backend connected (status: ${response.status})`);
+    setIsBackendConnected(true);
+    
+  } catch (error: any) {
+    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+      // Network error means server is not reachable
+      console.error('❌ Backend connection error - server not reachable:', error);
+      setIsBackendConnected(false);
+    } else if (error.response) {
+      // We got a response from the server (even if it's an error), so server is running
+      console.log(`✅ Backend is running but returned status ${error.response.status}`);
+      setIsBackendConnected(true);
+    } else {
+      console.error('❌ Backend connection error:', error);
+      setIsBackendConnected(false);
+    }
+  } finally {
+    setIsCheckingConnection(false);
+  }
+};
+
+  // Fetch tasks where this specific supervisor is assigned
+  const fetchSupervisorSitesFromTasks = useCallback(async () => {
+    if (!currentSupervisor) return { siteNames: [], siteIds: [] };
+    
     try {
-      setIsCheckingConnection(true);
-      console.log('🔄 Checking backend connection at:', `${API_URL}/health`);
+      const supervisorId = currentSupervisor.id;
+      const supervisorName = currentSupervisor.name;
       
-      const response = await fetch(`${API_URL}/health`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      console.log("🔍 Fetching tasks for supervisor:", {
+        id: supervisorId,
+        name: supervisorName
+      });
+      
+      const response = await axios.get(`${API_URL}/tasks`, {
+        params: { limit: 1000 }
+      });
+      
+      let supervisorSiteNamesSet = new Set<string>();
+      let supervisorSiteIdsSet = new Set<string>();
+      let tasksWithSupervisor: Task[] = [];
+      
+      let allTasks: Task[] = [];
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          allTasks = response.data;
+        } else if (response.data.success && Array.isArray(response.data.data)) {
+          allTasks = response.data.data;
+        } else if (response.data.tasks && Array.isArray(response.data.tasks)) {
+          allTasks = response.data.tasks;
+        }
+      }
+      
+      console.log(`📊 Total tasks fetched: ${allTasks.length}`);
+      
+      allTasks.forEach((task: Task) => {
+        let isAssignedToThisSupervisor = false;
+        
+        if (task.assignedUsers && Array.isArray(task.assignedUsers)) {
+          isAssignedToThisSupervisor = task.assignedUsers.some(user => {
+            const userIdMatch = user.userId === supervisorId;
+            const nameMatch = user.name?.toLowerCase() === supervisorName?.toLowerCase();
+            return userIdMatch || nameMatch;
+          });
+        }
+        
+        if (!isAssignedToThisSupervisor && task.assignedTo) {
+          isAssignedToThisSupervisor = 
+            task.assignedTo === supervisorId || 
+            task.assignedToName?.toLowerCase() === supervisorName?.toLowerCase();
+        }
+        
+        if (isAssignedToThisSupervisor && task.siteId && task.siteName) {
+          supervisorSiteIdsSet.add(task.siteId);
+          supervisorSiteNamesSet.add(task.siteName);
+          tasksWithSupervisor.push(task);
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Health check response:', data);
-        
-        if (data.status === 'OK') {
-          setIsBackendConnected(true);
-          console.log('✅ Backend connected successfully for supervisor');
-        } else {
-          setIsBackendConnected(false);
-          console.warn('⚠️ Backend health check failed');
-        }
-      } else {
-        setIsBackendConnected(false);
-        console.warn('⚠️ Backend health check failed with status:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ Backend connection error:', error);
-      setIsBackendConnected(false);
-    } finally {
-      setIsCheckingConnection(false);
+      const supervisorSiteNames = Array.from(supervisorSiteNamesSet);
+      const supervisorSiteIds = Array.from(supervisorSiteIdsSet);
+      
+      console.log(`✅ Found ${tasksWithSupervisor.length} tasks for this supervisor`);
+      console.log("📍 Supervisor's sites from tasks:", supervisorSiteNames);
+      
+      return { siteNames: supervisorSiteNames, siteIds: supervisorSiteIds };
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching tasks:', error);
+      return { siteNames: [], siteIds: [] };
     }
-  };
+  }, [currentSupervisor]);
 
-  const loadData = async () => {
-    setLoading(true);
+  // Fetch all sites and filter by supervisor's task-assigned sites
+  const fetchAllSites = useCallback(async () => {
+    if (!currentSupervisor) return [];
+    
     try {
-      // Use mock data instead of API calls
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setLoadingSites(true);
+      const { siteNames: taskSiteNames, siteIds: taskSiteIds } = await fetchSupervisorSitesFromTasks();
       
-      setStats(generateMockStats());
-      setActivities(generateMockActivities());
-      setTeam(generateMockTeam());
-      setTasks(generateMockTasks());
+      console.log("🌐 Fetching all sites from API...");
       
-    } catch (error) {
-      console.error('Error loading data:', error);
-      // Fallback to mock data even if there's an error
-      setStats(generateMockStats());
-      setActivities(generateMockActivities());
-      setTeam(generateMockTeam());
-      setTasks(generateMockTasks());
+      const response = await axios.get(`${API_URL}/sites`);
+      
+      let allSitesData: Site[] = [];
+      
+      if (response.data) {
+        if (response.data.success && Array.isArray(response.data.data)) {
+          allSitesData = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          allSitesData = response.data;
+        } else if (response.data.sites && Array.isArray(response.data.sites)) {
+          allSitesData = response.data.sites;
+        }
+      }
+      
+      console.log(`📊 Fetched ${allSitesData.length} sites from API`);
+      
+      const transformedSites = allSitesData.map((site: any) => ({
+        _id: site._id || site.id,
+        name: site.name,
+        clientName: site.clientName || site.client,
+        status: site.status || "active"
+      }));
+      
+      // Filter sites based on task assignments - EXACT MATCH ONLY
+      let supervisorSiteList: Site[] = [];
+      
+      if (taskSiteNames.length > 0) {
+        supervisorSiteList = transformedSites.filter(site => {
+          // Check exact match with site name
+          const exactNameMatch = taskSiteNames.some(taskSiteName => 
+            site.name === taskSiteName
+          );
+          
+          // Check exact match with normalized names
+          const exactNormalizedMatch = taskSiteNames.some(taskSiteName => 
+            normalizeSiteName(site.name) === normalizeSiteName(taskSiteName)
+          );
+          
+          // Check ID match
+          const idMatch = taskSiteIds.includes(site._id);
+          
+          return exactNameMatch || exactNormalizedMatch || idMatch;
+        });
+        
+        console.log(`✅ Matched ${supervisorSiteList.length} sites from task assignments (exact matches only)`);
+      } else {
+        supervisorSiteList = transformedSites;
+        console.log("⚠️ No task sites found, showing all sites");
+      }
+      
+      setSupervisorSites(supervisorSiteList);
+      setSupervisorSiteNames(supervisorSiteList.map(site => site.name));
+      
+      setLoadingSites(false);
+      return supervisorSiteList;
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching sites:', error);
+      setLoadingSites(false);
+      return [];
+    }
+  }, [currentSupervisor, fetchSupervisorSitesFromTasks]);
+
+  // Fetch employees assigned to supervisor's sites
+  const fetchEmployees = useCallback(async () => {
+    if (!currentSupervisor) {
+      console.log("No current supervisor");
+      return;
+    }
+    
+    try {
+      setLoadingEmployees(true);
+      console.log("Fetching employees...");
+      
+      let supervisorSiteList = supervisorSites;
+      let supervisorSiteNameList = supervisorSiteNames;
+      
+      if (supervisorSiteList.length === 0) {
+        supervisorSiteList = await fetchAllSites() || [];
+        supervisorSiteNameList = supervisorSiteList.map(site => site.name);
+      }
+      
+      if (supervisorSiteNameList.length === 0) {
+        console.log("❌ No sites from tasks - setting empty employees array");
+        setEmployees([]);
+        setSiteEmployeeCounts([]);
+        
+        toast.warning("You have no tasks assigned to any sites. Please contact your administrator.");
+        setLoadingEmployees(false);
+        return;
+      }
+      
+      console.log("📡 Fetching all employees from API:", `${API_URL}/employees`);
+      
+      const response = await axios.get(`${API_URL}/employees`, {
+        params: { limit: 1000 }
+      });
+      
+      let fetchedEmployees: Employee[] = [];
+      let allEmployees: Employee[] = [];
+      
+      if (response.data) {
+        if (response.data.success) {
+          allEmployees = response.data.data || response.data.employees || [];
+        } else if (Array.isArray(response.data)) {
+          allEmployees = response.data;
+        } else if (response.data.employees && Array.isArray(response.data.employees)) {
+          allEmployees = response.data.employees;
+        }
+        
+        console.log(`📊 Total employees from API: ${allEmployees.length}`);
+        console.log("📍 Supervisor's task-assigned sites:", supervisorSiteNameList);
+        
+        // IMPORTANT FIX: Filter employees by supervisor's task-assigned sites using EXACT MATCH ONLY
+        // No partial matches, no "includes" matching
+        fetchedEmployees = allEmployees.filter((emp: Employee) => {
+          const employeeSite = emp.siteName || '';
+          
+          // EXACT MATCH ONLY - compare the full site name
+          const exactMatch = supervisorSiteNameList.some(siteName => 
+            siteName === employeeSite
+          );
+          
+          // Normalized exact match (case insensitive, trimmed)
+          const normalizedExactMatch = supervisorSiteNameList.some(siteName => 
+            normalizeSiteName(siteName) === normalizeSiteName(employeeSite)
+          );
+          
+          // Only match if it's an exact match - NO PARTIAL MATCHES
+          const matches = exactMatch || normalizedExactMatch;
+          
+          if (matches) {
+            console.log(`✅ Employee ${emp.name} (${emp.employeeId}) matches site: "${employeeSite}" exactly with supervisor site: "${supervisorSiteNameList.find(s => normalizeSiteName(s) === normalizeSiteName(employeeSite))}"`);
+          } else {
+            console.log(`❌ Employee ${emp.name} site: "${employeeSite}" does NOT exactly match any supervisor site: [${supervisorSiteNameList.join(', ')}]`);
+          }
+          
+          return matches;
+        });
+        
+        console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites (exact matches only)`);
+        
+        const siteCountMap = new Map<string, number>();
+        fetchedEmployees.forEach(emp => {
+          const siteName = emp.siteName || 'Unknown Site';
+          siteCountMap.set(siteName, (siteCountMap.get(siteName) || 0) + 1);
+        });
+        
+        const siteCounts = Array.from(siteCountMap.entries()).map(([siteName, count]) => ({
+          siteName,
+          totalEmployees: count
+        }));
+        
+        setSiteEmployeeCounts(siteCounts);
+        
+        if (fetchedEmployees.length > 0) {
+          toast.success(`Loaded ${fetchedEmployees.length} employees for your task-assigned sites`);
+        } else {
+          toast.warning(`No employees found for your task-assigned sites: ${supervisorSiteNameList.join(', ')}`);
+        }
+      }
+      
+      setEmployees(fetchedEmployees);
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching employees:', error);
+      
+      if (error.code === 'ERR_NETWORK') {
+        toast.error("Network error: Cannot connect to server");
+      } else {
+        toast.error(`Failed to load employees: ${error.message}`);
+      }
+      
+      setEmployees([]);
+      setSiteEmployeeCounts([]);
     } finally {
-      setLoading(false);
+      setLoadingEmployees(false);
+    }
+  }, [currentSupervisor, supervisorSites, supervisorSiteNames, fetchAllSites]);
+
+  // Load attendance records for selected date - FIXED ABSENT COUNT LOGIC
+  const loadAttendanceRecords = async (date: string) => {
+    try {
+      setLoadingAttendance(true);
+      console.log('📋 Fetching attendance for date:', date);
+      
+      if (employees.length === 0) {
+        console.log("No employees to fetch attendance for");
+        setAttendanceRecords([]);
+        setSummary({
+          totalEmployees: 0,
+          presentCount: 0,
+          absentCount: 0,
+          weeklyOffCount: 0,
+          leaveCount: 0,
+          halfDayCount: 0
+        });
+        setLoadingAttendance(false);
+        return;
+      }
+      
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: { date }
+      });
+      
+      console.log('Attendance API response:', response.data);
+      
+      if (response.data && response.data.success) {
+        const allRecords = response.data.data || [];
+        
+        const employeeIdsFromSites = new Set(employees.map(emp => emp._id));
+        const employeeNamesFromSites = new Set(employees.map(emp => emp.name));
+        
+        const filteredRecords = allRecords.filter((record: any) => 
+          employeeIdsFromSites.has(record.employeeId) || 
+          employeeNamesFromSites.has(record.employeeName)
+        );
+        
+        console.log(`📊 Total attendance records: ${allRecords.length}, Filtered: ${filteredRecords.length}`);
+        
+        setAttendanceRecords(filteredRecords);
+        
+        // Calculate counts
+        const presentCount = filteredRecords.filter((r: AttendanceRecord) => r.status === 'present').length;
+        const weeklyOffCount = filteredRecords.filter((r: AttendanceRecord) => r.status === 'weekly-off').length;
+        const leaveCount = filteredRecords.filter((r: AttendanceRecord) => r.status === 'leave').length;
+        const halfDayCount = filteredRecords.filter((r: AttendanceRecord) => r.status === 'half-day').length;
+        
+        // Employees with status 'absent' in records
+        const absentFromRecords = filteredRecords.filter((r: AttendanceRecord) => r.status === 'absent').length;
+        
+        // Employees with NO attendance record at all
+        const employeesWithRecords = new Set(filteredRecords.map(r => r.employeeId));
+        const employeesWithoutRecords = employees.filter(emp => !employeesWithRecords.has(emp._id)).length;
+        
+        // Total absent = absent from records + employees without records
+        // Employees on weekly off are NOT counted as absent
+        const totalAbsentCount = absentFromRecords + employeesWithoutRecords;
+        
+        console.log(`📊 Summary - Present: ${presentCount}, Weekly Off: ${weeklyOffCount}, Leave: ${leaveCount}, Half Day: ${halfDayCount}, Absent: ${totalAbsentCount} (${absentFromRecords} from records + ${employeesWithoutRecords} without records)`);
+        
+        setSummary({
+          totalEmployees: employees.length,
+          presentCount,
+          absentCount: totalAbsentCount,
+          weeklyOffCount,
+          leaveCount,
+          halfDayCount
+        });
+      } else {
+        console.error('Failed to load attendance:', response.data?.message);
+        setAttendanceRecords([]);
+        
+        // If no attendance records at all, all employees are absent
+        setSummary({
+          totalEmployees: employees.length,
+          presentCount: 0,
+          absentCount: employees.length,
+          weeklyOffCount: 0,
+          leaveCount: 0,
+          halfDayCount: 0
+        });
+      }
+    } catch (error: any) {
+      console.error('Error loading attendance:', error);
+      
+      if (error.code === 'ERR_NETWORK') {
+        toast.error("Network error: Cannot fetch attendance data");
+      }
+      
+      setAttendanceRecords([]);
+      
+      // On error, all employees are considered absent
+      setSummary({
+        totalEmployees: employees.length,
+        presentCount: 0,
+        absentCount: employees.length,
+        weeklyOffCount: 0,
+        leaveCount: 0,
+        halfDayCount: 0
+      });
+    } finally {
+      setLoadingAttendance(false);
     }
   };
 
-  // Load manager attendance data from MongoDB API
+  // Load manager attendance data
   const loadManagerAttendanceData = async () => {
     try {
       setIsLoadingManagerAttendance(true);
       console.log('🔄 Loading manager attendance data...');
       
-      // Try to get manager ID from localStorage (same logic as manager dashboard)
       const storedUser = localStorage.getItem("sk_user");
       let managerId = '';
       let managerName = '';
@@ -387,7 +935,6 @@ const SupervisorDashboard = () => {
           managerName = 'Manager';
         }
       } else {
-        // Fallback for development
         managerId = `manager-${Date.now()}`;
         managerName = 'Demo Manager';
       }
@@ -400,8 +947,7 @@ const SupervisorDashboard = () => {
       
       console.log('📋 Fetching manager attendance for ID:', managerId);
       
-      // Fetch today's attendance for the manager
-      const response = await fetch(`${API_URL}/api/manager-attendance/today/${managerId}`, {
+      const response = await fetch(`${API_URL}/manager-attendance/today/${managerId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -416,7 +962,6 @@ const SupervisorDashboard = () => {
           setManagerAttendance(data.data);
           console.log('✅ Manager attendance data loaded:', data.data);
           
-          // Add an activity entry for manager check-in if available
           if (data.data.checkInTime) {
             const checkInTime = formatTimeForDisplay(data.data.checkInTime);
             addActivity('checkin', `Manager ${managerName} checked in at ${checkInTime}`, 'manager');
@@ -437,13 +982,13 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Load attendance status from backend API with duplicate check prevention
+  // Load attendance status
   const loadAttendanceStatus = async () => {
     try {
       setIsCheckingStatus(true);
       console.log('🔄 Loading attendance status from API...');
       
-      const response = await fetch(`${API_URL}/api/attendance/status/${currentSupervisor.id}`);
+      const response = await fetch(`${API_URL}/attendance/status/${currentSupervisor.id}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -476,12 +1021,6 @@ const SupervisorDashboard = () => {
           setAttendance(newAttendance);
           localStorage.setItem(`supervisorAttendance_${currentSupervisor.id}`, JSON.stringify(newAttendance));
           console.log('✅ Attendance loaded from API');
-          console.log('📊 Status:', {
-            hasCheckedInToday,
-            hasCheckedOutToday,
-            isCheckedIn: newAttendance.isCheckedIn,
-            checkOutTime: newAttendance.checkOutTime
-          });
           setApiStatus('');
           return;
         }
@@ -490,12 +1029,10 @@ const SupervisorDashboard = () => {
         setApiStatus('API connection failed, using local data');
       }
       
-      // Fallback to localStorage if API fails
       const savedAttendance = localStorage.getItem(`supervisorAttendance_${currentSupervisor.id}`);
       if (savedAttendance) {
         const parsedAttendance = JSON.parse(savedAttendance);
         
-        // Check if already checked in today
         const today = new Date().toDateString();
         const lastCheckInDate = parsedAttendance.lastCheckInDate ? 
           new Date(parsedAttendance.lastCheckInDate).toDateString() : null;
@@ -517,7 +1054,6 @@ const SupervisorDashboard = () => {
       console.error('❌ Error loading attendance status:', error);
       setApiStatus('Error loading attendance data');
       
-      // Fallback to localStorage
       const savedAttendance = localStorage.getItem(`supervisorAttendance_${currentSupervisor.id}`);
       if (savedAttendance) {
         const parsedAttendance = JSON.parse(savedAttendance);
@@ -534,20 +1070,18 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Load supervisor attendance records from MongoDB
+  // Load supervisor attendance records
   const loadSupervisorAttendanceRecords = async () => {
     try {
       console.log('🔄 Loading supervisor attendance history...');
       
-      // Use the history endpoint to get all records
-      const response = await fetch(`${API_URL}/api/attendance/history?employeeId=${currentSupervisor.id}`);
+      const response = await fetch(`${API_URL}/attendance/history?employeeId=${currentSupervisor.id}`);
       
       if (response.ok) {
         const data = await response.json();
         console.log('📊 Supervisor attendance history response:', data);
         
         if (data.success && Array.isArray(data.data)) {
-          // Filter to include ONLY current supervisor's records
           const supervisorRecords = data.data.filter((record: any) => 
             record.employeeId === currentSupervisor.id || 
             record.supervisorId === currentSupervisor.id
@@ -603,7 +1137,7 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Helper function for fallback data
+  // Create sample attendance records
   const createSampleAttendanceRecords = () => {
     const today = new Date().toISOString().split('T')[0];
     const sampleRecords: SupervisorAttendanceRecord[] = [
@@ -678,7 +1212,7 @@ const SupervisorDashboard = () => {
     setSupervisorAttendanceRecords(sampleRecords);
   };
 
-  // Save attendance status to both localStorage and update local state
+  // Save attendance status
   const saveAttendanceStatus = (newAttendance: AttendanceStatus) => {
     const sanitizedAttendance = {
       ...newAttendance,
@@ -690,32 +1224,16 @@ const SupervisorDashboard = () => {
     localStorage.setItem(`supervisorAttendance_${currentSupervisor.id}`, JSON.stringify(sanitizedAttendance));
   };
 
-  // ========== FIXED ATTENDANCE HANDLERS WITH DUPLICATE CHECK ==========
-
-  // Handle check-in with duplicate prevention
+  // Handle check-in
   const handleCheckIn = async () => {
     try {
-      // Check if already checked in today
       if (attendance.hasCheckedInToday && !attendance.isCheckedIn) {
-        toast.error("You have already checked in today. Only one check-in allowed per day.", {
-          action: {
-            label: "View Status",
-            onClick: () => {
-              toast.info("Showing your attendance status");
-            }
-          }
-        });
+        toast.error("You have already checked in today. Only one check-in allowed per day.");
         return;
       }
 
-      // Check if already checked in currently
       if (attendance.isCheckedIn) {
-        toast.error("You are already checked in!", {
-          action: {
-            label: "Check Out",
-            onClick: () => handleCheckOut()
-          }
-        });
+        toast.error("You are already checked in!");
         return;
       }
 
@@ -729,7 +1247,7 @@ const SupervisorDashboard = () => {
         supervisorId: currentSupervisor.supervisorId,
       };
       
-      const response = await fetch(`${API_URL}/api/attendance/checkin`, {
+      const response = await fetch(`${API_URL}/attendance/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -752,42 +1270,20 @@ const SupervisorDashboard = () => {
           hasCheckedOutToday: false
         };
         
-        // Update local state
         saveAttendanceStatus(newAttendance);
-        
-        // Add activity
         addActivity('checkin', `Checked in at ${formatTimeForDisplay(now)}`);
-        
-        // Reload supervisor records
         loadSupervisorAttendanceRecords();
         
-        // Show success message
-        toast.success("✅ Successfully checked in!", {
-          description: "Your attendance has been recorded",
-          action: {
-            label: "View Status",
-            onClick: () => {
-              toast.info("Your current status: Checked In");
-            }
-          }
-        });
+        toast.success("✅ Successfully checked in!");
       } else {
         throw new Error(data.message || 'Failed to check in');
       }
     } catch (error: any) {
       console.error('❌ Check-in error:', error);
       
-      // Check for specific error messages
       if (error.message.includes('Already checked in') || error.message.includes('already checked in')) {
-        toast.error("❌ Already Checked In Today", {
-          description: "You can only check in once per day. Please check out first if needed.",
-          action: {
-            label: "Reset",
-            onClick: () => handleResetAttendance()
-          }
-        });
+        toast.error("❌ Already Checked In Today");
         
-        // Update local state to reflect already checked in
         const newAttendance = {
           ...attendance,
           hasCheckedInToday: true,
@@ -797,7 +1293,6 @@ const SupervisorDashboard = () => {
       } else {
         toast.error(`❌ Check-in failed: ${error.message}`);
         
-        // Fallback: Update local state only
         const now = new Date().toISOString();
         const newAttendance = {
           ...attendance,
@@ -815,34 +1310,19 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Handle check-out with duplicate prevention
+  // Handle check-out
   const handleCheckOut = async () => {
     try {
-      // Check if already checked out today
       if (attendance.hasCheckedOutToday) {
-        toast.error("You have already checked out today.", {
-          action: {
-            label: "View Record",
-            onClick: () => {
-              toast.info("Showing today's attendance record");
-            }
-          }
-        });
+        toast.error("You have already checked out today.");
         return;
       }
 
-      // Check if not checked in
       if (!attendance.isCheckedIn && !attendance.hasCheckedInToday) {
-        toast.error("You need to check in first!", {
-          action: {
-            label: "Check In",
-            onClick: () => handleCheckIn()
-          }
-        });
+        toast.error("You need to check in first!");
         return;
       }
 
-      // If not currently checked in but has checked in today, allow check out
       if (!attendance.isCheckedIn && attendance.hasCheckedInToday) {
         toast.warning("You are not currently checked in, but you checked in earlier today.", {
           action: {
@@ -861,7 +1341,7 @@ const SupervisorDashboard = () => {
         employeeId: currentSupervisor.id,
       };
       
-      const response = await fetch(`${API_URL}/api/attendance/checkout`, {
+      const response = await fetch(`${API_URL}/attendance/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -884,44 +1364,20 @@ const SupervisorDashboard = () => {
           hasCheckedOutToday: true
         };
         
-        // Update local state
         saveAttendanceStatus(newAttendance);
-        
-        // Add activity
         addActivity('checkout', `Checked out at ${formatTimeForDisplay(now)} - Total: ${totalHours.toFixed(2)}h`);
-        
-        // Reload supervisor records
         loadSupervisorAttendanceRecords();
         
-        // Show success message
-        toast.success(`✅ Successfully checked out!`, {
-          description: `Total hours: ${totalHours.toFixed(2)}`,
-          action: {
-            label: "View Summary",
-            onClick: () => {
-              toast.info(`Today's total: ${totalHours.toFixed(2)} hours`);
-            }
-          }
-        });
+        toast.success(`✅ Successfully checked out! Total hours: ${totalHours.toFixed(2)}`);
       } else {
         throw new Error(data.message || 'Failed to check out');
       }
     } catch (error: any) {
       console.error('❌ Check-out error:', error);
       
-      // Check for specific error messages
       if (error.message.includes('Already checked out') || error.message.includes('already checked out')) {
-        toast.error("❌ Already Checked Out Today", {
-          description: "You have already checked out for today.",
-          action: {
-            label: "View Record",
-            onClick: () => {
-              toast.info("Showing today's attendance record");
-            }
-          }
-        });
+        toast.error("❌ Already Checked Out Today");
         
-        // Update local state to reflect already checked out
         const newAttendance = {
           ...attendance,
           hasCheckedOutToday: true,
@@ -931,7 +1387,6 @@ const SupervisorDashboard = () => {
       } else {
         toast.error(`❌ Check-out failed: ${error.message}`);
         
-        // Fallback: Update local state only
         const now = new Date().toISOString();
         const totalHours = calculateTotalHours(attendance.checkInTime, now);
         const newAttendance = {
@@ -950,7 +1405,7 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Force check out (for when user checked in but not currently checked in)
+  // Force check out
   const forceCheckOut = async () => {
     try {
       console.log('🔄 Force checking out for supervisor:', currentSupervisor.id);
@@ -969,15 +1424,10 @@ const SupervisorDashboard = () => {
         hasCheckedOutToday: true
       };
       
-      // Update local state
       saveAttendanceStatus(newAttendance);
-      
-      // Add activity
       addActivity('checkout', `Force checked out at ${formatTimeForDisplay(now)} - Total: ${totalHours.toFixed(2)}h`);
       
-      toast.success(`✅ Force checked out successfully!`, {
-        description: `Total hours: ${totalHours.toFixed(2)}`,
-      });
+      toast.success(`✅ Force checked out successfully! Total hours: ${totalHours.toFixed(2)}`);
       
     } catch (error) {
       console.error('Force check-out error:', error);
@@ -987,16 +1437,15 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Reset attendance for new day
+  // Reset attendance
   const handleResetAttendance = async () => {
     try {
       console.log('🔄 Resetting attendance for new day...');
       
       setIsAttendanceLoading(true);
       
-      // Call reset endpoint if available
       try {
-        const response = await fetch(`${API_URL}/api/attendance/reset/${currentSupervisor.id}`, {
+        const response = await fetch(`${API_URL}/attendance/reset/${currentSupervisor.id}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1013,7 +1462,6 @@ const SupervisorDashboard = () => {
         console.log('Reset API failed, using local reset:', resetError);
       }
       
-      // Always reset locally
       const newAttendance = {
         isCheckedIn: false,
         isOnBreak: false,
@@ -1030,13 +1478,7 @@ const SupervisorDashboard = () => {
       
       saveAttendanceStatus(newAttendance);
       
-      toast.success("✅ Attendance reset for new day!", {
-        description: "You can now check in again",
-        action: {
-          label: "Check In",
-          onClick: () => handleCheckIn()
-        }
-      });
+      toast.success("✅ Attendance reset for new day!");
       
     } catch (error) {
       console.error('Reset error:', error);
@@ -1046,20 +1488,14 @@ const SupervisorDashboard = () => {
     }
   };
 
+  // Handle break in
   const handleBreakIn = async () => {
     try {
-      // Check if checked in
       if (!attendance.isCheckedIn) {
-        toast.error("You need to check in first!", {
-          action: {
-            label: "Check In",
-            onClick: () => handleCheckIn()
-          }
-        });
+        toast.error("You need to check in first!");
         return;
       }
 
-      // Check if already on break
       if (attendance.isOnBreak) {
         toast.error("You are already on break!");
         return;
@@ -1073,7 +1509,7 @@ const SupervisorDashboard = () => {
         employeeId: currentSupervisor.id,
       };
       
-      const response = await fetch(`${API_URL}/api/attendance/breakin`, {
+      const response = await fetch(`${API_URL}/attendance/breakin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1086,7 +1522,6 @@ const SupervisorDashboard = () => {
       if (data.success) {
         toast.success("Break started successfully!");
         
-        // Update local state
         const now = new Date().toISOString();
         const newAttendance = {
           ...attendance,
@@ -1094,11 +1529,7 @@ const SupervisorDashboard = () => {
           breakStartTime: now
         };
         saveAttendanceStatus(newAttendance);
-        
-        // Add activity
         addActivity('break', `Started break at ${formatTimeForDisplay(now)}`);
-        
-        // Reload supervisor attendance
         loadSupervisorAttendanceRecords();
       } else {
         throw new Error(data.message || "Error starting break");
@@ -1107,7 +1538,6 @@ const SupervisorDashboard = () => {
       console.error('Break-in error:', error);
       toast.error(`Break-in failed: ${error.message}`);
       
-      // Fallback: Update local state only
       const now = new Date().toISOString();
       const newAttendance = {
         ...attendance,
@@ -1121,9 +1551,9 @@ const SupervisorDashboard = () => {
     }
   };
 
+  // Handle break out
   const handleBreakOut = async () => {
     try {
-      // Check if on break
       if (!attendance.isOnBreak) {
         toast.error("You are not on break!");
         return;
@@ -1137,7 +1567,7 @@ const SupervisorDashboard = () => {
         employeeId: currentSupervisor.id,
       };
       
-      const response = await fetch(`${API_URL}/api/attendance/breakout`, {
+      const response = await fetch(`${API_URL}/attendance/breakout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1150,7 +1580,6 @@ const SupervisorDashboard = () => {
       if (data.success) {
         toast.success("Break ended successfully!");
         
-        // Update local state
         const now = new Date().toISOString();
         const breakTime = calculateBreakTime(attendance.breakStartTime, now);
         const totalBreakTime = (Number(attendance.breakTime) || 0) + breakTime;
@@ -1161,11 +1590,7 @@ const SupervisorDashboard = () => {
           breakTime: totalBreakTime
         };
         saveAttendanceStatus(newAttendance);
-        
-        // Add activity
         addActivity('break', `Ended break at ${formatTimeForDisplay(now)} - Duration: ${breakTime.toFixed(2)}h`);
-        
-        // Reload supervisor attendance
         loadSupervisorAttendanceRecords();
       } else {
         throw new Error(data.message || "Error ending break");
@@ -1174,7 +1599,6 @@ const SupervisorDashboard = () => {
       console.error('Break-out error:', error);
       toast.error(`Break-out failed: ${error.message}`);
       
-      // Fallback: Update local state only
       const now = new Date().toISOString();
       const breakTime = calculateBreakTime(attendance.breakStartTime, now);
       const totalBreakTime = (Number(attendance.breakTime) || 0) + breakTime;
@@ -1191,26 +1615,53 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Helper functions for time calculations
-  const calculateTotalHours = (start: string | null, end: string | null): number => {
-    if (!start || !end) return 0;
-    const startTime = new Date(start).getTime();
-    const endTime = new Date(end).getTime();
-    return (endTime - startTime) / (1000 * 60 * 60);
+  // Handle card clicks
+  const handlePresentClick = () => {
+    if (summary.presentCount === 0) {
+      toast.info('No present employees to show');
+      return;
+    }
+    navigate('/supervisor/attendance', { 
+      state: { 
+        filterStatus: 'present',
+        date: selectedDate,
+        fromDashboard: true 
+      } 
+    });
+    toast.info('Showing present employees for today');
   };
 
-  const calculateBreakTime = (start: string | null, end: string | null): number => {
-    if (!start || !end) return 0;
-    const startTime = new Date(start).getTime();
-    const endTime = new Date(end).getTime();
-    return (endTime - startTime) / (1000 * 60 * 60);
+  const handleAbsentClick = () => {
+    if (summary.absentCount === 0) {
+      toast.info('No absent employees to show');
+      return;
+    }
+    navigate('/supervisor/attendance', { 
+      state: { 
+        filterStatus: 'absent',
+        date: selectedDate,
+        fromDashboard: true 
+      } 
+    });
+    toast.info('Showing absent employees for today');
   };
 
-  const formatTimeForDisplay = (timestamp: string | null): string => {
-    if (!timestamp || timestamp === "-") return "-";
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleWeeklyOffClick = () => {
+    if (summary.weeklyOffCount === 0) {
+      toast.info('No employees on weekly off to show');
+      return;
+    }
+    navigate('/supervisor/attendance', { 
+      state: { 
+        filterStatus: 'weekly-off',
+        date: selectedDate,
+        fromDashboard: true 
+      } 
+    });
+    toast.info('Showing employees on weekly off for today');
   };
 
+  // Add activity
   const addActivity = (type: string, message: string, userType: string = 'self') => {
     const user = userType === 'manager' ? 'Manager' : 'You';
     const newActivity: Activity = {
@@ -1232,11 +1683,11 @@ const SupervisorDashboard = () => {
     ),
     tasks: tasks.filter(item =>
       item.title?.toLowerCase().includes(search.toLowerCase()) ||
-      item.assignedTo?.toLowerCase().includes(search.toLowerCase())
+      item.assignedToName?.toLowerCase().includes(search.toLowerCase())
     )
   };
 
-  // Simple action handlers
+  // Handle action
   const handleAction = (action: string, id?: string) => {
     const actions: { [key: string]: (id?: string) => void } = {
       assignTask: () => alert('Opening task assignment...'),
@@ -1258,7 +1709,7 @@ const SupervisorDashboard = () => {
     }
   };
 
-  // Simple styling helpers
+  // Get color for badges
   const getColor = (type: string, value: string) => {
     const colors: { [key: string]: { [key: string]: string } } = {
       priority: {
@@ -1289,7 +1740,7 @@ const SupervisorDashboard = () => {
     return colors[type]?.[value] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700';
   };
 
-  // Format time simply
+  // Format time
   const formatTime = (timestamp: string) => {
     if (!timestamp) return '';
     const diff = Date.now() - new Date(timestamp).getTime();
@@ -1303,7 +1754,7 @@ const SupervisorDashboard = () => {
     return 'Just now';
   };
 
-  // Safe number formatting for display
+  // Format number
   const formatNumber = (value: number): string => {
     return Number(value).toFixed(2);
   };
@@ -1316,25 +1767,37 @@ const SupervisorDashboard = () => {
         loadAttendanceStatus();
         loadManagerAttendanceData();
         loadSupervisorAttendanceRecords();
+        fetchAllSites();
+        fetchEmployees();
+        loadAttendanceRecords(selectedDate);
       }
     });
   };
 
-  // Refresh all data
+  // Handle refresh
   const handleRefresh = () => {
-    // Refresh current supervisor info
     setCurrentSupervisor(getCurrentSupervisor());
     
-    // Refresh data
+    checkBackendConnection();
     loadData();
     loadAttendanceStatus();
     loadManagerAttendanceData();
     loadSupervisorAttendanceRecords();
+    fetchAllSites();
+    fetchEmployees();
+    loadAttendanceRecords(selectedDate);
     
     toast.success("Dashboard data refreshed!");
   };
 
-  // Check if it's a new day (for resetting attendance)
+  const loadData = async () => {
+    setStats(generateMockStats());
+    setActivities(generateMockActivities());
+    setTeam(generateMockTeam());
+    setTasks(generateMockTasks());
+  };
+
+  // Check if it's a new day
   const isNewDay = () => {
     if (!attendance.lastCheckInDate) return true;
     
@@ -1357,6 +1820,41 @@ const SupervisorDashboard = () => {
     }
   }, [attendance.lastCheckInDate]);
 
+  // Initialize data
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      console.log("🚀 Initializing supervisor dashboard...");
+      await checkBackendConnection();
+      await fetchAllSites();
+      await fetchEmployees();
+      await loadAttendanceRecords(selectedDate);
+      await loadAttendanceStatus();
+      await loadManagerAttendanceData();
+      await loadSupervisorAttendanceRecords();
+      await loadData();
+      setLoading(false);
+    };
+    
+    initializeData();
+  }, []);
+
+  // Load attendance records when employees or date changes
+  useEffect(() => {
+    if (employees.length > 0) {
+      loadAttendanceRecords(selectedDate);
+    } else {
+      setSummary({
+        totalEmployees: 0,
+        presentCount: 0,
+        absentCount: 0,
+        weeklyOffCount: 0,
+        leaveCount: 0,
+        halfDayCount: 0
+      });
+    }
+  }, [employees, selectedDate]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -1378,7 +1876,7 @@ const SupervisorDashboard = () => {
 
       <div className="p-6 space-y-6">
         {/* Connection Status Banner */}
-        {!isBackendConnected && (
+        {/* {!isBackendConnected && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <WifiOff className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
@@ -1409,7 +1907,7 @@ const SupervisorDashboard = () => {
               </Button>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Connected Status Banner */}
         {isBackendConnected && (
@@ -1808,6 +2306,235 @@ const SupervisorDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Site Employee Counts */}
+        {siteEmployeeCounts.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Employee Count Per Site (Task-Assigned Sites Only)
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Total employees across all sites: {summary.totalEmployees}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {siteEmployeeCounts.map((site) => (
+                  <div key={site.siteName} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                    <span className="text-sm font-medium truncate max-w-[200px]" title={site.siteName}>
+                      {site.siteName}
+                    </span>
+                    <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                      {site.totalEmployees} employee{site.totalEmployees !== 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Total Employees Summary Card */}
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Total Employees</p>
+                <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{summary.totalEmployees}</p>
+                <p className="text-xs text-blue-700 dark:text-blue-500 mt-1">
+                  Across {supervisorSites.length} task-assigned site{supervisorSites.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <div className="p-4 bg-blue-100 dark:bg-blue-800 rounded-full">
+                <Users className="h-8 w-8 text-blue-600 dark:text-blue-300" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Attendance Summary Cards - Present, Absent, Weekly Off with Click Handlers */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Present Card */}
+          <motion.div
+            whileHover={summary.presentCount > 0 ? { scale: 1.02 } : {}}
+            whileTap={summary.presentCount > 0 ? { scale: 0.98 } : {}}
+            className={summary.presentCount > 0 ? "cursor-pointer" : "cursor-default opacity-75"}
+            onClick={handlePresentClick}
+          >
+            <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">Present Today</p>
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                      {summary.presentCount}
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-500 mt-1">
+                      {summary.totalEmployees > 0 
+                        ? `${Math.round((summary.presentCount / summary.totalEmployees) * 100)}% of total`
+                        : 'No employees'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-100 dark:bg-green-800 rounded-full">
+                    <UserCheck className="h-6 w-6 text-green-600 dark:text-green-300" />
+                  </div>
+                </div>
+                {summary.presentCount > 0 && (
+                  <div className="mt-3 text-xs text-green-700 dark:text-green-500 flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    Click to view details
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Absent Card */}
+          <motion.div
+            whileHover={summary.absentCount > 0 ? { scale: 1.02 } : {}}
+            whileTap={summary.absentCount > 0 ? { scale: 0.98 } : {}}
+            className={summary.absentCount > 0 ? "cursor-pointer" : "cursor-default opacity-75"}
+            onClick={handleAbsentClick}
+          >
+            <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-red-800 dark:text-red-300">Absent Today</p>
+                    <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                      {summary.absentCount}
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-500 mt-1">
+                      {summary.totalEmployees > 0 
+                        ? `${Math.round((summary.absentCount / summary.totalEmployees) * 100)}% of total`
+                        : 'No employees'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-100 dark:bg-red-800 rounded-full">
+                    <UserX className="h-6 w-6 text-red-600 dark:text-red-300" />
+                  </div>
+                </div>
+                {summary.absentCount > 0 && (
+                  <div className="mt-3 text-xs text-red-700 dark:text-red-500 flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    Click to view details
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Weekly Off Card */}
+          <motion.div
+            whileHover={summary.weeklyOffCount > 0 ? { scale: 1.02 } : {}}
+            whileTap={summary.weeklyOffCount > 0 ? { scale: 0.98 } : {}}
+            className={summary.weeklyOffCount > 0 ? "cursor-pointer" : "cursor-default opacity-75"}
+            onClick={handleWeeklyOffClick}
+          >
+            <Card className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-800 dark:text-purple-300">Weekly Off Today</p>
+                    <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                      {summary.weeklyOffCount}
+                    </p>
+                    <p className="text-xs text-purple-700 dark:text-purple-500 mt-1">
+                      {summary.totalEmployees > 0 
+                        ? `${Math.round((summary.weeklyOffCount / summary.totalEmployees) * 100)}% of total`
+                        : 'No employees'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-800 rounded-full">
+                    <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-300" />
+                  </div>
+                </div>
+                {summary.weeklyOffCount > 0 && (
+                  <div className="mt-3 text-xs text-purple-700 dark:text-purple-500 flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    Click to view details
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Additional Stats - Leave and Half Day (Not Clickable) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">On Leave Today</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{summary.leaveCount}</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-500 mt-1">
+                    {summary.totalEmployees > 0 
+                      ? `${Math.round((summary.leaveCount / summary.totalEmployees) * 100)}% of total`
+                      : 'No employees'}
+                  </p>
+                </div>
+                <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-full">
+                  <CalendarDays className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Half Day Today</p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{summary.halfDayCount}</p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-500 mt-1">
+                    {summary.totalEmployees > 0 
+                      ? `${Math.round((summary.halfDayCount / summary.totalEmployees) * 100)}% of total`
+                      : 'No employees'}
+                  </p>
+                </div>
+                <div className="p-2 bg-yellow-100 dark:bg-yellow-800 rounded-full">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-300" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Summary Footer */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 mr-1" />
+                  <span className="text-sm">Present: {summary.presentCount}</span>
+                </div>
+                <div className="flex items-center ml-4">
+                  <XCircle className="h-4 w-4 text-red-600 mr-1" />
+                  <span className="text-sm">Absent: {summary.absentCount}</span>
+                </div>
+                <div className="flex items-center ml-4">
+                  <Calendar className="h-4 w-4 text-purple-600 mr-1" />
+                  <span className="text-sm">Weekly Off: {summary.weeklyOffCount}</span>
+                </div>
+                <div className="flex items-center ml-4">
+                  <CalendarDays className="h-4 w-4 text-blue-600 mr-1" />
+                  <span className="text-sm">Leave: {summary.leaveCount}</span>
+                </div>
+                <div className="flex items-center ml-4">
+                  <AlertCircle className="h-4 w-4 text-yellow-600 mr-1" />
+                  <span className="text-sm">Half Day: {summary.halfDayCount}</span>
+                </div>
+              </div>
+              <div className="text-sm text-gray-500">
+                Last updated: {new Date().toLocaleTimeString()}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard title="Total Employees" value={stats.totalEmployees || 0} icon={Users} />
@@ -1887,12 +2614,12 @@ const SupervisorDashboard = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {filteredData.tasks.map(task => (
-                  <div key={task.id} className="p-3 border rounded-lg">
+                  <div key={task._id} className="p-3 border rounded-lg">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-medium">{task.title}</p>
                         <p className="text-sm text-gray-500">
-                          Due: {task.dueDate} • {task.assignedTo}
+                          Due: {task.deadline} • {task.assignedToName || 'Unassigned'}
                         </p>
                       </div>
                       <Badge className={getColor('priority', task.priority)}>
@@ -1902,14 +2629,14 @@ const SupervisorDashboard = () => {
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
                         className={`h-2 rounded-full ${getColor('progress', task.priority)}`}
-                        style={{ width: `${task.progress || 0}%` }}
+                        style={{ width: `${task.status === 'completed' ? 100 : task.status === 'in-progress' ? 50 : 20}%` }}
                       />
                     </div>
                     <Button 
                       size="sm" 
                       variant="outline" 
                       className="w-full mt-3"
-                      onClick={() => handleAction('viewTask', task.id)}
+                      onClick={() => handleAction('viewTask', task._id)}
                     >
                       View Details
                     </Button>
@@ -2001,6 +2728,36 @@ const SupervisorDashboard = () => {
             </Card>
           </div>
         </div>
+
+        {/* Empty State - No Data */}
+        {summary.totalEmployees === 0 && (
+          <Card className="bg-gray-50 border-gray-200">
+            <CardContent className="p-12 text-center">
+              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Employees Found</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                No employees are currently assigned to your task-assigned sites. 
+                Please contact your administrator to assign employees to your sites.
+              </p>
+              {supervisorSites.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Your task-assigned sites:</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {supervisorSites.map(site => (
+                      <Badge key={site._id} variant="outline" className="bg-white">
+                        {site.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Button onClick={handleRefresh} variant="outline" className="mt-6">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

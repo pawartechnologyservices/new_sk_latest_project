@@ -6,16 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { 
   Plus, Eye, Trash2, Edit, MapPin, Building, DollarSign, Square, 
   Search, Users, Filter, BarChart, Calendar, RefreshCw, User, Briefcase,
-  Loader2, AlertCircle, ChevronDown, Phone, Mail
+  Loader2, AlertCircle, ChevronDown, Phone, Mail, Upload, Download, FileText,
+  CheckCircle, XCircle, UploadCloud
 } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "./sharedA";
-import { Label } from "@/components/ui/label";
 import { siteService, Site, Client, SiteStats, CreateSiteRequest } from "@/services/SiteService";
 import { crmService } from "@/services/crmService";
+import * as XLSX from "xlsx";
 
 // Define Services and Roles
 const ServicesList = [
@@ -39,11 +41,9 @@ class ClientService {
   async getAllClients(searchTerm?: string): Promise<Client[]> {
     try {
       console.log('👥 Fetching clients from CRM...');
-      // Fetch from CRM
       const crmClients = await crmService.clients.getAll(searchTerm);
       console.log('👥 CRM clients fetched:', crmClients);
       
-      // Transform CRM clients to match SiteService Client interface
       const transformedClients = crmClients.map(client => ({
         _id: client._id,
         name: client.name,
@@ -51,14 +51,13 @@ class ClientService {
         email: client.email,
         phone: client.phone,
         city: client.city || "",
-        state: "" // CRM might not have state, you can add if available
+        state: ""
       }));
       
       return transformedClients;
     } catch (error) {
       console.error('❌ Failed to fetch from CRM, falling back to site service:', error);
       
-      // Fallback to siteService
       try {
         if (searchTerm) {
           return await siteService.searchClients(searchTerm);
@@ -82,6 +81,7 @@ const SitesSection = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [staffDeployment, setStaffDeployment] = useState<Array<{ role: string; count: number }>>([]);
@@ -95,6 +95,18 @@ const SitesSection = () => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientSearch, setClientSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  
+  // Import states
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [validationResults, setValidationResults] = useState<{
+    valid: any[];
+    invalid: any[];
+    missingClients: string[];
+  }>({ valid: [], invalid: [], missingClients: [] });
 
   // Initialize client service
   const clientService = new ClientService();
@@ -130,8 +142,7 @@ const SitesSection = () => {
       const clientsData = await clientService.getAllClients();
       setClients(clientsData || []);
       
-      // Auto-select first client if available
-      if (clientsData && clientsData.length > 0) {
+      if (clientsData && clientsData.length > 0 && !selectedClient) {
         setSelectedClient(clientsData[0]._id);
       }
     } catch (error: any) {
@@ -163,7 +174,6 @@ const SitesSection = () => {
       setStats(statsData || siteService.getDefaultStats());
     } catch (error) {
       console.error("Error fetching stats:", error);
-      // Fallback to calculated stats
       const safeSites = sites || [];
       const statusCounts = siteService.getSiteStatusCounts(safeSites);
       setStats({
@@ -227,6 +237,15 @@ const SitesSection = () => {
     setClientSearch("");
   };
 
+  // Reset import state
+  const resetImport = () => {
+    setImportFile(null);
+    setImportPreview([]);
+    setShowPreview(false);
+    setImportErrors([]);
+    setValidationResults({ valid: [], invalid: [], missingClients: [] });
+  };
+
   // View site details
   const handleViewSite = (site: Site) => {
     setSelectedSite(site);
@@ -240,14 +259,12 @@ const SitesSection = () => {
     setSelectedServices(site.services || []);
     setStaffDeployment(site.staffDeployment || []);
     
-    // Set client if exists in clients list
     if (site.clientId) {
       const client = clients.find(c => c._id === site.clientId);
       if (client) {
         setSelectedClient(client._id);
       }
     } else {
-      // Find client by name if ID is not available
       const client = clients.find(c => c.name === site.clientName);
       if (client) {
         setSelectedClient(client._id);
@@ -256,7 +273,6 @@ const SitesSection = () => {
       }
     }
     
-    // Set form values for editing
     setTimeout(() => {
       const form = document.getElementById('site-form') as HTMLFormElement;
       if (form) {
@@ -288,7 +304,6 @@ const SitesSection = () => {
     let clientId = "";
 
     if (selectedClient) {
-      // Use selected client from dropdown
       const client = clients.find(c => c._id === selectedClient);
       if (client) {
         clientName = client.name;
@@ -304,7 +319,6 @@ const SitesSection = () => {
       return;
     }
 
-    // Prepare site data
     const siteData: CreateSiteRequest = {
       name: formData.get("site-name") as string,
       clientName: clientName.trim(),
@@ -318,7 +332,6 @@ const SitesSection = () => {
       status: 'active'
     };
 
-    // Validate data
     const validationErrors = siteService.validateSiteData(siteData);
     if (validationErrors.length > 0) {
       validationErrors.forEach(error => toast.error(error));
@@ -327,13 +340,11 @@ const SitesSection = () => {
 
     try {
       if (editMode && editingSiteId) {
-        // Update existing site
         const updatedSite = await siteService.updateSite(editingSiteId, siteData);
         if (updatedSite) {
           toast.success("Site updated successfully!");
         }
       } else {
-        // Create new site
         const newSite = await siteService.createSite(siteData);
         if (newSite) {
           toast.success("Site added successfully!");
@@ -344,14 +355,12 @@ const SitesSection = () => {
       resetForm();
       (e.target as HTMLFormElement).reset();
       
-      // Refresh sites list and stats
       await fetchSites();
       await fetchStats();
       
     } catch (error: any) {
       console.error("Error saving site:", error);
       
-      // Check for specific error types
       if (error.message?.includes('Duplicate entry') || error.message?.includes('duplicate')) {
         toast.error("Site name might already exist. Please try a different name.");
       } else if (error.message?.includes('id')) {
@@ -376,7 +385,6 @@ const SitesSection = () => {
         toast.error("Failed to delete site");
       }
       
-      // Refresh sites list and stats
       await fetchSites();
       await fetchStats();
     } catch (error: any) {
@@ -393,7 +401,6 @@ const SitesSection = () => {
         toast.success("Site status updated!");
       }
       
-      // Refresh sites list and stats
       await fetchSites();
       await fetchStats();
     } catch (error: any) {
@@ -451,6 +458,335 @@ const SitesSection = () => {
     return stats || siteService.getDefaultStats();
   };
 
+  // ============== IMPORT FUNCTIONS ==============
+
+  // Read Excel file
+  const readExcelFile = (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+            header: 1,
+            blankrows: false,
+            defval: ''
+          });
+          
+          if (jsonData.length < 2) {
+            resolve([]);
+            return;
+          }
+          
+          const headers = (jsonData[0] as string[]).map(h => h?.toString().trim() || '');
+          const rows = jsonData.slice(1) as any[];
+          
+          const formattedData = rows
+            .filter(row => {
+              return row.some((cell: any) => cell !== null && cell !== undefined && cell.toString().trim() !== '');
+            })
+            .map(row => {
+              const obj: any = {};
+              headers.forEach((header, index) => {
+                if (header && row[index] !== undefined && row[index] !== null) {
+                  obj[header] = row[index]?.toString().trim();
+                } else {
+                  obj[header] = '';
+                }
+              });
+              return obj;
+            });
+          
+          resolve(formattedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = (error) => {
+        reject(error);
+      };
+      
+      reader.readAsBinaryString(file);
+    });
+  };
+
+  // Validate imported sites against CRM clients
+  const validateImportedSites = async (importedData: any[]) => {
+    const validSites: any[] = [];
+    const invalidSites: any[] = [];
+    const missingClients: string[] = [];
+    const errors: string[] = [];
+
+    // Fetch all clients for validation
+    await fetchClients();
+    
+    for (let index = 0; index < importedData.length; index++) {
+      const row = importedData[index];
+      const rowNumber = index + 2; // +2 for header row and 1-based index
+      
+      // Check required fields
+      const siteName = row['Site Name'] || row['SITE NAME'] || row['site name'] || '';
+      const clientName = row['Client Name'] || row['CLIENT NAME'] || row['client name'] || '';
+      const location = row['Location'] || row['LOCATION'] || row['location'] || '';
+      const areaSqft = row['Area (sqft)'] || row['AREA'] || row['area'] || row['Area Sqft'] || '';
+      const contractValue = row['Contract Value'] || row['CONTRACT VALUE'] || row['contract value'] || row['Value'] || '';
+      const contractEndDate = row['Contract End Date'] || row['CONTRACT END DATE'] || row['contract end date'] || row['End Date'] || '';
+
+      if (!siteName) {
+        errors.push(`Row ${rowNumber}: Missing Site Name`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      if (!clientName) {
+        errors.push(`Row ${rowNumber}: Missing Client Name`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      if (!location) {
+        errors.push(`Row ${rowNumber}: Missing Location`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      if (!areaSqft) {
+        errors.push(`Row ${rowNumber}: Missing Area`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      if (!contractValue) {
+        errors.push(`Row ${rowNumber}: Missing Contract Value`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      if (!contractEndDate) {
+        errors.push(`Row ${rowNumber}: Missing Contract End Date`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      // Check if client exists in CRM
+      const clientExists = clients.some(client => 
+        client.name.toLowerCase() === clientName.toLowerCase() ||
+        client.company.toLowerCase() === clientName.toLowerCase()
+      );
+
+      if (!clientExists) {
+        missingClients.push(`${clientName} (Row ${rowNumber})`);
+        invalidSites.push(row);
+        continue;
+      }
+
+      // Parse services
+      let services: string[] = [];
+      const servicesStr = row['Services'] || row['SERVICES'] || row['services'] || '';
+      if (servicesStr) {
+        services = servicesStr.split(',').map((s: string) => s.trim()).filter((s: string) => 
+          ServicesList.includes(s)
+        );
+      }
+
+      // Parse staff deployment
+      let staffDeployment: Array<{ role: string; count: number }> = [];
+      StaffRoles.forEach(role => {
+        const roleKey = role.replace(/\s+/g, '');
+        const roleCount = row[role] || row[roleKey] || row[role.toUpperCase()] || 0;
+        const count = parseInt(roleCount) || 0;
+        if (count > 0) {
+          staffDeployment.push({ role, count });
+        }
+      });
+
+      // Calculate manager count and supervisor count from staffDeployment
+      const managerCount = staffDeployment
+        .filter(item => item.role === 'Manager')
+        .reduce((sum, item) => sum + item.count, 0);
+      
+      const supervisorCount = staffDeployment
+        .filter(item => item.role === 'Supervisor')
+        .reduce((sum, item) => sum + item.count, 0);
+
+      // Create site object
+      const siteObj = {
+        name: siteName,
+        clientName: clientName,
+        location: location,
+        areaSqft: parseFloat(areaSqft) || 0,
+        contractValue: parseFloat(contractValue.toString().replace(/[^0-9.-]+/g, '')) || 0,
+        contractEndDate: new Date(contractEndDate).toISOString().split('T')[0],
+        services: services,
+        staffDeployment: staffDeployment,
+        managerCount: managerCount,
+        supervisorCount: supervisorCount,
+        status: 'active'
+      };
+
+      validSites.push(siteObj);
+    }
+
+    setImportErrors(errors);
+    return { valid: validSites, invalid: invalidSites, missingClients };
+  };
+
+  // Handle file selection for import
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFile(file);
+    setImportLoading(true);
+    setImportErrors([]);
+    setValidationResults({ valid: [], invalid: [], missingClients: [] });
+
+    try {
+      const importedData = await readExcelFile(file);
+      setImportPreview(importedData);
+      
+      // Validate against CRM clients
+      const results = await validateImportedSites(importedData);
+      setValidationResults(results);
+      setShowPreview(true);
+      
+      if (results.valid.length > 0) {
+        toast.success(`${results.valid.length} valid sites ready for import`);
+      }
+      if (results.missingClients.length > 0) {
+        toast.warning(`${results.missingClients.length} sites have clients not in CRM`);
+      }
+    } catch (error) {
+      console.error("Error reading file:", error);
+      toast.error("Failed to read file. Please check the format.");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Import valid sites
+  const handleImportSites = async () => {
+    if (validationResults.valid.length === 0) {
+      toast.error("No valid sites to import");
+      return;
+    }
+
+    setImportLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    for (const siteData of validationResults.valid) {
+      try {
+        // Find client ID from CRM
+        const client = clients.find(c => 
+          c.name.toLowerCase() === siteData.clientName.toLowerCase() ||
+          c.company.toLowerCase() === siteData.clientName.toLowerCase()
+        );
+
+        const siteToCreate: CreateSiteRequest = {
+          ...siteData,
+          clientId: client?._id,
+          staffDeployment: siteData.staffDeployment,
+          status: 'active'
+        };
+
+        await siteService.createSite(siteToCreate);
+        successCount++;
+      } catch (error: any) {
+        console.error(`Failed to import site ${siteData.name}:`, error);
+        errors.push(`${siteData.name}: ${error.message || 'Unknown error'}`);
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully imported ${successCount} sites${errorCount > 0 ? `, ${errorCount} failed` : ''}`);
+      if (errors.length > 0) {
+        console.error('Import errors:', errors);
+      }
+      
+      // Refresh data
+      await fetchSites();
+      await fetchStats();
+      
+      // Close import dialog and reset
+      setImportDialogOpen(false);
+      resetImport();
+    } else {
+      toast.error(`Failed to import any sites. ${errors[0] || 'Check the data format.'}`);
+    }
+
+    setImportLoading(false);
+  };
+
+  // Download import template
+  const downloadTemplate = () => {
+    const templateData = [
+      [
+        'Site Name*', 
+        'Client Name*', 
+        'Location*', 
+        'Area (sqft)*', 
+        'Contract Value*', 
+        'Contract End Date*', 
+        'Services', 
+        'Manager', 
+        'Supervisor', 
+        'Housekeeping Staff', 
+        'Security Guard', 
+        'Parking Attendant', 
+        'Waste Collector'
+      ],
+      [
+        'Phoenix Mall', 
+        'PHOENIX MALL', 
+        'Wakad, Pune', 
+        '50000', 
+        '5000000', 
+        '2025-12-31', 
+        'Housekeeping,Security', 
+        '1', 
+        '2', 
+        '10', 
+        '5', 
+        '3', 
+        '2'
+      ],
+      [
+        'Highstreet Mall', 
+        'HIGHSTREET MALL', 
+        'Hinjewadi, Pune', 
+        '75000', 
+        '7500000', 
+        '2025-06-30', 
+        'Security,Parking,Waste Management', 
+        '1', 
+        '3', 
+        '0', 
+        '8', 
+        '4', 
+        '3'
+      ],
+      ['', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['*Required fields: Site Name, Client Name, Location, Area, Contract Value, Contract End Date'],
+      ['Services: Separate multiple services with commas (Housekeeping, Security, Parking, Waste Management)'],
+      ['Staff Counts: Enter numbers for each role (0 if not applicable)'],
+      ['Contract End Date format: YYYY-MM-DD'],
+      ['Note: Client Name must match exactly with client name in CRM']
+    ];
+    
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Site Import Template');
+    XLSX.writeFile(wb, 'Site_Import_Template.xlsx');
+  };
+
   // Render clients dropdown with CRM data
   const renderClientsDropdown = () => {
     if (isLoadingClients) {
@@ -476,7 +812,7 @@ const SitesSection = () => {
               if (e.target.value.length >= 2) {
                 searchClients(e.target.value);
               } else if (e.target.value.length === 0) {
-                fetchClients(); // Reset to all clients
+                fetchClients();
               }
             }}
             className="pl-10 mb-2"
@@ -493,7 +829,6 @@ const SitesSection = () => {
                 size="sm" 
                 className="mt-1"
                 onClick={() => {
-                  // Optionally open CRM in new tab or redirect
                   toast.info("Please add clients in the CRM section first");
                 }}
               >
@@ -528,7 +863,6 @@ const SitesSection = () => {
           )}
         </div>
         
-        {/* Selected client info */}
         {selectedClient && safeClients.length > 0 && (
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
             <div className="flex justify-between items-start">
@@ -568,19 +902,19 @@ const SitesSection = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-4 md:px-6">
       {/* Error Display */}
       {error && (
         <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center text-red-700">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
+              <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+              <span className="text-sm sm:text-base">{error}</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setError(null)}
-                className="ml-auto"
+                className="ml-auto flex-shrink-0"
               >
                 Dismiss
               </Button>
@@ -589,18 +923,18 @@ const SitesSection = () => {
         </Card>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Cards - Responsive Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Sites</p>
-                <p className="text-2xl font-bold">{getSafeStats().totalSites}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Sites</p>
+                <p className="text-xl sm:text-2xl font-bold">{getSafeStats().totalSites}</p>
               </div>
-              <Building className="h-8 w-8 text-blue-500" />
+              <Building className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
             </div>
-            <div className="mt-2 text-sm">
+            <div className="mt-2 text-xs sm:text-sm">
               <span className="text-green-600 font-medium">{getSafeStats().activeSites} active</span>
               <span className="mx-2">•</span>
               <span className="text-gray-600">{getSafeStats().inactiveSites} inactive</span>
@@ -609,66 +943,66 @@ const SitesSection = () => {
         </Card>
         
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Staff</p>
-                <p className="text-2xl font-bold">{getSafeStats().totalStaff}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Staff</p>
+                <p className="text-xl sm:text-2xl font-bold">{getSafeStats().totalStaff}</p>
               </div>
-              <Users className="h-8 w-8 text-green-500" />
+              <Users className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Contract Value</p>
-                <p className="text-2xl font-bold">{formatCurrency(getSafeStats().totalContractValue)}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Contract Value</p>
+                <p className="text-xl sm:text-2xl font-bold">{formatCurrency(getSafeStats().totalContractValue)}</p>
               </div>
-              <DollarSign className="h-8 w-8 text-amber-500" />
+              <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-amber-500" />
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Average Area</p>
-                <p className="text-2xl font-bold">{calculateAverageArea()}K sqft</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Average Area</p>
+                <p className="text-xl sm:text-2xl font-bold">{calculateAverageArea()}K sqft</p>
               </div>
-              <BarChart className="h-8 w-8 text-purple-500" />
+              <BarChart className="h-6 w-6 sm:h-8 sm:w-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and Filter Bar */}
+      {/* Search and Filter Bar - Responsive */}
       <Card>
-        <CardContent className="p-6">
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
+        <CardContent className="p-4 sm:p-6">
+          <form onSubmit={handleSearch} className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search sites by name, client, or location..."
+                    placeholder="Search sites..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 text-sm sm:text-base"
                   />
                 </div>
               </div>
               
-              <div className="w-full md:w-48">
+              <div className="w-full sm:w-48">
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="w-full h-9 sm:h-10 pl-10 pr-4 rounded-md border border-input bg-background text-xs sm:text-sm"
                   >
                     <option value="all">All Status</option>
                     <option value="active">Active Only</option>
@@ -677,17 +1011,17 @@ const SitesSection = () => {
                 </div>
               </div>
               
-              <div className="flex gap-2">
-                <Button type="submit">
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" size="sm" className="flex-1 sm:flex-none">
                   <Search className="h-4 w-4 mr-2" />
-                  Search
+                  <span className="hidden sm:inline">Search</span>
                 </Button>
-                <Button type="button" variant="outline" onClick={handleResetFilters}>
+                <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
                   Reset
                 </Button>
-                <Button type="button" variant="outline" onClick={() => { fetchSites(); fetchStats(); fetchClients(); }}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh All
+                <Button type="button" variant="outline" size="sm" onClick={() => { fetchSites(); fetchStats(); fetchClients(); }}>
+                  <RefreshCw className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Refresh</span>
                 </Button>
               </div>
             </div>
@@ -695,214 +1029,380 @@ const SitesSection = () => {
         </CardContent>
       </Card>
 
+      {/* Main Card with Header */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>Site Management</CardTitle>
-          <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-            <DialogTrigger asChild>
-              <Button onClick={() => resetForm()}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Site
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editMode ? "Edit Site" : "Add New Site"}</DialogTitle>
-                <DialogDescription>
-                  Select a client from your CRM database
-                </DialogDescription>
-              </DialogHeader>
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0 p-4 sm:p-6">
+          <CardTitle className="text-lg sm:text-xl">Site Management</CardTitle>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            {/* Import Button */}
+            <Dialog open={importDialogOpen} onOpenChange={(open) => {
+              setImportDialogOpen(open);
+              if (!open) resetImport();
+            }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                  <Upload className="h-4 w-4 sm:mr-2" />
+                  <span className="text-xs sm:text-sm">Import</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-lg sm:text-xl">Import Sites from Excel</DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
+                    Upload an Excel file with site data. Client names must match exactly with clients in CRM.
+                  </DialogDescription>
+                </DialogHeader>
 
-              <form id="site-form" onSubmit={handleAddOrUpdateSite} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Site Name" id="site-name" required>
-                    <Input 
-                      id="site-name" 
-                      name="site-name" 
-                      placeholder="Enter site name" 
-                      required 
-                      defaultValue=""
-                    />
-                  </FormField>
-
-                  <FormField label="Location" id="location" required>
-                    <Input 
-                      id="location" 
-                      name="location" 
-                      placeholder="Enter location" 
-                      required 
-                      defaultValue=""
-                    />
-                  </FormField>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    Select Client from CRM <span className="text-muted-foreground">(Required)</span>
-                  </Label>
-                  <div className="text-xs text-muted-foreground mb-2">
-                    Search and select a client from your CRM database
+                <div className="space-y-4 sm:space-y-6">
+                  {/* File Upload Area */}
+                  <div className="space-y-2">
+                    <Label htmlFor="site-excel-file" className="text-xs sm:text-sm font-medium">Upload Excel File</Label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 sm:p-8 text-center hover:border-blue-400 transition-colors bg-gray-50">
+                      <Input 
+                        id="site-excel-file"
+                        type="file" 
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={importLoading}
+                      />
+                      <Label htmlFor="site-excel-file" className="cursor-pointer">
+                        <UploadCloud className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 text-gray-400" />
+                        <p className="text-xs sm:text-sm font-medium text-gray-700">
+                          {importLoading ? 'Processing...' : 'Drag & drop or click to upload'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Supports .xlsx, .xls, .csv files
+                        </p>
+                      </Label>
+                      {importFile && (
+                        <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-100">
+                          <p className="text-xs sm:text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                            <span className="truncate">{importFile.name}</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {renderClientsDropdown()}
-                  
-                  {!selectedClient && !isLoadingClients && clients.length > 0 && (
-                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                      <p className="text-xs text-yellow-700">
-                        Please select a client from the list above
-                      </p>
+
+                  {/* Download Template */}
+                  <div className="flex justify-center">
+                    <Button 
+                      onClick={downloadTemplate}
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50 text-xs sm:text-sm"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Template
+                    </Button>
+                  </div>
+
+                  {/* Preview Section */}
+                  {showPreview && validationResults.valid.length > 0 && (
+                    <div className="border rounded-lg p-3 sm:p-4 bg-green-50">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                        <h3 className="font-semibold text-green-800 text-xs sm:text-sm">Valid Sites ({validationResults.valid.length})</h3>
+                      </div>
+                      <div className="max-h-32 sm:max-h-40 overflow-y-auto text-xs">
+                        {validationResults.valid.map((site, idx) => (
+                          <div key={idx} className="py-1 border-b border-green-200 last:border-0">
+                            {site.name} - {site.clientName}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField label="Area (sqft)" id="area-sqft" required>
-                    <Input 
-                      id="area-sqft" 
-                      name="area-sqft" 
-                      type="number" 
-                      placeholder="Enter area in sqft" 
-                      required 
-                      min="1"
-                      defaultValue="1000"
-                    />
-                  </FormField>
-                  <FormField label="Contract Value (₹)" id="contract-value" required>
-                    <Input 
-                      id="contract-value" 
-                      name="contract-value" 
-                      type="number" 
-                      placeholder="Enter contract value" 
-                      required 
-                      min="0"
-                      defaultValue="100000"
-                    />
-                  </FormField>
-                  <FormField label="Contract End Date" id="contract-end-date" required>
-                    <Input 
-                      id="contract-end-date" 
-                      name="contract-end-date" 
-                      type="date" 
-                      required 
-                      min={new Date().toISOString().split('T')[0]}
-                      defaultValue={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="border p-4 rounded-md">
-                  <p className="font-medium mb-3">Services for this Site</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {ServicesList.map((service) => (
-                      <div key={service} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`service-${service}`}
-                          checked={selectedServices.includes(service)}
-                          onCheckedChange={() => toggleService(service)}
-                        />
-                        <label htmlFor={`service-${service}`} className="cursor-pointer text-sm">
-                          {service}
-                        </label>
+                  {/* Missing Clients Section */}
+                  {validationResults.missingClients.length > 0 && (
+                    <div className="border rounded-lg p-3 sm:p-4 bg-yellow-50">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 flex-shrink-0" />
+                        <h3 className="font-semibold text-yellow-800 text-xs sm:text-sm">Clients Not Found in CRM ({validationResults.missingClients.length})</h3>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border p-4 rounded-md">
-                  <p className="font-medium mb-3">Staff Deployment</p>
-                  <div className="space-y-3">
-                    {StaffRoles.map((role) => {
-                      const deployment = staffDeployment.find(item => item.role === role);
-                      const count = deployment?.count || 0;
-                      return (
-                        <div key={role} className="flex items-center justify-between">
-                          <span className="text-sm">{role}</span>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateStaffCount(role, count - 1)}
-                              disabled={count <= 0}
-                              className="h-8 w-8"
-                            >
-                              -
-                            </Button>
-                            <Input
-                              type="number"
-                              value={count}
-                              onChange={(e) => updateStaffCount(role, parseInt(e.target.value) || 0)}
-                              className="w-16 text-center h-8"
-                              min="0"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateStaffCount(role, count + 1)}
-                              className="h-8 w-8"
-                            >
-                              +
-                            </Button>
+                      <p className="text-xs text-yellow-700 mb-2">
+                        Add these clients to CRM first:
+                      </p>
+                      <div className="max-h-32 sm:max-h-40 overflow-y-auto text-xs">
+                        {validationResults.missingClients.map((client, idx) => (
+                          <div key={idx} className="py-1 border-b border-yellow-200 last:border-0">
+                            {client}
                           </div>
-                        </div>
-                      );
-                    })}
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Errors Section */}
+                  {importErrors.length > 0 && (
+                    <div className="border rounded-lg p-3 sm:p-4 bg-red-50">
+                      <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0" />
+                        <h3 className="font-semibold text-red-800 text-xs sm:text-sm">Validation Errors ({importErrors.length})</h3>
+                      </div>
+                      <div className="max-h-32 sm:max-h-40 overflow-y-auto text-xs">
+                        {importErrors.map((error, idx) => (
+                          <div key={idx} className="py-1 border-b border-red-200 last:border-0 text-red-700">
+                            {error}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <Button 
+                      onClick={handleImportSites}
+                      disabled={validationResults.valid.length === 0 || importLoading}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm py-2 sm:py-2"
+                      size="sm"
+                    >
+                      {importLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        `Import ${validationResults.valid.length} Sites`
+                      )}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setImportDialogOpen(false);
+                        resetImport();
+                      }}
+                      className="flex-1 text-xs sm:text-sm py-2 sm:py-2"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </div>
+              </DialogContent>
+            </Dialog>
 
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex-1" disabled={!selectedClient}>
-                    {editMode ? "Update Site" : "Add Site"}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+            {/* Add Site Button */}
+            <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+              <DialogTrigger asChild>
+                <Button onClick={() => resetForm()} size="sm" className="flex-1 sm:flex-none">
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="text-xs sm:text-sm">Add Site</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-lg sm:text-xl">{editMode ? "Edit Site" : "Add New Site"}</DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
+                    Select a client from your CRM database
+                  </DialogDescription>
+                </DialogHeader>
+
+                <form id="site-form" onSubmit={handleAddOrUpdateSite} className="space-y-3 sm:space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <FormField label="Site Name" id="site-name" required>
+                      <Input 
+                        id="site-name" 
+                        name="site-name" 
+                        placeholder="Enter site name" 
+                        required 
+                        defaultValue=""
+                        className="text-sm"
+                      />
+                    </FormField>
+
+                    <FormField label="Location" id="location" required>
+                      <Input 
+                        id="location" 
+                        name="location" 
+                        placeholder="Enter location" 
+                        required 
+                        defaultValue=""
+                        className="text-sm"
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs sm:text-sm font-medium">
+                      Select Client from CRM <span className="text-muted-foreground">(Required)</span>
+                    </Label>
+                    <div className="text-xs text-muted-foreground mb-1 sm:mb-2">
+                      Search and select a client from your CRM database
+                    </div>
+                    {renderClientsDropdown()}
+                    
+                    {!selectedClient && !isLoadingClients && clients.length > 0 && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-xs text-yellow-700">
+                          Please select a client from the list above
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                    <FormField label="Area (sqft)" id="area-sqft" required>
+                      <Input 
+                        id="area-sqft" 
+                        name="area-sqft" 
+                        type="number" 
+                        placeholder="Area" 
+                        required 
+                        min="1"
+                        defaultValue="1000"
+                        className="text-sm"
+                      />
+                    </FormField>
+                    <FormField label="Contract Value (₹)" id="contract-value" required>
+                      <Input 
+                        id="contract-value" 
+                        name="contract-value" 
+                        type="number" 
+                        placeholder="Value" 
+                        required 
+                        min="0"
+                        defaultValue="100000"
+                        className="text-sm"
+                      />
+                    </FormField>
+                    <FormField label="Contract End Date" id="contract-end-date" required>
+                      <Input 
+                        id="contract-end-date" 
+                        name="contract-end-date" 
+                        type="date" 
+                        required 
+                        min={new Date().toISOString().split('T')[0]}
+                        defaultValue={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                        className="text-sm"
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="border p-3 sm:p-4 rounded-md">
+                    <p className="font-medium mb-2 sm:mb-3 text-sm">Services for this Site</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ServicesList.map((service) => (
+                        <div key={service} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`service-${service}`}
+                            checked={selectedServices.includes(service)}
+                            onCheckedChange={() => toggleService(service)}
+                          />
+                          <label htmlFor={`service-${service}`} className="cursor-pointer text-xs sm:text-sm">
+                            {service}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border p-3 sm:p-4 rounded-md">
+                    <p className="font-medium mb-2 sm:mb-3 text-sm">Staff Deployment</p>
+                    <div className="space-y-2 sm:space-y-3">
+                      {StaffRoles.map((role) => {
+                        const deployment = staffDeployment.find(item => item.role === role);
+                        const count = deployment?.count || 0;
+                        return (
+                          <div key={role} className="flex items-center justify-between">
+                            <span className="text-xs sm:text-sm">{role}</span>
+                            <div className="flex items-center space-x-1 sm:space-x-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateStaffCount(role, count - 1)}
+                                disabled={count <= 0}
+                                className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                              >
+                                -
+                              </Button>
+                              <Input
+                                type="number"
+                                value={count}
+                                onChange={(e) => updateStaffCount(role, parseInt(e.target.value) || 0)}
+                                className="w-12 sm:w-16 text-center h-7 sm:h-8 text-sm"
+                                min="0"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateStaffCount(role, count + 1)}
+                                className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                              >
+                                +
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 pt-2">
+                    <Button type="submit" className="flex-1 text-sm py-2" disabled={!selectedClient} size="sm">
+                      {editMode ? "Update Site" : "Add Site"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="text-sm py-2" size="sm">
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="p-0 sm:p-4">
           {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="ml-3">Loading sites...</span>
+            <div className="flex justify-center items-center py-8 sm:py-12">
+              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+              <span className="ml-2 sm:ml-3 text-sm sm:text-base">Loading sites...</span>
             </div>
           ) : !sites || sites.length === 0 ? (
-            <div className="text-center py-12">
-              <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Sites Found</h3>
-              <p className="text-muted-foreground mb-4">
+            <div className="text-center py-8 sm:py-12 px-4">
+              <Building className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">No Sites Found</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                 {searchQuery || statusFilter !== 'all' 
                   ? 'Try adjusting your search filters'
                   : 'Get started by adding your first site'
                 }
               </p>
-              <Button onClick={() => setDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Site
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button onClick={() => setDialogOpen(true)} size="sm" className="text-xs sm:text-sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Site
+                </Button>
+                <Button variant="outline" onClick={() => setImportDialogOpen(true)} size="sm" className="text-xs sm:text-sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Sites
+                </Button>
+              </div>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Site Name</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Services</TableHead>
-                    <TableHead>Staff</TableHead>
-                    <TableHead>Area (sqft)</TableHead>
-                    <TableHead>Contract Value</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Site Name</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Client</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Location</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Services</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Staff</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Area</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Value</TableHead>
+                    <TableHead className="text-xs sm:text-sm whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sites.map((site) => {
-                    // Safely get values
                     const safeAreaSqft = site.areaSqft || 0;
                     const safeContractValue = site.contractValue || 0;
                     const safeStaffDeployment = Array.isArray(site.staffDeployment) ? site.staffDeployment : [];
@@ -910,93 +1410,82 @@ const SitesSection = () => {
                     
                     return (
                       <TableRow key={site._id}>
-                        <TableCell className="font-medium">
+                        <TableCell className="text-xs sm:text-sm">
                           <div>
-                            <div>{site.name || 'Unnamed Site'}</div>
+                            <div className="font-medium">{site.name || 'Unnamed'}</div>
                             <div className="text-xs text-muted-foreground">
-                              Added: {formatDate(site.createdAt)}
+                              {formatDate(site.createdAt)}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs sm:text-sm">
                           <div>
-                            <div className="font-medium">{site.clientName || 'Unknown Client'}</div>
-                            {site.clientDetails && (
-                              <div className="text-xs text-muted-foreground">
-                                {site.clientDetails.company}
-                              </div>
-                            )}
+                            <div>{site.clientName || 'Unknown'}</div>
                           </div>
                         </TableCell>
-                        <TableCell>{site.location || 'Unknown Location'}</TableCell>
-                        <TableCell className="w-[160px]">
+                        <TableCell className="text-xs sm:text-sm">{site.location || 'Unknown'}</TableCell>
+                        <TableCell className="max-w-[120px] sm:max-w-[160px]">
                           <div className="flex flex-wrap gap-1">
-                            {safeServices.map((srv, i) => (
-                              <Badge key={i} variant="secondary" className="text-xs">
+                            {safeServices.slice(0, 2).map((srv, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] sm:text-xs">
                                 {srv}
                               </Badge>
                             ))}
+                            {safeServices.length > 2 && (
+                              <Badge variant="outline" className="text-[10px] sm:text-xs">
+                                +{safeServices.length - 2}
+                              </Badge>
+                            )}
                             {safeServices.length === 0 && (
-                              <span className="text-xs text-muted-foreground">No services</span>
+                              <span className="text-xs text-muted-foreground">None</span>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <Badge variant="outline" className="mr-1">
-                              Total: {getTotalStaff(site)}
-                            </Badge>
-                            {safeStaffDeployment.slice(0, 2).map((deploy, i) => (
-                              <div key={i} className="text-xs text-muted-foreground">
-                                {deploy.role}: {deploy.count}
-                              </div>
-                            ))}
-                            {safeStaffDeployment.length > 2 && (
-                              <div className="text-xs text-muted-foreground">
-                                +{safeStaffDeployment.length - 2} more
-                              </div>
-                            )}
-                            {safeStaffDeployment.length === 0 && (
-                              <div className="text-xs text-muted-foreground">No staff assigned</div>
-                            )}
-                          </div>
+                        <TableCell className="text-xs sm:text-sm">
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">
+                            {getTotalStaff(site)}
+                          </Badge>
                         </TableCell>
-                        <TableCell>{formatNumber(safeAreaSqft)}</TableCell>
-                        <TableCell>{formatCurrency(safeContractValue)}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{formatNumber(safeAreaSqft)}</TableCell>
+                        <TableCell className="text-xs sm:text-sm">{formatCurrency(safeContractValue)}</TableCell>
                         <TableCell>
-                          <Badge variant={site.status === "active" ? "default" : "secondary"}>
+                          <Badge variant={site.status === "active" ? "default" : "secondary"} className="text-[10px] sm:text-xs">
                             {site.status || 'active'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1 sm:gap-2">
                             <Button 
-                              variant="outline" 
+                              variant="ghost" 
                               size="sm"
                               onClick={() => handleViewSite(site)}
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleEditSite(site)}
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleToggleStatus(site._id)}
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                             >
-                              {site.status === "active" ? "Deactivate" : "Activate"}
+                              {site.status === "active" ? "D" : "A"}
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDeleteSite(site._id)}
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -1010,143 +1499,135 @@ const SitesSection = () => {
         </CardContent>
       </Card>
       
-      {/* View Site Dialog */}
+      {/* View Site Dialog - Responsive */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Site Details</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Site Details</DialogTitle>
           </DialogHeader>
           
           {selectedSite && (
-            <div className="space-y-6">
-              {/* Site Info Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Site Name</h3>
-                    <p className="text-lg font-semibold">{selectedSite.name}</p>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Site Name</h3>
+                    <p className="text-base sm:text-lg font-semibold">{selectedSite.name}</p>
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Client</h3>
-                    <p className="text-lg font-semibold">{selectedSite.clientName}</p>
-                    {selectedSite.clientDetails && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        <div>{selectedSite.clientDetails.company}</div>
-                        <div>{selectedSite.clientDetails.email}</div>
-                        <div>{selectedSite.clientDetails.phone}</div>
-                        <div>{selectedSite.clientDetails.city}, {selectedSite.clientDetails.state}</div>
-                      </div>
-                    )}
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Client</h3>
+                    <p className="text-base sm:text-lg font-semibold">{selectedSite.clientName}</p>
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Location</h3>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Location</h3>
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-lg font-semibold">{selectedSite.location}</p>
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <p className="text-base sm:text-lg font-semibold">{selectedSite.location}</p>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Area</h3>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Area</h3>
                     <div className="flex items-center gap-2">
-                      <Square className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-lg font-semibold">{formatNumber(selectedSite.areaSqft)} sqft</p>
+                      <Square className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <p className="text-base sm:text-lg font-semibold">{formatNumber(selectedSite.areaSqft)} sqft</p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Contract Value</h3>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Contract Value</h3>
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-lg font-semibold">{formatCurrency(selectedSite.contractValue)}</p>
+                      <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <p className="text-base sm:text-lg font-semibold">{formatCurrency(selectedSite.contractValue)}</p>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Contract End Date</h3>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Contract End Date</h3>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-lg font-semibold">{formatDate(selectedSite.contractEndDate)}</p>
+                      <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <p className="text-base sm:text-lg font-semibold">{formatDate(selectedSite.contractEndDate)}</p>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
-                    <Badge variant={selectedSite.status === "active" ? "default" : "secondary"}>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Status</h3>
+                    <Badge variant={selectedSite.status === "active" ? "default" : "secondary"} className="text-xs sm:text-sm">
                       {selectedSite.status?.toUpperCase() || 'ACTIVE'}
                     </Badge>
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Created</h3>
+                    <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Created</h3>
                     <p className="text-sm">{formatDate(selectedSite.createdAt)}</p>
                   </div>
                 </div>
               </div>
               
-              {/* Services Section */}
-              <div className="border rounded-lg p-4">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Services</h3>
-                <div className="flex flex-wrap gap-2">
+              <div className="border rounded-lg p-3 sm:p-4">
+                <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">Services</h3>
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   {Array.isArray(selectedSite.services) && selectedSite.services.length > 0 ? (
                     selectedSite.services.map((service, index) => (
-                      <Badge key={index} variant="secondary">
+                      <Badge key={index} variant="secondary" className="text-[10px] sm:text-xs">
                         {service}
                       </Badge>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">No services assigned</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">No services assigned</p>
                   )}
                 </div>
               </div>
               
-              {/* Staff Deployment Section */}
-              <div className="border rounded-lg p-4">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Staff Deployment</h3>
-                <div className="space-y-3">
+              <div className="border rounded-lg p-3 sm:p-4">
+                <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">Staff Deployment</h3>
+                <div className="space-y-2 sm:space-y-3">
                   {Array.isArray(selectedSite.staffDeployment) && selectedSite.staffDeployment.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                         {selectedSite.staffDeployment.map((deploy, index) => (
                           <div key={index} className="flex justify-between items-center p-2 bg-muted/30 rounded">
-                            <span className="text-sm font-medium">{deploy.role}</span>
-                            <Badge variant="outline">{deploy.count} staff</Badge>
+                            <span className="text-xs sm:text-sm font-medium">{deploy.role}</span>
+                            <Badge variant="outline" className="text-[10px] sm:text-xs">{deploy.count}</Badge>
                           </div>
                         ))}
                       </div>
-                      <div className="pt-3 border-t">
+                      <div className="pt-2 sm:pt-3 border-t">
                         <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Total Staff:</span>
-                          <span className="text-lg font-bold">{getTotalStaff(selectedSite)}</span>
+                          <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-xs sm:text-sm font-medium">Total Staff:</span>
+                          <span className="text-base sm:text-lg font-bold">{getTotalStaff(selectedSite)}</span>
                         </div>
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No staff deployed</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">No staff deployed</p>
                   )}
                 </div>
               </div>
               
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 pt-3 sm:pt-4 border-t">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setViewDialogOpen(false);
                     handleEditSite(selectedSite);
                   }}
+                  size="sm"
+                  className="text-xs sm:text-sm"
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                  Edit Site
+                  Edit
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => handleToggleStatus(selectedSite._id)}
+                  size="sm"
+                  className="text-xs sm:text-sm"
                 >
                   {selectedSite.status === "active" ? "Deactivate" : "Activate"}
                 </Button>
@@ -1156,9 +1637,11 @@ const SitesSection = () => {
                     setViewDialogOpen(false);
                     handleDeleteSite(selectedSite._id);
                   }}
+                  size="sm"
+                  className="text-xs sm:text-sm"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Site
+                  Delete
                 </Button>
               </div>
             </div>

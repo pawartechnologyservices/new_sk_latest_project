@@ -15,6 +15,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Plus, 
   Search, 
@@ -48,7 +54,17 @@ import {
   User,
   Upload,
   DownloadCloud,
-  Target
+  Target,
+  MoreVertical,
+  Menu,
+  X,
+  Home,
+  ChevronRight,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  Bell,
+  Search as SearchIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -58,8 +74,11 @@ import SupervisorOnboardingTab from "./SupervisorOnboardingTab";
 
 // API URL
 const API_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:5001/api' 
+  ? `http://${window.location.hostname}:5001/api` 
   : '/api';
+
+// Default avatar SVG as a data URL (properly formatted)
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
 
 // Types from your backend
 interface Employee {
@@ -180,6 +199,209 @@ interface User {
   isActive?: boolean;
 }
 
+// Mobile responsive employee card component - FIXED IMAGE ERROR
+const MobileEmployeeCard = ({
+  employee,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  onToggleStatus,
+  employeeTasks,
+  isLoadingTasks,
+  getPriorityBadge,
+  getStatusBadge,
+  formatDate
+}: {
+  employee: Employee;
+  isExpanded: boolean;
+  onToggleExpand: (id: string) => void;
+  onEdit: (employee: Employee) => void;
+  onDelete: (id: string) => void;
+  onToggleStatus: (id: string) => void;
+  employeeTasks: Task[];
+  isLoadingTasks: boolean;
+  getPriorityBadge: (priority: string) => JSX.Element;
+  getStatusBadge: (status: string) => JSX.Element;
+  formatDate: (date: string) => string;
+}) => {
+  // Handle image error with proper fallback
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <Card className="mb-4 overflow-hidden">
+      <CardContent className="p-4">
+        {/* Header with expand button */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            {employee.photo && !imgError ? (
+              <img 
+                src={employee.photo} 
+                alt={employee.name}
+                className="h-12 w-12 rounded-full object-cover"
+                onError={() => setImgError(true)}
+                loading="lazy"
+              />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="h-6 w-6 text-primary" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-base truncate">{employee.name}</h3>
+                <Badge 
+                  variant={employee.status === "active" ? "default" : 
+                          employee.status === "inactive" ? "secondary" : "destructive"}
+                  className="text-xs"
+                >
+                  {employee.status}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">ID: {employee.employeeId}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(employee)}>
+                  <Edit className="h-4 w-4 mr-2" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onToggleStatus(employee._id)}>
+                  {employee.status === "active" ? (
+                    <UserX className="h-4 w-4 mr-2" />
+                  ) : (
+                    <UserCheck className="h-4 w-4 mr-2" />
+                  )}
+                  {employee.status === "active" ? "Deactivate" : "Activate"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(employee._id)} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onToggleExpand(employee._id)}
+            >
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Employee details */}
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate flex-1">{employee.email}</span>
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            <span>{employee.phone}</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Department</p>
+              <p className="text-sm font-medium">{employee.department}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Role</p>
+              <p className="text-sm font-medium">{employee.position}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground">Site</p>
+              <div className="flex items-center gap-1 mt-1">
+                <Building className="h-3 w-3 text-muted-foreground" />
+                <span className="text-sm">{employee.siteName || 'Not Assigned'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Expanded section with tasks */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold flex items-center gap-2 text-sm">
+                <Briefcase className="h-4 w-4" />
+                Assigned Tasks
+              </h4>
+              <Badge variant="outline" className="text-xs">
+                {employeeTasks.length} task(s)
+              </Badge>
+            </div>
+            
+            {isLoadingTasks ? (
+              <div className="text-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                <p className="text-xs text-muted-foreground mt-2">Loading tasks...</p>
+              </div>
+            ) : employeeTasks.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No tasks assigned</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {employeeTasks.map((task) => (
+                  <Card key={task._id} className="border-l-4" style={{
+                    borderLeftColor: task.priority === 'high' ? '#ef4444' : 
+                                    task.priority === 'medium' ? '#eab308' : 
+                                    task.priority === 'low' ? '#22c55e' : '#6b7280'
+                  }}>
+                    <CardContent className="p-3">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <h5 className="font-medium text-sm">{task.title}</h5>
+                              {getPriorityBadge(task.priority)}
+                            </div>
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {task.description}
+                            </p>
+                          </div>
+                          {getStatusBadge(task.status)}
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+                          <div className="flex items-center gap-1">
+                            <Building className="h-3 w-3" />
+                            <span className="truncate max-w-[120px]">{task.siteName}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(task.deadline)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 // Schema for employee form
 const employeeSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -207,6 +429,9 @@ const SupervisorEmployees = () => {
   const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([]);
   const [activeTab, setActiveTab] = useState("employees");
   
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  
   const [loading, setLoading] = useState({
     employees: false,
     sites: false,
@@ -229,15 +454,34 @@ const SupervisorEmployees = () => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showDebug, setShowDebug] = useState(false);
 
-  // Helper function to normalize site names for comparison
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Helper function to normalize site names for comparison - MODIFIED TO REMOVE PARTIAL MATCHING
   const normalizeSiteName = useCallback((siteName: string | null | undefined): string => {
     if (!siteName) return '';
-    return siteName
-      .toString()
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/[^a-z0-9\s]/g, '');
+    // Only trim and convert to lowercase, don't remove special characters
+    // This ensures exact matching
+    return siteName.toString().toLowerCase().trim();
   }, []);
 
   // Fetch tasks where this specific supervisor is assigned - USING YOUR TASK CONTROLLER
@@ -397,19 +641,29 @@ const SupervisorEmployees = () => {
       
       setSites(transformedSites);
       
-      // Filter sites based ONLY on task assignments
+      // Filter sites based ONLY on task assignments - EXACT MATCH ONLY
       let supervisorSiteList: Site[] = [];
       
       if (taskSiteNames.length > 0) {
-        // Match sites by name from tasks
-        supervisorSiteList = transformedSites.filter(site => 
-          taskSiteNames.some(taskSiteName => 
-            site.name === taskSiteName || 
+        // Match sites by exact name from tasks - NO PARTIAL MATCHES
+        supervisorSiteList = transformedSites.filter(site => {
+          // Check exact match with site name
+          const exactNameMatch = taskSiteNames.some(taskSiteName => 
+            site.name === taskSiteName
+          );
+          
+          // Check exact match with normalized names
+          const exactNormalizedMatch = taskSiteNames.some(taskSiteName => 
             normalizeSiteName(site.name) === normalizeSiteName(taskSiteName)
-          ) || taskSiteIds.includes(site._id)
-        );
+          );
+          
+          // Check ID match
+          const idMatch = taskSiteIds.includes(site._id);
+          
+          return exactNameMatch || exactNormalizedMatch || idMatch;
+        });
         
-        console.log(`✅ Matched ${supervisorSiteList.length} sites from task assignments`);
+        console.log(`✅ Matched ${supervisorSiteList.length} sites from task assignments (exact matches only)`);
       } else {
         console.log("⚠️ No sites found from tasks - supervisor has no assigned tasks");
       }
@@ -488,31 +742,34 @@ const SupervisorEmployees = () => {
         console.log(`📊 Total employees from API: ${allEmployees.length}`);
         console.log("📍 Supervisor's task-assigned sites:", supervisorSiteNameList);
         
-        // Filter employees by supervisor's task-assigned sites ONLY
-        const supervisorSiteNormalizedNames = supervisorSiteNameList.map(name => normalizeSiteName(name));
-        
+        // IMPORTANT FIX: Filter employees by supervisor's task-assigned sites using EXACT MATCH ONLY
+        // No partial matches, no "includes" matching
         fetchedEmployees = allEmployees.filter((emp: Employee) => {
           const employeeSite = emp.siteName || '';
-          const employeeSiteNormalized = normalizeSiteName(employeeSite);
           
-          // Check if employee's site matches any of supervisor's sites from tasks
-          const matchesExactName = supervisorSiteNameList.includes(employeeSite);
-          const matchesNormalizedName = supervisorSiteNormalizedNames.includes(employeeSiteNormalized);
-          const matchesPartial = supervisorSiteNormalizedNames.some(siteNorm => 
-            employeeSiteNormalized.includes(siteNorm) || 
-            siteNorm.includes(employeeSiteNormalized)
+          // EXACT MATCH ONLY - compare the full site name
+          const exactMatch = supervisorSiteNameList.some(siteName => 
+            siteName === employeeSite
           );
           
-          const matches = matchesExactName || matchesNormalizedName || matchesPartial;
+          // Normalized exact match (case insensitive, trimmed)
+          const normalizedExactMatch = supervisorSiteNameList.some(siteName => 
+            normalizeSiteName(siteName) === normalizeSiteName(employeeSite)
+          );
+          
+          // Only match if it's an exact match - NO PARTIAL MATCHES
+          const matches = exactMatch || normalizedExactMatch;
           
           if (matches) {
-            console.log(`✅ Employee ${emp.name} (${emp.employeeId}) matches site: ${employeeSite}`);
+            console.log(`✅ Employee ${emp.name} (${emp.employeeId}) matches site: "${employeeSite}" exactly with supervisor site: "${supervisorSiteNameList.find(s => normalizeSiteName(s) === normalizeSiteName(employeeSite))}"`);
+          } else {
+            console.log(`❌ Employee ${emp.name} site: "${employeeSite}" does NOT exactly match any supervisor site: [${supervisorSiteNameList.join(', ')}]`);
           }
           
           return matches;
         });
         
-        console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites`);
+        console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites (exact matches only)`);
         
         // Log which sites have employees
         const siteCount: Record<string, number> = {};
@@ -864,11 +1121,17 @@ const SupervisorEmployees = () => {
   // Check if user is a supervisor
   if (!isAuthenticated || !currentUser) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
           <p className="text-muted-foreground">Please login to access this page</p>
+          <Button 
+            onClick={() => navigate('/login')} 
+            className="mt-4"
+          >
+            Go to Login
+          </Button>
         </div>
       </div>
     );
@@ -876,7 +1139,7 @@ const SupervisorEmployees = () => {
 
   if (currentUser.role !== "supervisor") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
@@ -886,6 +1149,12 @@ const SupervisorEmployees = () => {
               Your role: {currentUser.role}
             </Badge>
           </div>
+          <Button 
+            onClick={() => navigate('/dashboard')} 
+            className="mt-4"
+          >
+            Go to Dashboard
+          </Button>
         </div>
       </div>
     );
@@ -901,81 +1170,88 @@ const SupervisorEmployees = () => {
         onMenuClick={onMenuClick}
       />
       
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Supervisor Info Card */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold">{currentUser.name}</h3>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg font-semibold truncate">{currentUser.name}</h3>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="default" className="text-sm capitalize">
+                  <Badge variant="default" className="text-xs md:text-sm capitalize">
                     <Users className="h-3 w-3 mr-1" />
                     {currentUser.role}
                   </Badge>
                   {supervisorSites.length > 0 ? (
-                    <Badge variant="outline" className="text-sm">
-                      <Building className="h-3 w-3 mr-1" />
-                      Task-Assigned Sites: {supervisorSites.map(s => s.name).join(', ')}
+                    <Badge variant="outline" className="text-xs md:text-sm max-w-full">
+                      <Building className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">
+                        Task-Assigned Sites: {supervisorSites.map(s => s.name).join(', ')}
+                      </span>
                     </Badge>
                   ) : (
-                    <Badge variant="destructive" className="text-sm">
+                    <Badge variant="destructive" className="text-xs md:text-sm">
                       <AlertTriangle className="h-3 w-3 mr-1" />
                       No Task-Assigned Sites
                     </Badge>
                   )}
                   {currentUser.email && (
-                    <Badge variant="outline" className="text-sm">
-                      <Mail className="h-3 w-3 mr-1" />
-                      {currentUser.email}
+                    <Badge variant="outline" className="text-xs md:text-sm max-w-full">
+                      <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{currentUser.email}</span>
                     </Badge>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex gap-2">
+              
+              <div className="flex flex-col items-start md:items-end gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={() => setShowDebug(!showDebug)}
                     className="text-xs"
                   >
                     <Info className="h-3 w-3 mr-1" />
-                    Debug
+                    {!isMobileView && "Debug"}
                   </Button>
+                  
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={handleExportEmployees}
-                    className="text-xs"
                     disabled={employees.length === 0}
+                    className="text-xs"
                   >
                     <DownloadCloud className="h-3 w-3 mr-1" />
-                    Export
+                    {!isMobileView && "Export"}
                   </Button>
+                  
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={handleRefresh}
                     disabled={loading.employees || loading.sites}
                     className="text-xs"
                   >
                     <RefreshCw className={`h-3 w-3 mr-1 ${loading.employees ? 'animate-spin' : ''}`} />
-                    Refresh
+                    {!isMobileView && "Refresh"}
                   </Button>
+                  
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "default"}
                     onClick={() => setShowFilters(!showFilters)}
                     className="text-xs"
                   >
                     <Filter className="h-3 w-3 mr-1" />
-                    Filters
+                    {!isMobileView && "Filters"}
                     {showFilters ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
                   </Button>
                 </div>
+                
                 <div className="text-xs text-muted-foreground">
-                  {stats.total} employees • {stats.active} active • {stats.sites} site(s) from tasks
+                  {stats.total} employees • {stats.active} active • {stats.sites} site(s)
                 </div>
               </div>
             </div>
@@ -985,83 +1261,83 @@ const SupervisorEmployees = () => {
         {/* Debug Info */}
         {showDebug && debugInfo && (
           <Card className="bg-black/5 border-muted">
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <h4 className="font-semibold mb-2">Debug Information</h4>
-              <pre className="text-xs bg-black/10 p-4 rounded overflow-auto max-h-96">
+              <pre className="text-xs bg-black/10 p-3 md:p-4 rounded overflow-auto max-h-96">
                 {JSON.stringify(debugInfo, null, 2)}
               </pre>
             </CardContent>
           </Card>
         )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {/* Stats Overview - Mobile responsive grid */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Employees</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Total</p>
+                  <p className="text-xl md:text-2xl font-bold">{stats.total}</p>
                 </div>
-                <Users className="h-8 w-8 text-blue-500" />
+                <Users className="h-6 w-6 md:h-8 md:w-8 text-blue-500" />
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                  <p className="text-2xl font-bold">{stats.active}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Active</p>
+                  <p className="text-xl md:text-2xl font-bold">{stats.active}</p>
                 </div>
-                <UserCheck className="h-8 w-8 text-green-500" />
+                <UserCheck className="h-6 w-6 md:h-8 md:w-8 text-green-500" />
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Inactive</p>
-                  <p className="text-2xl font-bold">{stats.inactive}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Inactive</p>
+                  <p className="text-xl md:text-2xl font-bold">{stats.inactive}</p>
                 </div>
-                <UserX className="h-8 w-8 text-gray-500" />
+                <UserX className="h-6 w-6 md:h-8 md:w-8 text-gray-500" />
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Left</p>
-                  <p className="text-2xl font-bold">{stats.left}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Left</p>
+                  <p className="text-xl md:text-2xl font-bold">{stats.left}</p>
                 </div>
-                <UserMinus className="h-8 w-8 text-red-500" />
+                <UserMinus className="h-6 w-6 md:h-8 md:w-8 text-red-500" />
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="col-span-2 md:col-span-1">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Task-Assigned Sites</p>
-                  <p className="text-2xl font-bold">{stats.sites}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Sites</p>
+                  <p className="text-xl md:text-2xl font-bold">{stats.sites}</p>
                 </div>
-                <MapPin className="h-8 w-8 text-purple-500" />
+                <MapPin className="h-6 w-6 md:h-8 md:w-8 text-purple-500" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Collapsible on mobile */}
         {showFilters && (
           <Card>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <CardContent className="p-4 md:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Search</label>
                   <div className="relative">
@@ -1084,7 +1360,9 @@ const SupervisorEmployees = () => {
                     <SelectContent>
                       <SelectItem value="all">All Sites</SelectItem>
                       {getUniqueSites().map(site => (
-                        <SelectItem key={site} value={site}>{site}</SelectItem>
+                        <SelectItem key={site} value={site} className="truncate">
+                          {site}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1142,19 +1420,19 @@ const SupervisorEmployees = () => {
         {/* Task-Assigned Sites Info */}
         {supervisorSites.length > 0 ? (
           <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-start gap-3">
-                <Target className="h-5 w-5 text-primary mt-0.5" />
-                <div>
+                <Target className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
                   <h4 className="font-semibold">Sites from Your Task Assignments</h4>
                   <p className="text-sm text-muted-foreground mb-2">
                     You have tasks assigned at these sites. Showing employees from these sites only.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {supervisorSites.map(site => (
-                      <Badge key={site._id} variant="outline" className="bg-white">
+                      <Badge key={site._id} variant="outline" className="bg-white text-xs">
                         {site.name}
-                        {site.clientName && <span className="ml-1 text-muted-foreground">({site.clientName})</span>}
+                        {site.clientName && <span className="ml-1 text-muted-foreground hidden sm:inline">({site.clientName})</span>}
                       </Badge>
                     ))}
                   </div>
@@ -1167,9 +1445,9 @@ const SupervisorEmployees = () => {
           </Card>
         ) : (
           <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="pt-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <h4 className="font-semibold text-yellow-800">No Task-Assigned Sites Found</h4>
                   <p className="text-sm text-yellow-700">
@@ -1183,33 +1461,33 @@ const SupervisorEmployees = () => {
 
         {/* HRMS Tabs */}
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="employees" className="flex-1 min-w-[120px]">
-                  Employees
+                <TabsTrigger value="employees" className="text-sm md:text-base">
+                  Employees ({filteredEmployees.length})
                 </TabsTrigger>
-                <TabsTrigger value="onboarding" className="flex-1 min-w-[120px]">
+                <TabsTrigger value="onboarding" className="text-sm md:text-base">
                   Onboarding
                 </TabsTrigger>
               </TabsList>
               
-              <TabsContent value="employees" className="space-y-4">
+              <TabsContent value="employees" className="space-y-4 mt-4">
                 {loading.initial ? (
-                  <div className="text-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                    <p className="text-muted-foreground mt-4">Loading your data...</p>
+                  <div className="text-center py-8 md:py-12">
+                    <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mx-auto text-primary" />
+                    <p className="text-sm md:text-base text-muted-foreground mt-4">Loading your data...</p>
                   </div>
                 ) : filteredEmployees.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No employees found for your task-assigned sites</p>
+                  <div className="text-center py-8 md:py-12">
+                    <Users className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-sm md:text-base text-muted-foreground">No employees found for your task-assigned sites</p>
                     {supervisorSites.length > 0 ? (
                       <div className="mt-4">
                         <p className="text-sm text-muted-foreground mb-2">Your task-assigned sites:</p>
                         <div className="flex flex-wrap justify-center gap-2">
                           {supervisorSites.map(site => (
-                            <Badge key={site._id} variant="outline">
+                            <Badge key={site._id} variant="outline" className="text-xs">
                               {site.name}
                             </Badge>
                           ))}
@@ -1220,7 +1498,7 @@ const SupervisorEmployees = () => {
                       </div>
                     ) : (
                       <div>
-                        <p className="text-muted-foreground">You don't have any sites assigned through tasks.</p>
+                        <p className="text-sm text-muted-foreground">You don't have any sites assigned through tasks.</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           Please contact your administrator to assign you to tasks.
                         </p>
@@ -1230,6 +1508,7 @@ const SupervisorEmployees = () => {
                       variant="outline"
                       onClick={handleRefresh}
                       className="mt-4"
+                      size={isMobileView ? "sm" : "default"}
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh
@@ -1237,226 +1516,289 @@ const SupervisorEmployees = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                       <p className="text-sm text-muted-foreground">
                         Showing {filteredEmployees.length} of {employees.length} employees from your task-assigned sites
                       </p>
+                      
+                      {/* Mobile Add Employee Button */}
+                      {isMobileView && (
+                        <Button 
+                          onClick={() => {
+                            setEditingEmployee(null);
+                            form.reset({
+                              name: "",
+                              email: "",
+                              phone: "",
+                              site: "",
+                              shift: "Day",
+                              department: "",
+                              role: "",
+                            });
+                            setDialogOpen(true);
+                          }}
+                          className="w-full sm:w-auto"
+                          size="sm"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Employee
+                        </Button>
+                      )}
                     </div>
                     
-                    <div className="rounded-md border overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-8"></TableHead>
-                            <TableHead>Employee</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Department</TableHead>
-                            <TableHead>Role</TableHead>
-                            <TableHead>Site</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredEmployees.map((employee) => {
-                            const isExpanded = expandedEmployee === employee._id;
-                            const employeeTaskList = employeeTasks.get(employee._id) || [];
-                            const isLoadingTasks = tasksLoading.get(employee._id) || false;
-                            
-                            return (
-                              <>
-                                <TableRow key={employee._id} className="cursor-pointer hover:bg-muted/50">
-                                  <TableCell>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0"
-                                      onClick={() => toggleEmployeeExpand(employee._id)}
-                                    >
-                                      {isExpanded ? (
-                                        <ChevronUp className="h-4 w-4" />
-                                      ) : (
-                                        <ChevronDown className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      {employee.photo ? (
-                                        <img 
-                                          src={employee.photo} 
-                                          alt={employee.name}
-                                          className="h-8 w-8 rounded-full object-cover"
-                                          onError={(e) => {
-                                            (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
-                                          }}
-                                        />
-                                      ) : (
-                                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                          <User className="h-4 w-4 text-primary" />
-                                        </div>
-                                      )}
-                                      <div>
-                                        <div className="font-medium">{employee.name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                          ID: {employee.employeeId}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>
-                                      <div className="flex items-center gap-1 text-sm">
-                                        <Mail className="h-3 w-3 flex-shrink-0" />
-                                        <span className="truncate max-w-[150px]">{employee.email}</span>
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                        <Phone className="h-3 w-3 flex-shrink-0" />
-                                        {employee.phone}
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>{employee.department}</TableCell>
-                                  <TableCell>{employee.position}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="max-w-[150px] truncate">
-                                      {employee.siteName || 'Not Assigned'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge 
-                                      variant={employee.status === "active" ? "default" : 
-                                              employee.status === "inactive" ? "secondary" : "destructive"}
-                                      className="cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleEmployeeStatus(employee._id);
-                                      }}
-                                    >
-                                      {employee.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-1">
+                    {/* Mobile view - Cards */}
+                    {isMobileView ? (
+                      <div className="space-y-3">
+                        {filteredEmployees.map((employee) => (
+                          <MobileEmployeeCard
+                            key={employee._id}
+                            employee={employee}
+                            isExpanded={expandedEmployee === employee._id}
+                            onToggleExpand={toggleEmployeeExpand}
+                            onEdit={(emp) => {
+                              setEditingEmployee(emp);
+                              form.reset({
+                                name: emp.name,
+                                email: emp.email,
+                                phone: emp.phone,
+                                site: emp.siteName || '',
+                                shift: 'Day',
+                                department: emp.department,
+                                role: emp.position,
+                              });
+                              setDialogOpen(true);
+                            }}
+                            onDelete={(id) => {
+                              setEmployeeToDelete(id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            onToggleStatus={toggleEmployeeStatus}
+                            employeeTasks={employeeTasks.get(employee._id) || []}
+                            isLoadingTasks={tasksLoading.get(employee._id) || false}
+                            getPriorityBadge={getPriorityBadge}
+                            getStatusBadge={getStatusBadge}
+                            formatDate={formatDate}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      /* Desktop view - Table */
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-8"></TableHead>
+                              <TableHead>Employee</TableHead>
+                              <TableHead>Contact</TableHead>
+                              <TableHead>Department</TableHead>
+                              <TableHead>Role</TableHead>
+                              <TableHead>Site</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredEmployees.map((employee) => {
+                              const isExpanded = expandedEmployee === employee._id;
+                              const employeeTaskList = employeeTasks.get(employee._id) || [];
+                              const isLoadingTasks = tasksLoading.get(employee._id) || false;
+                              
+                              return (
+                                <>
+                                  <TableRow key={employee._id} className="cursor-pointer hover:bg-muted/50">
+                                    <TableCell>
                                       <Button
                                         variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingEmployee(employee);
-                                          form.reset({
-                                            name: employee.name,
-                                            email: employee.email,
-                                            phone: employee.phone,
-                                            site: employee.siteName || '',
-                                            shift: 'Day',
-                                            department: employee.department,
-                                            role: employee.position,
-                                          });
-                                          setDialogOpen(true);
-                                        }}
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => toggleEmployeeExpand(employee._id)}
                                       >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEmployeeToDelete(employee._id);
-                                          setDeleteDialogOpen(true);
-                                        }}
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                                
-                                {/* Expanded row with tasks */}
-                                {isExpanded && (
-                                  <TableRow className="bg-muted/30">
-                                    <TableCell colSpan={8} className="p-4">
-                                      <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                          <h4 className="font-semibold flex items-center gap-2">
-                                            <Briefcase className="h-4 w-4" />
-                                            Assigned Tasks
-                                          </h4>
-                                          <Badge variant="outline">
-                                            {employeeTaskList.length} task(s)
-                                          </Badge>
-                                        </div>
-                                        
-                                        {isLoadingTasks ? (
-                                          <div className="text-center py-4">
-                                            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                                            <p className="text-sm text-muted-foreground mt-2">Loading tasks...</p>
-                                          </div>
-                                        ) : employeeTaskList.length === 0 ? (
-                                          <div className="text-center py-4 text-muted-foreground">
-                                            <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                            <p>No tasks assigned to this employee</p>
-                                          </div>
+                                        {isExpanded ? (
+                                          <ChevronUp className="h-4 w-4" />
                                         ) : (
-                                          <div className="space-y-3 max-h-96 overflow-y-auto">
-                                            {employeeTaskList.map((task) => (
-                                              <Card key={task._id} className="border-l-4" style={{
-                                                borderLeftColor: task.priority === 'high' ? '#ef4444' : 
-                                                                task.priority === 'medium' ? '#eab308' : 
-                                                                task.priority === 'low' ? '#22c55e' : '#6b7280'
-                                              }}>
-                                                <CardContent className="p-4">
-                                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                    <div className="flex-1">
-                                                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                        <h5 className="font-medium">{task.title}</h5>
-                                                        {getPriorityBadge(task.priority)}
-                                                      </div>
-                                                      <p className="text-sm text-muted-foreground line-clamp-2">
-                                                        {task.description}
-                                                      </p>
-                                                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
-                                                        <div className="flex items-center gap-1">
-                                                          <Building className="h-3 w-3 flex-shrink-0" />
-                                                          <span className="truncate max-w-[150px]">{task.siteName}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                          <Calendar className="h-3 w-3 flex-shrink-0" />
-                                                          Deadline: {new Date(task.deadline).toLocaleDateString()}
-                                                        </div>
-                                                        {task.dueDateTime && (
-                                                          <div className="flex items-center gap-1">
-                                                            <Clock className="h-3 w-3 flex-shrink-0" />
-                                                            Due: {new Date(task.dueDateTime).toLocaleString()}
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                      {getStatusBadge(task.status)}
-                                                    </div>
-                                                  </div>
-                                                </CardContent>
-                                              </Card>
-                                            ))}
+                                          <ChevronDown className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        {employee.photo ? (
+                                          <img 
+                                            src={employee.photo} 
+                                            alt={employee.name}
+                                            className="h-8 w-8 rounded-full object-cover"
+                                            onError={(e) => {
+                                              (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                            loading="lazy"
+                                          />
+                                        ) : (
+                                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <User className="h-4 w-4 text-primary" />
                                           </div>
                                         )}
+                                        <div>
+                                          <div className="font-medium">{employee.name}</div>
+                                          <div className="text-xs text-muted-foreground">
+                                            ID: {employee.employeeId}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <div className="flex items-center gap-1 text-sm">
+                                          <Mail className="h-3 w-3 flex-shrink-0" />
+                                          <span className="truncate max-w-[150px]">{employee.email}</span>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                          <Phone className="h-3 w-3 flex-shrink-0" />
+                                          {employee.phone}
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{employee.department}</TableCell>
+                                    <TableCell>{employee.position}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="max-w-[150px] truncate">
+                                        {employee.siteName || 'Not Assigned'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge 
+                                        variant={employee.status === "active" ? "default" : 
+                                                employee.status === "inactive" ? "secondary" : "destructive"}
+                                        className="cursor-pointer"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleEmployeeStatus(employee._id);
+                                        }}
+                                      >
+                                        {employee.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingEmployee(employee);
+                                            form.reset({
+                                              name: employee.name,
+                                              email: employee.email,
+                                              phone: employee.phone,
+                                              site: employee.siteName || '',
+                                              shift: 'Day',
+                                              department: employee.department,
+                                              role: employee.position,
+                                            });
+                                            setDialogOpen(true);
+                                          }}
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEmployeeToDelete(employee._id);
+                                            setDeleteDialogOpen(true);
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                )}
-                              </>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                                  
+                                  {/* Expanded row with tasks */}
+                                  {isExpanded && (
+                                    <TableRow className="bg-muted/30">
+                                      <TableCell colSpan={8} className="p-4">
+                                        <div className="space-y-4">
+                                          <div className="flex items-center justify-between">
+                                            <h4 className="font-semibold flex items-center gap-2">
+                                              <Briefcase className="h-4 w-4" />
+                                              Assigned Tasks
+                                            </h4>
+                                            <Badge variant="outline">
+                                              {employeeTaskList.length} task(s)
+                                            </Badge>
+                                          </div>
+                                          
+                                          {isLoadingTasks ? (
+                                            <div className="text-center py-4">
+                                              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                                              <p className="text-sm text-muted-foreground mt-2">Loading tasks...</p>
+                                            </div>
+                                          ) : employeeTaskList.length === 0 ? (
+                                            <div className="text-center py-4 text-muted-foreground">
+                                              <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                              <p>No tasks assigned to this employee</p>
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                              {employeeTaskList.map((task) => (
+                                                <Card key={task._id} className="border-l-4" style={{
+                                                  borderLeftColor: task.priority === 'high' ? '#ef4444' : 
+                                                                  task.priority === 'medium' ? '#eab308' : 
+                                                                  task.priority === 'low' ? '#22c55e' : '#6b7280'
+                                                }}>
+                                                  <CardContent className="p-4">
+                                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                      <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                          <h5 className="font-medium">{task.title}</h5>
+                                                          {getPriorityBadge(task.priority)}
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground line-clamp-2">
+                                                          {task.description}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+                                                          <div className="flex items-center gap-1">
+                                                            <Building className="h-3 w-3 flex-shrink-0" />
+                                                            <span className="truncate max-w-[150px]">{task.siteName}</span>
+                                                          </div>
+                                                          <div className="flex items-center gap-1">
+                                                            <Calendar className="h-3 w-3 flex-shrink-0" />
+                                                            Deadline: {formatDate(task.deadline)}
+                                                          </div>
+                                                          {task.dueDateTime && (
+                                                            <div className="flex items-center gap-1">
+                                                              <Clock className="h-3 w-3 flex-shrink-0" />
+                                                              Due: {formatDate(task.dueDateTime)}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                      <div className="flex items-center gap-3">
+                                                        {getStatusBadge(task.status)}
+                                                      </div>
+                                                    </div>
+                                                  </CardContent>
+                                                </Card>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>
               
-              <TabsContent value="onboarding" className="space-y-4">
+              <TabsContent value="onboarding" className="space-y-4 mt-4">
                 <SupervisorOnboardingTab 
                   employees={employees}
                   setEmployees={setEmployees}
@@ -1470,9 +1812,32 @@ const SupervisorEmployees = () => {
         </Card>
       </div>
 
+      {/* Floating Add Button for Mobile */}
+      {isMobileView && activeTab === "employees" && filteredEmployees.length > 0 && (
+        <Button
+          onClick={() => {
+            setEditingEmployee(null);
+            form.reset({
+              name: "",
+              email: "",
+              phone: "",
+              site: "",
+              shift: "Day",
+              department: "",
+              role: "",
+            });
+            setDialogOpen(true);
+          }}
+          className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg z-50"
+          size="icon"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
+
       {/* Add/Edit Employee Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingEmployee ? "Edit Employee" : "Add New Employee"}
@@ -1598,9 +1963,14 @@ const SupervisorEmployees = () => {
                 )}
               />
               
-              <Button type="submit" className="w-full">
-                {editingEmployee ? "Update Employee" : "Add Employee"}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button type="submit" className="flex-1">
+                  {editingEmployee ? "Update Employee" : "Add Employee"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
             </form>
           </Form>
         </DialogContent>
@@ -1608,14 +1978,14 @@ const SupervisorEmployees = () => {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-[425px]">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Employee</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this employee? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDelete} 

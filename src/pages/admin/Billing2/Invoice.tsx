@@ -20,7 +20,8 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Share2
 } from "lucide-react";
 import { Invoice } from "../AdminBilling";
 import { PerformInvoiceForm } from "./PerformInvoiceForm1";
@@ -40,7 +41,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   onInvoiceCreate,
   onMarkAsPaid,
   userId,
-  userRole = 'admin'
+  userRole = 'superadmin'
 }) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +49,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   const [performInvoiceDialogOpen, setPerformInvoiceDialogOpen] = useState(false);
   const [taxInvoiceDialogOpen, setTaxInvoiceDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +57,8 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   const [itemsPerPage] = useState(10);
   const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
   const [markingAsPaidId, setMarkingAsPaidId] = useState<string | null>(null);
+  const [sharingInvoiceId, setSharingInvoiceId] = useState<string | null>(null);
+  const [shareUserId, setShareUserId] = useState("");
 
   // Initialize InvoiceService with user info
   const invoiceService = new InvoiceService(userId, userRole);
@@ -86,7 +90,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
       
       // Call the parent callback if provided
       if (onInvoiceCreate) {
-        onInvoiceCreate(newInvoice);
+        onInvoiceCreate(newInvoice as Invoice);
       }
       
       // Show success message
@@ -108,7 +112,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
       // Update local state
       setInvoices(prev => 
         prev.map(invoice => 
-          invoice.id === invoiceId ? updatedInvoice : invoice
+          invoice.id === invoiceId ? updatedInvoice as Invoice : invoice
         )
       );
       
@@ -155,6 +159,40 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
       console.error('Error deleting invoice:', err);
     } finally {
       setDeletingInvoiceId(null);
+    }
+  };
+
+  // Handle sharing an invoice with admin
+  const handleShareInvoice = async (invoiceId: string, shareWithUserId: string) => {
+    if (!shareWithUserId.trim()) {
+      alert('Please enter a user ID to share with');
+      return;
+    }
+
+    try {
+      setSharingInvoiceId(invoiceId);
+      await invoiceService.shareInvoice(invoiceId, [shareWithUserId]);
+      
+      // Update local state
+      setInvoices(prev => 
+        prev.map(invoice => 
+          invoice.id === invoiceId 
+            ? { 
+                ...invoice, 
+                sharedWith: [...(invoice.sharedWith || []), shareWithUserId] 
+              } 
+            : invoice
+        )
+      );
+      
+      setShareDialogOpen(false);
+      setShareUserId("");
+      alert('Invoice shared successfully!');
+    } catch (err: any) {
+      alert(`Failed to share invoice: ${err.message}`);
+      console.error('Error sharing invoice:', err);
+    } finally {
+      setSharingInvoiceId(null);
     }
   };
 
@@ -432,7 +470,9 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
       yPos += 6;
       
       const amountInWords = invoice.amountInWords || convertToIndianWords(invoice.amount);
-      const wordsLines = doc.splitTextToSize(amountInWords, contentWidth);
+      // Cast doc to any to access splitTextToSize which might not be in the types
+      const docAny = doc as any;
+      const wordsLines = docAny.splitTextToSize?.(amountInWords, contentWidth) || [amountInWords];
       wordsLines.forEach((line: string) => {
         addText(line, leftMargin, yPos, { size: 9 });
         yPos += 4;
@@ -636,10 +676,10 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
     return invoiceList.filter(invoice => 
       invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.site?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.serviceType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (invoice.site && invoice.site.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (invoice.serviceType && invoice.serviceType.toLowerCase().includes(searchTerm.toLowerCase())) ||
       invoice.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.voucherNo?.toLowerCase().includes(searchTerm.toLowerCase())
+      (invoice.voucherNo && invoice.voucherNo.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
 
@@ -657,7 +697,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   const paginatedTaxInvoices = getPaginatedData(filteredTaxInvoices);
 
   // Get status color
-  // In InvoicesTab components (both superadmin and admin)
+ // In InvoicesTab components (both superadmin and admin)
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case 'paid': return 'default';     // Changed from 'success'
@@ -756,21 +796,33 @@ const getStatusColor = (status: string) => {
                             )}
                           </Button>
                         )}
-                        {invoice.userId === userId && (
+                        {userRole === 'superadmin' && (
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
-                            className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            disabled={deletingInvoiceId === invoice.id}
+                            onClick={() => {
+                              setSelectedInvoice(invoice);
+                              setShareDialogOpen(true);
+                            }}
+                            className="h-8 px-2"
+                            disabled={sharingInvoiceId === invoice.id}
                           >
-                            {deletingInvoiceId === invoice.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
+                            <Share2 className="h-4 w-4" />
                           </Button>
                         )}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteInvoice(invoice.id)}
+                          className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={deletingInvoiceId === invoice.id}
+                        >
+                          {deletingInvoiceId === invoice.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -892,21 +944,33 @@ const getStatusColor = (status: string) => {
                         )}
                       </Button>
                     )}
-                    {invoice.userId === userId && (
+                    {userRole === 'superadmin' && (
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="flex-1 h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleDeleteInvoice(invoice.id)}
-                        disabled={deletingInvoiceId === invoice.id}
+                        className="flex-1 h-8"
+                        onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setShareDialogOpen(true);
+                        }}
+                        disabled={sharingInvoiceId === invoice.id}
                       >
-                        {deletingInvoiceId === invoice.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
+                        <Share2 className="h-4 w-4" />
                       </Button>
                     )}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex-1 h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleDeleteInvoice(invoice.id)}
+                      disabled={deletingInvoiceId === invoice.id}
+                    >
+                      {deletingInvoiceId === invoice.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1320,31 +1384,88 @@ const getStatusColor = (status: string) => {
                 >
                   Close Preview
                 </Button>
-                {selectedInvoice.userId === userId && (
-                  <Button 
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to delete this invoice?')) {
-                        handleDeleteInvoice(selectedInvoice.id);
-                        setPreviewDialogOpen(false);
-                      }
-                    }}
-                    disabled={deletingInvoiceId === selectedInvoice.id}
-                  >
-                    {deletingInvoiceId === selectedInvoice.id ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Invoice
-                      </>
-                    )}
-                  </Button>
-                )}
+                <Button 
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this invoice?')) {
+                      handleDeleteInvoice(selectedInvoice.id);
+                      setPreviewDialogOpen(false);
+                    }
+                  }}
+                  disabled={deletingInvoiceId === selectedInvoice.id}
+                >
+                  {deletingInvoiceId === selectedInvoice.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Invoice
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Invoice Dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Invoice</DialogTitle>
+          </DialogHeader>
+          {selectedInvoice && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium mb-2">Share Invoice: {selectedInvoice.id}</p>
+                <p className="text-sm text-muted-foreground">
+                  Enter the Admin User ID to share this invoice with:
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="userId" className="text-sm font-medium">
+                  Admin User ID
+                </label>
+                <Input
+                  id="userId"
+                  placeholder="Enter admin user ID"
+                  value={shareUserId}
+                  onChange={(e) => setShareUserId(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShareDialogOpen(false);
+                    setShareUserId("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => handleShareInvoice(selectedInvoice.id, shareUserId)}
+                  disabled={!shareUserId.trim() || sharingInvoiceId === selectedInvoice.id}
+                >
+                  {sharingInvoiceId === selectedInvoice.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sharing...
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Share Invoice
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}

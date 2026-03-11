@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import {
@@ -38,7 +38,17 @@ import {
   Building,
   CalendarDays,
   Filter,
-  Eye
+  Eye,
+  Loader2,
+  RefreshCw,
+  Briefcase,
+  UserCheck,
+  UserX,
+  UserMinus,
+  UserPlus,
+  BarChart3,
+  X,
+  MapPin
 } from 'lucide-react';
 
 // Recharts for charts
@@ -51,12 +61,25 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// Chart color constants (EXACTLY THE SAME)
+// Import axios for API calls
+import axios from 'axios';
+
+// Import site service
+import { siteService, Site } from "@/services/SiteService";
+
+// API URL
+const API_URL = process.env.NODE_ENV === 'development' 
+  ? `http://${window.location.hostname}:5001/api` 
+  : '/api';
+
+// Chart color constants
 const CHART_COLORS = {
   present: '#10b981',
   absent: '#ef4444',
   late: '#f59e0b',
-  payroll: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444']
+  weeklyOff: '#94a3b8',
+  leave: '#f97316',
+  payroll: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b4d6', '#ef4444']
 };
 
 // Animation variants
@@ -107,39 +130,519 @@ const scaleIn = {
   }
 };
 
-// Generate attendance data from today going backwards
-const generateAttendanceData = () => {
+// Helper function to format date
+const formatDate = (date: Date | string) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Interface for attendance record
+interface AttendanceRecord {
+  _id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  totalHours: number;
+  breakTime: number;
+  status: 'present' | 'absent' | 'half-day' | 'leave' | 'weekly-off';
+  isCheckedIn: boolean;
+  isOnBreak: boolean;
+  supervisorId?: string;
+  remarks?: string;
+  siteName?: string;
+  department?: string;
+  shift?: string;
+  overtimeHours?: number;
+  lateMinutes?: number;
+  earlyLeaveMinutes?: number;
+}
+
+// Interface for employee
+interface Employee {
+  id: string;
+  _id?: string;
+  employeeId?: string;
+  name: string;
+  department: string;
+  position: string;
+  site: string;
+  siteName?: string;
+  isManager?: boolean;
+  isSupervisor?: boolean;
+  status?: string;
+  assignedSites?: string[];
+}
+
+// Interface for site employee count (ONLY EMPLOYEES ASSIGNED TO SITES)
+interface SiteEmployeeCount {
+  siteName: string;
+  totalEmployees: number;
+}
+
+// Interface for daily attendance summary (TOTAL ACROSS ALL SITES - ONLY SITE-ASSIGNED EMPLOYEES)
+interface DailyAttendanceSummary {
+  date: string;
+  day: string;
+  present: number;
+  absent: number;
+  weeklyOff: number;
+  leave: number;
+  total: number;
+  rate: string;
+  index: number;
+  totalEmployees: number;
+  sitesWithData: number;
+  siteBreakdown?: {
+    [siteName: string]: {
+      total: number;
+      present: number;
+      absent: number;
+      weeklyOff: number;
+      leave: number;
+    }
+  };
+}
+
+// Fetch all employees and count ONLY THOSE ASSIGNED TO SITES
+const fetchEmployeesAssignedToSites = async (): Promise<{employees: Employee[], siteCounts: SiteEmployeeCount[]}> => {
+  try {
+    console.log('🔄 Fetching employees assigned to sites from API...');
+    
+    // First fetch all sites to get valid site names
+    const sites = await siteService.getAllSites();
+    const validSiteNames = new Set(sites.map(site => site.name));
+    
+    console.log(`Found ${sites.length} sites with names:`, Array.from(validSiteNames));
+    
+    const response = await axios.get(`${API_URL}/employees`, {
+      params: { limit: 5000 }
+    });
+    
+    console.log('Employees API response:', response.data);
+    
+    let employeesData = [];
+    
+    if (response.data) {
+      if (Array.isArray(response.data)) {
+        employeesData = response.data;
+      } else if (response.data.success && Array.isArray(response.data.data)) {
+        employeesData = response.data.data;
+      } else if (Array.isArray(response.data.employees)) {
+        employeesData = response.data.employees;
+      } else if (response.data.data && Array.isArray(response.data.data.employees)) {
+        employeesData = response.data.data.employees;
+      }
+    }
+    
+    // Transform employees data and filter ONLY those assigned to valid sites
+    const transformedEmployees: Employee[] = [];
+    const siteCountMap = new Map<string, number>();
+    
+    employeesData.forEach((emp: any) => {
+      // Check if employee has a site assignment
+      const siteName = emp.site || emp.siteName || '';
+      const assignedSites = emp.assignedSites || emp.sites || [];
+      
+      // Only include if employee has a valid site assignment
+      const hasValidSite = siteName && validSiteNames.has(siteName);
+      const hasValidAssignedSites = Array.isArray(assignedSites) && assignedSites.some((site: string) => validSiteNames.has(site));
+      
+      if (hasValidSite || hasValidAssignedSites) {
+        const employeeSite = hasValidSite ? siteName : (assignedSites.find((site: string) => validSiteNames.has(site)) || 'Unknown Site');
+        
+        const employee: Employee = {
+          id: emp._id || emp.id || `emp_${Math.random()}`,
+          _id: emp._id || emp.id,
+          employeeId: emp.employeeId || emp.employeeID || `EMP${String(Math.random()).slice(2, 6)}`,
+          name: emp.name || emp.employeeName || "Unknown Employee",
+          department: emp.department || emp.department || "Unknown Department",
+          position: emp.position || emp.designation || emp.role || "Employee",
+          site: employeeSite,
+          siteName: employeeSite,
+          assignedSites: assignedSites,
+          isManager: (emp.position?.toLowerCase() || '').includes('manager') || (emp.department?.toLowerCase() || '').includes('manager'),
+          isSupervisor: (emp.position?.toLowerCase() || '').includes('supervisor') || (emp.department?.toLowerCase() || '').includes('supervisor')
+        };
+        
+        transformedEmployees.push(employee);
+        
+        // Count employees per site
+        siteCountMap.set(employeeSite, (siteCountMap.get(employeeSite) || 0) + 1);
+      }
+    });
+    
+    const siteCounts: SiteEmployeeCount[] = Array.from(siteCountMap.entries()).map(([siteName, count]) => ({
+      siteName,
+      totalEmployees: count
+    }));
+    
+    console.log(`✅ Loaded ${transformedEmployees.length} employees ASSIGNED TO SITES from API`);
+    console.log(`📊 Employee count per site:`, siteCounts);
+    
+    return {
+      employees: transformedEmployees,
+      siteCounts
+    };
+  } catch (error: any) {
+    console.error('Error fetching employees:', error);
+    throw new Error(`Error loading employees: ${error.message}`);
+  }
+};
+
+// Fetch attendance data from API and calculate totals across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES)
+const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSummary[]> => {
+  try {
+    console.log(`🔄 Fetching attendance data for last ${days} days across ALL sites (only site-assigned employees)...`);
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days + 1);
+    
+    const startDateStr = formatDate(startDate);
+    const endDateStr = formatDate(endDate);
+    
+    console.log(`Fetching attendance from ${startDateStr} to ${endDateStr}`);
+    
+    // First, fetch employees assigned to sites
+    let employeesWithCounts = await fetchEmployeesAssignedToSites();
+    const siteAssignedEmployees = employeesWithCounts.employees;
+    const siteCounts = employeesWithCounts.siteCounts;
+    
+    // Calculate total employees assigned to sites
+    const totalEmployeesAssignedToSites = siteAssignedEmployees.length;
+    
+    console.log(`Total employees assigned to sites: ${totalEmployeesAssignedToSites}`);
+    
+    // Try to fetch attendance records
+    let allRecords: AttendanceRecord[] = [];
+    
+    try {
+      // First try: main attendance endpoint with date range
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: { 
+          startDate: startDateStr, 
+          endDate: endDateStr,
+          limit: 10000
+        }
+      });
+      
+      console.log('Attendance API response:', response.data);
+      
+      if (response.data) {
+        if (response.data.success && Array.isArray(response.data.data)) {
+          allRecords = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          allRecords = response.data;
+        } else if (response.data.attendance && Array.isArray(response.data.attendance)) {
+          allRecords = response.data.attendance;
+        }
+      }
+    } catch (mainError) {
+      console.log('Main attendance endpoint failed, trying bulk range endpoint:', mainError);
+      
+      try {
+        // Second try: bulk range endpoint
+        const response = await axios.get(`${API_URL}/attendance/range`, {
+          params: { startDate: startDateStr, endDate: endDateStr }
+        });
+        
+        if (response.data) {
+          if (response.data.success && Array.isArray(response.data.data)) {
+            allRecords = response.data.data;
+          } else if (Array.isArray(response.data)) {
+            allRecords = response.data;
+          } else if (response.data.attendance && Array.isArray(response.data.attendance)) {
+            allRecords = response.data.attendance;
+          }
+        }
+      } catch (rangeError) {
+        console.log('Range endpoint failed, falling back to day-by-day:', rangeError);
+        
+        // Third try: fetch day by day
+        const tempDate = new Date(startDate);
+        while (tempDate <= endDate) {
+          const dateStr = formatDate(tempDate);
+          try {
+            const response = await axios.get(`${API_URL}/attendance`, {
+              params: { date: dateStr }
+            });
+            
+            if (response.data) {
+              let dayRecords = [];
+              if (response.data.success && Array.isArray(response.data.data)) {
+                dayRecords = response.data.data;
+              } else if (Array.isArray(response.data)) {
+                dayRecords = response.data;
+              } else if (response.data.attendance && Array.isArray(response.data.attendance)) {
+                dayRecords = response.data.attendance;
+              }
+              
+              allRecords.push(...dayRecords);
+            }
+          } catch (dayError) {
+            console.log(`No data for ${dateStr}`);
+          }
+          
+          tempDate.setDate(tempDate.getDate() + 1);
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+    }
+    
+    console.log(`✅ Fetched ${allRecords.length} attendance records total across all sites`);
+    
+    // Process records into daily summaries (TOTALS ACROSS ALL SITES - ONLY SITE-ASSIGNED EMPLOYEES)
+    const dailySummaries: { [key: string]: DailyAttendanceSummary } = {};
+    
+    // Initialize all dates in range
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      const dateStr = formatDate(currentDate);
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
+      
+      dailySummaries[dateStr] = {
+        date: dateStr,
+        day: dateStr === formatDate(new Date()) ? 'Today' :
+             dateStr === formatDate(new Date(Date.now() - 86400000)) ? 'Yesterday' : dayName,
+        present: 0,
+        absent: 0,
+        weeklyOff: 0,
+        leave: 0,
+        total: 0,
+        rate: '0.0%',
+        index: days - Math.floor((new Date(endDate).getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)),
+        totalEmployees: totalEmployeesAssignedToSites,
+        sitesWithData: 0,
+        siteBreakdown: {}
+      };
+      
+      // Initialize site breakdown for this date using site counts from employees assigned to sites
+      siteCounts.forEach(site => {
+        if (dailySummaries[dateStr].siteBreakdown) {
+          dailySummaries[dateStr].siteBreakdown![site.siteName] = {
+            total: site.totalEmployees,
+            present: 0,
+            absent: 0,
+            weeklyOff: 0,
+            leave: 0
+          };
+        }
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Track which sites have data for each date
+    const sitesWithDataPerDate: { [date: string]: Set<string> } = {};
+    
+    // Create a set of valid site names from our site counts
+    const validSiteNames = new Set(siteCounts.map(site => site.siteName));
+    
+    // Count attendance by date across ALL SITES (only for valid sites)
+    allRecords.forEach(record => {
+      // Only count attendance if the site is valid (has employees assigned)
+      if (record.siteName && validSiteNames.has(record.siteName) && dailySummaries[record.date]) {
+        dailySummaries[record.date].total++;
+        
+        // Track unique sites for this date
+        if (!sitesWithDataPerDate[record.date]) {
+          sitesWithDataPerDate[record.date] = new Set();
+        }
+        sitesWithDataPerDate[record.date].add(record.siteName);
+        
+        // Update site breakdown
+        if (dailySummaries[record.date].siteBreakdown?.[record.siteName]) {
+          if (record.status === 'present' || record.status === 'half-day') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].present++;
+          } else if (record.status === 'weekly-off') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].weeklyOff++;
+          } else if (record.status === 'leave') {
+            dailySummaries[record.date].siteBreakdown![record.siteName].leave++;
+          } else {
+            dailySummaries[record.date].siteBreakdown![record.siteName].absent++;
+          }
+        }
+        
+        // Update totals
+        if (record.status === 'present' || record.status === 'half-day') {
+          dailySummaries[record.date].present++;
+        } else if (record.status === 'weekly-off') {
+          dailySummaries[record.date].weeklyOff++;
+        } else if (record.status === 'leave') {
+          dailySummaries[record.date].leave++;
+        } else {
+          dailySummaries[record.date].absent++;
+        }
+      }
+    });
+    
+    // Set sitesWithData count
+    Object.keys(sitesWithDataPerDate).forEach(date => {
+      if (dailySummaries[date]) {
+        dailySummaries[date].sitesWithData = sitesWithDataPerDate[date].size;
+      }
+    });
+    
+    // For dates with no attendance data or partial data, calculate using site employee counts
+    Object.values(dailySummaries).forEach(summary => {
+      // Calculate total accounted employees from attendance records
+      const totalAccounted = summary.present + summary.weeklyOff + summary.leave;
+      
+      if (totalAccounted < summary.totalEmployees) {
+        // The unaccounted employees should be marked as absent
+        summary.absent += (summary.totalEmployees - totalAccounted);
+      }
+      
+      // Also update site breakdown to account for missing employees
+      if (summary.siteBreakdown) {
+        Object.keys(summary.siteBreakdown).forEach(siteName => {
+          const siteData = summary.siteBreakdown![siteName];
+          const accountedSite = siteData.present + siteData.weeklyOff + siteData.leave;
+          if (accountedSite < siteData.total) {
+            siteData.absent += (siteData.total - accountedSite);
+          }
+        });
+      }
+      
+      // Calculate attendance rate (present + weekly off considered as present for rate)
+      const totalPresentWithWO = summary.present + summary.weeklyOff;
+      summary.rate = summary.totalEmployees > 0 
+        ? ((totalPresentWithWO / summary.totalEmployees) * 100).toFixed(1) + '%'
+        : '0.0%';
+    });
+    
+    // Sort by date descending (most recent first)
+    const summaries = Object.values(dailySummaries).sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    
+    console.log(`📊 Processed ${summaries.length} daily summaries across all sites`);
+    console.log(`📈 Total employees assigned to sites: ${totalEmployeesAssignedToSites}`);
+    console.log(`🏢 Site breakdown:`, siteCounts);
+    
+    return summaries;
+    
+  } catch (error: any) {
+    console.error('Error fetching attendance data:', error);
+    toast.error('Failed to fetch attendance data', {
+      description: error.message || 'Using demo data instead'
+    });
+    
+    // Generate demo data as fallback with realistic totals (only site-assigned employees)
+    return generateDemoAttendanceData(days);
+  }
+};
+
+// Generate demo attendance data as fallback (with realistic totals - ONLY SITE-ASSIGNED EMPLOYEES)
+const generateDemoAttendanceData = (days: number): DailyAttendanceSummary[] => {
+  console.log('Generating demo attendance data (only site-assigned employees)...');
   const data = [];
   const today = new Date();
+  
+  // Demo site counts (only sites that exist)
+  const demoSites = [
+    'ALYSSUM DEVELOPERS PVT. LTD.',
+    'ARYA ASSOCIATES',
+    'ASTITVA ASSET MANAGEMENT LLP',
+    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
+    'BAHIRAT ESTATE LLP',
+    'CHITRALI PROPERTIES PVT LTD',
+    'Concretely Infra Llp',
+    'COORTUS ADVISORS LLP',
+    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.'
+  ];
+  
+  // Demo employee counts per site (total employees assigned to sites: ~120)
+  const siteEmployeeCounts: { [key: string]: number } = {
+    'ALYSSUM DEVELOPERS PVT. LTD.': 25,
+    'ARYA ASSOCIATES': 18,
+    'ASTITVA ASSET MANAGEMENT LLP': 15,
+    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD': 12,
+    'BAHIRAT ESTATE LLP': 10,
+    'CHITRALI PROPERTIES PVT LTD': 10,
+    'Concretely Infra Llp': 8,
+    'COORTUS ADVISORS LLP': 12,
+    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.': 10
+  };
+  
+  const totalEmployees = Object.values(siteEmployeeCounts).reduce((a, b) => a + b, 0);
 
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < days; i++) {
     const date = new Date();
     date.setDate(today.getDate() - i);
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
     const dayName = i === 0 ? 'Today' :
       i === 1 ? 'Yesterday' :
         date.toLocaleDateString('en-US', { weekday: 'long' });
 
-    const present = Math.floor(Math.random() * 30) + 85;
-    const absent = Math.floor(Math.random() * 15) + 5;
-    const total = present + absent;
-    const rate = ((present / total) * 100).toFixed(1) + '%';
+    let totalPresent = 0;
+    let totalWeeklyOff = 0;
+    let totalLeave = 0;
+    let totalAbsent = 0;
+    
+    const siteBreakdown: { [siteName: string]: { total: number; present: number; absent: number; weeklyOff: number; leave: number } } = {};
+    
+    // Calculate per site
+    Object.entries(siteEmployeeCounts).forEach(([siteName, siteTotal]) => {
+      let present, weeklyOff, leave, absent;
+      
+      if (isWeekend) {
+        // Weekend pattern
+        weeklyOff = Math.floor(siteTotal * 0.7);
+        present = Math.floor(siteTotal * 0.2);
+        leave = Math.floor(siteTotal * 0.05);
+        absent = siteTotal - present - weeklyOff - leave;
+      } else {
+        // Weekday pattern
+        present = Math.floor(siteTotal * 0.85);
+        weeklyOff = Math.floor(siteTotal * 0.05);
+        leave = Math.floor(siteTotal * 0.05);
+        absent = siteTotal - present - weeklyOff - leave;
+      }
+      
+      siteBreakdown[siteName] = {
+        total: siteTotal,
+        present,
+        absent,
+        weeklyOff,
+        leave
+      };
+      
+      totalPresent += present;
+      totalWeeklyOff += weeklyOff;
+      totalLeave += leave;
+      totalAbsent += absent;
+    });
+
+    const totalPresentWithWO = totalPresent + totalWeeklyOff;
+    const rate = totalEmployees > 0 ? ((totalPresentWithWO / totalEmployees) * 100).toFixed(1) + '%' : '0.0%';
 
     data.push({
       date: date.toISOString().split('T')[0],
       day: dayName,
-      present,
-      absent,
-      total,
+      present: totalPresent,
+      absent: totalAbsent,
+      weeklyOff: totalWeeklyOff,
+      leave: totalLeave,
+      total: totalEmployees,
       rate,
-      index: i
+      index: i,
+      totalEmployees,
+      sitesWithData: demoSites.length,
+      siteBreakdown
     });
   }
 
   return data;
 };
-
-const attendanceData = generateAttendanceData();
 
 // Department View Data
 const departmentViewData = [
@@ -193,28 +696,20 @@ const departmentViewData = [
   },
 ];
 
-// Outstanding Amount Data
-const outstandingData = {
-  totalInvoices: 45,
-  receivedTotalAmount: 3250000,
-  totalOutstandingDue: 1850000
-};
-
-// Site Names Data (shortened for readability)
-const siteNames = [
-  'ALYSSUM DEVELOPERS PVT. LTD.',
-  'ARYA ASSOCIATES',
-  'ASTITVA ASSET MANAGEMENT LLP',
-  'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
-  'BAHIRAT ESTATE LLP',
-  'CHITRALI PROPERTIES PVT LTD',
-  'Concretely Infra Llp',
-  'COORTUS ADVISORS LLP',
-  'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.',
-];
-
+// Generate payroll data
 const generatePayrollData = () => {
   const payrollData = [];
+  const siteNames = [
+    'ALYSSUM DEVELOPERS PVT. LTD.',
+    'ARYA ASSOCIATES',
+    'ASTITVA ASSET MANAGEMENT LLP',
+    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
+    'BAHIRAT ESTATE LLP',
+    'CHITRALI PROPERTIES PVT LTD',
+    'Concretely Infra Llp',
+    'COORTUS ADVISORS LLP',
+    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.',
+  ];
 
   siteNames.forEach((siteName, index) => {
     const billingAmount = Math.floor(Math.random() * 500000) + 200000;
@@ -362,6 +857,7 @@ const Pagination = ({
   );
 };
 
+// Export to Excel function
 const exportToExcel = (data: any[], filename: string) => {
   const headers = ['Site Name', 'Billing Amount (₹)', 'Total Paid (₹)', 'Hold Salary (₹)', 'Difference (₹)', 'Status', 'Remark'];
 
@@ -400,25 +896,138 @@ const SuperAdminDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const navigate = useNavigate();
 
+  // State for attendance data
+  const [attendanceData, setAttendanceData] = useState<DailyAttendanceSummary[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(true);
+  const [refreshingAttendance, setRefreshingAttendance] = useState(false);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [totalEmployeesAssignedToSites, setTotalEmployeesAssignedToSites] = useState(0);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [siteEmployeeCounts, setSiteEmployeeCounts] = useState<SiteEmployeeCount[]>([]);
+
+  // State for UI navigation
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [sixDaysStartIndex, setSixDaysStartIndex] = useState(1);
   const [selectedYear, setSelectedYear] = useState('2024');
   const [selectedMonth, setSelectedMonth] = useState('01');
   const [payrollData, setPayrollData] = useState(generatePayrollData());
   const [payrollTab, setPayrollTab] = useState('list-view');
-  const [selectedSite, setSelectedSite] = useState(siteNames[0]);
+  const [selectedSite, setSelectedSite] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showSiteBreakdown, setShowSiteBreakdown] = useState(false);
   const itemsPerPage = 5;
 
-  const currentDayData = attendanceData[currentDayIndex];
-  const sixDaysData = attendanceData.slice(sixDaysStartIndex, sixDaysStartIndex + 6);
+  // Load attendance data on component mount
+  useEffect(() => {
+    loadAttendanceData();
+    loadSites();
+  }, []);
 
+  // Load sites data
+  const loadSites = async () => {
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData);
+    } catch (error) {
+      console.error('Error loading sites:', error);
+    }
+  };
+
+  // Function to load attendance data
+  const loadAttendanceData = async (showRefreshToast: boolean = false) => {
+    try {
+      if (showRefreshToast) {
+        setRefreshingAttendance(true);
+      } else {
+        setLoadingAttendance(true);
+      }
+      setAttendanceError(null);
+
+      const data = await fetchAttendanceData(30);
+      setAttendanceData(data);
+      
+      if (data.length > 0) {
+        setTotalEmployeesAssignedToSites(data[0].totalEmployees);
+        
+        // Extract site employee counts from the first day's breakdown
+        if (data[0].siteBreakdown) {
+          const counts = Object.entries(data[0].siteBreakdown).map(([siteName, siteData]) => ({
+            siteName,
+            totalEmployees: siteData.total
+          }));
+          setSiteEmployeeCounts(counts);
+        }
+      }
+
+      // Reset indices if needed
+      if (data.length > 0) {
+        setCurrentDayIndex(0);
+        setSixDaysStartIndex(Math.min(1, data.length - 6));
+      }
+
+      if (showRefreshToast) {
+        toast.success('Attendance data refreshed successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to load attendance data:', error);
+      setAttendanceError(error.message || 'Failed to load attendance data');
+      toast.error('Failed to load attendance data', {
+        description: error.message || 'Please try again later'
+      });
+    } finally {
+      setLoadingAttendance(false);
+      setRefreshingAttendance(false);
+    }
+  };
+
+  // Handle refresh
+  const handleRefreshAttendance = () => {
+    loadAttendanceData(true);
+  };
+
+  // Get current day data
+  const currentDayData = useMemo(() => {
+    if (attendanceData.length === 0) {
+      return {
+        date: new Date().toISOString().split('T')[0],
+        day: 'Today',
+        present: 0,
+        absent: 0,
+        weeklyOff: 0,
+        leave: 0,
+        total: 0,
+        rate: '0.0%',
+        index: 0,
+        totalEmployees: totalEmployeesAssignedToSites,
+        sitesWithData: 0,
+        siteBreakdown: {}
+      };
+    }
+    return attendanceData[currentDayIndex] || attendanceData[0];
+  }, [attendanceData, currentDayIndex, totalEmployeesAssignedToSites]);
+
+  // Get six days data
+  const sixDaysData = useMemo(() => {
+    if (attendanceData.length === 0) return [];
+    return attendanceData.slice(sixDaysStartIndex, sixDaysStartIndex + 6);
+  }, [attendanceData, sixDaysStartIndex]);
+
+  // Current day pie data (present vs absent)
   const currentDayPieData = [
     { name: 'Present', value: currentDayData.present, color: CHART_COLORS.present },
     { name: 'Absent', value: currentDayData.absent, color: CHART_COLORS.absent }
   ];
 
+  // Detailed pie data with all categories
+  const detailedPieData = [
+    { name: 'Present', value: currentDayData.present, color: CHART_COLORS.present },
+    { name: 'Weekly Off', value: currentDayData.weeklyOff, color: CHART_COLORS.weeklyOff },
+    { name: 'Leave', value: currentDayData.leave, color: CHART_COLORS.leave },
+    { name: 'Absent', value: currentDayData.absent, color: CHART_COLORS.absent }
+  ].filter(item => item.value > 0);
+
+  // Payroll summary
   const payrollSummary = useMemo(() => {
     const totalBilling = payrollData.reduce((sum, item) => sum + item.billingAmount, 0);
     const totalPaid = payrollData.reduce((sum, item) => sum + item.totalPaid, 0);
@@ -434,12 +1043,14 @@ const SuperAdminDashboard = () => {
     };
   }, [payrollData]);
 
+  // Filtered payroll data
   const filteredPayrollData = useMemo(() => {
     return payrollData.filter(item =>
       item.siteName.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [payrollData, searchTerm]);
 
+  // Paginated payroll data
   const paginatedPayrollData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredPayrollData.slice(startIndex, startIndex + itemsPerPage);
@@ -448,11 +1059,13 @@ const SuperAdminDashboard = () => {
   const totalPages = Math.ceil(filteredPayrollData.length / itemsPerPage);
   const selectedSiteData = payrollData.find(item => item.siteName === selectedSite);
 
+  // Site pie chart data
   const sitePieChartData = selectedSiteData ? [
     { name: 'Total Paid', value: selectedSiteData.totalPaid, color: CHART_COLORS.payroll[1] },
     { name: 'Hold Salary', value: selectedSiteData.holdSalary, color: CHART_COLORS.payroll[5] }
   ] : [];
 
+  // Navigation handlers
   const handlePreviousDay = () => {
     setCurrentDayIndex(prev => (prev > 0 ? prev - 1 : attendanceData.length - 1));
   };
@@ -526,6 +1139,7 @@ const SuperAdminDashboard = () => {
     navigate(`/superadmin/attendaceview?view=department&department=${department}&date=Today`);
   };
 
+  // Custom tooltips
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0];
@@ -537,7 +1151,7 @@ const SuperAdminDashboard = () => {
         >
           <p className="font-semibold text-sm">{data.name}</p>
           <p className="text-sm" style={{ color: data.payload.fill }}>
-            {data.value} employees ({((data.value / currentDayData.total) * 100).toFixed(1)}%)
+            {data.value} employees ({((data.value / currentDayData.totalEmployees) * 100).toFixed(1)}%)
           </p>
         </motion.div>
       );
@@ -589,7 +1203,180 @@ const SuperAdminDashboard = () => {
         onMenuClick={onMenuClick}
       />
       <div className="p-4 sm:p-6 space-y-6">
-        {/* 7 Days Attendance Rate Pie Charts - Moved to Top */}
+        {/* Attendance Data Status Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className={`border-2 ${attendanceError ? 'border-red-200' : 'border-green-200'}`}>
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  {loadingAttendance ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  ) : attendanceError ? (
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  )}
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {loadingAttendance ? 'Loading Attendance Data...' :
+                       attendanceError ? 'Attendance Data Error' :
+                       'Attendance Data Loaded'}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {loadingAttendance ? 'Fetching attendance records from server...' :
+                       attendanceError ? attendanceError :
+                       `Showing attendance data for ${attendanceData.length} days | Total Employees Assigned to Sites: ${totalEmployeesAssignedToSites}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    <Users className="h-3 w-3 mr-1" />
+                    {totalEmployeesAssignedToSites} Site Employees
+                  </Badge>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    <Building className="h-3 w-3 mr-1" />
+                    {siteEmployeeCounts.length} Sites
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshAttendance}
+                    disabled={loadingAttendance || refreshingAttendance}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshingAttendance ? 'animate-spin' : ''}`} />
+                    Refresh Data
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Site Employee Counts Summary - ONLY EMPLOYEES ASSIGNED TO SITES */}
+        {siteEmployeeCounts.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <Card>
+              <CardHeader className="py-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Employee Count Per Site (Only Site-Assigned Employees)
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSiteBreakdown(!showSiteBreakdown)}
+                  >
+                    {showSiteBreakdown ? 'Hide' : 'Show'} Breakdown
+                  </Button>
+                </div>
+              </CardHeader>
+              {showSiteBreakdown && (
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {siteEmployeeCounts.map((site) => (
+                      <div key={site.siteName} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                        <span className="text-sm font-medium truncate max-w-[200px]">{site.siteName}</span>
+                        <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-800">
+                          {site.totalEmployees} employees
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Today's Attendance Summary Cards - ONLY SITE-ASSIGNED EMPLOYEES */}
+        {!loadingAttendance && attendanceData.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+            className="grid grid-cols-1 md:grid-cols-4 gap-4"
+          >
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Present Today</p>
+                    <p className="text-2xl font-bold text-green-600">{currentDayData.present}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {((currentDayData.present / totalEmployeesAssignedToSites) * 100).toFixed(1)}% of site employees
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-100 rounded-full">
+                    <UserCheck className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-purple-50 border-purple-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-800">Weekly Off</p>
+                    <p className="text-2xl font-bold text-purple-600">{currentDayData.weeklyOff}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {((currentDayData.weeklyOff / totalEmployeesAssignedToSites) * 100).toFixed(1)}% of site employees
+                    </p>
+                  </div>
+                  <div className="p-2 bg-purple-100 rounded-full">
+                    <Calendar className="h-6 w-6 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-orange-50 border-orange-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">On Leave</p>
+                    <p className="text-2xl font-bold text-orange-600">{currentDayData.leave}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {((currentDayData.leave / totalEmployeesAssignedToSites) * 100).toFixed(1)}% of site employees
+                    </p>
+                  </div>
+                  <div className="p-2 bg-orange-100 rounded-full">
+                    <UserMinus className="h-6 w-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-red-50 border-red-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Absent</p>
+                    <p className="text-2xl font-bold text-red-600">{currentDayData.absent}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {((currentDayData.absent / totalEmployeesAssignedToSites) * 100).toFixed(1)}% of site employees
+                    </p>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded-full">
+                    <UserX className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* 7 Days Attendance Rate Pie Charts - Shows TOTAL across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -601,195 +1388,296 @@ const SuperAdminDashboard = () => {
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
                     <PieChartIcon className="h-5 w-5" />
-                    7 Days Attendance Rate
+                    Total Attendance Across All Sites
                   </CardTitle>
                   <p className="text-sm text-blue-600/80 mt-1">
-                    Daily attendance overview with interactive navigation
+                    Daily attendance overview for {totalEmployeesAssignedToSites} employees assigned to {siteEmployeeCounts.length} sites
+                    {!loadingAttendance && attendanceData.length > 0 && (
+                      <span className="ml-2 text-green-600">
+                        • {currentDayData.sitesWithData > 0 ? 'Real Data' : 'Demo Data'}
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Badge variant="outline" className="bg-white/80 border-blue-200">
                   <Eye className="h-3 w-3 mr-1" />
-                  Interactive
+                  Site-Assigned Only
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6">
-              {/* 6 Days Small Pie Charts */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Historical Overview
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {getDateRangeText()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSixDaysPrevious}
-                      disabled={!canGoSixDaysPrevious}
-                      className="h-8 w-8 p-0 hover:scale-105 transition-transform"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSixDaysNext}
-                      disabled={!canGoSixDaysNext}
-                      className="h-8 w-8 p-0 hover:scale-105 transition-transform"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+              {loadingAttendance ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600 mr-3" />
+                  <span className="text-muted-foreground">Loading attendance data across all sites...</span>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {sixDaysData.map((dayData, index) => {
-                    const pieData = [
-                      { name: 'Present', value: dayData.present, color: CHART_COLORS.present },
-                      { name: 'Absent', value: dayData.absent, color: CHART_COLORS.absent }
-                    ];
-
-                    return (
-                      <motion.div
-                        key={`${dayData.date}-${index}`}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.98 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Card
-                          className="cursor-pointer transform transition-all duration-200 hover:shadow-lg border-2 hover:border-blue-300"
-                          onClick={() => handleSmallPieChartClick(dayData)}
+              ) : attendanceData.length === 0 ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Attendance Data</h3>
+                  <p className="text-gray-500 mb-4">No attendance records found for the last 30 days.</p>
+                  <Button onClick={handleRefreshAttendance} variant="outline">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* 6 Days Small Pie Charts - Showing TOTALS across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES) */}
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Historical Overview - All Sites Combined
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {getDateRangeText()} | Total Site Employees: {totalEmployeesAssignedToSites}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSixDaysPrevious}
+                          disabled={!canGoSixDaysPrevious}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
                         >
-                          <CardContent className="p-3">
-                            <div className="text-center mb-2">
-                              <p className="text-xs font-medium text-gray-700">{dayData.day}</p>
-                              <p className="text-xs text-muted-foreground">{dayData.date}</p>
-                              <Badge variant={
-                                parseFloat(dayData.rate) > 90 ? 'default' :
-                                  parseFloat(dayData.rate) > 80 ? 'secondary' : 'destructive'
-                              } className="mt-1 text-xs">
-                                {dayData.rate}
-                              </Badge>
-                            </div>
-                            <div className="h-32">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <RechartsPieChart>
-                                  <Pie
-                                    data={pieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius={40}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                    labelLine={false}
-                                  >
-                                    {pieData.map((entry, cellIndex) => (
-                                      <Cell key={`cell-${cellIndex}`} fill={entry.color} />
-                                    ))}
-                                  </Pie>
-                                  <Tooltip />
-                                </RechartsPieChart>
-                              </ResponsiveContainer>
-                            </div>
-                            <div className="text-center mt-2">
-                              <div className="flex justify-center space-x-4 text-xs">
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                                  <span>{dayData.present}</span>
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSixDaysNext}
+                          disabled={!canGoSixDaysNext}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                      {sixDaysData.map((dayData, index) => {
+                        const pieData = [
+                          { name: 'Present', value: dayData.present, color: CHART_COLORS.present },
+                          { name: 'Absent', value: dayData.absent, color: CHART_COLORS.absent }
+                        ];
+
+                        return (
+                          <motion.div
+                            key={`${dayData.date}-${index}`}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <Card
+                              className="cursor-pointer transform transition-all duration-200 hover:shadow-lg border-2 hover:border-blue-300"
+                              onClick={() => handleSmallPieChartClick(dayData)}
+                            >
+                              <CardContent className="p-3">
+                                <div className="text-center mb-2">
+                                  <p className="text-xs font-medium text-gray-700">{dayData.day}</p>
+                                  <p className="text-xs text-muted-foreground">{dayData.date}</p>
+                                  <Badge variant={
+                                    parseFloat(dayData.rate) > 90 ? 'default' :
+                                      parseFloat(dayData.rate) > 80 ? 'secondary' : 'destructive'
+                                  } className="mt-1 text-xs">
+                                    {dayData.rate}
+                                  </Badge>
                                 </div>
-                                <div className="flex items-center">
-                                  <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
-                                  <span>{dayData.absent}</span>
+                                <div className="h-32">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <RechartsPieChart>
+                                      <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={40}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                        labelLine={false}
+                                      >
+                                        {pieData.map((entry, cellIndex) => (
+                                          <Cell key={`cell-${cellIndex}`} fill={entry.color} />
+                                        ))}
+                                      </Pie>
+                                      <Tooltip />
+                                    </RechartsPieChart>
+                                  </ResponsiveContainer>
                                 </div>
+                                <div className="text-center mt-2">
+                                  <div className="flex justify-center items-center gap-2 text-xs">
+                                    <div className="flex items-center">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                      <span>{dayData.present}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                      <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                                      <span>{dayData.absent}</span>
+                                    </div>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground mt-1">
+                                    Total: {dayData.totalEmployees}
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Main Today's Pie Chart - Showing TOTAL across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES) */}
+                  <div className="border-t pt-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                          Today's Overview - All Sites Combined
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Total Site-Assigned Employees: {currentDayData.totalEmployees} | 
+                          Attendance Rate: {currentDayData.rate} | 
+                          Sites with Data: {currentDayData.sitesWithData}
+                        </p>
+                        <div className="flex gap-4 mt-2 text-xs flex-wrap">
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                            Present: {currentDayData.present}
+                          </span>
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-red-500 rounded-full mr-1"></span>
+                            Absent: {currentDayData.absent}
+                          </span>
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-gray-400 rounded-full mr-1"></span>
+                            Weekly Off: {currentDayData.weeklyOff}
+                          </span>
+                          <span className="flex items-center">
+                            <span className="w-3 h-3 bg-orange-400 rounded-full mr-1"></span>
+                            Leave: {currentDayData.leave}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handlePreviousDay}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-muted-foreground mx-2 min-w-[60px] text-center">
+                          Day {currentDayIndex + 1}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleNextDay}
+                          className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <motion.div
+                        whileHover={{ scale: 1.01 }}
+                        className="cursor-pointer"
+                        onClick={() => handlePieChartClick(currentDayData.date)}
+                      >
+                        <div className="w-full h-80 bg-gradient-to-br from-blue-50/50 to-green-50/50 rounded-xl p-4 border-2 border-blue-200/50 hover:border-blue-400 transition-colors duration-300 backdrop-blur-sm">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RechartsPieChart>
+                              <Pie
+                                data={currentDayPieData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {currentDayPieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip content={<CustomPieTooltip />} />
+                              <Legend />
+                            </RechartsPieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </motion.div>
+
+                      {/* Detailed Breakdown Card */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Detailed Attendance Breakdown (Site-Assigned Employees)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                              <span className="font-medium">Present</span>
+                              <div className="text-right">
+                                <span className="font-bold text-green-600 text-lg">{currentDayData.present}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.present / totalEmployeesAssignedToSites) * 100).toFixed(1)}%)
+                                </span>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
+                            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                              <span className="font-medium">Weekly Off</span>
+                              <div className="text-right">
+                                <span className="font-bold text-purple-600 text-lg">{currentDayData.weeklyOff}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.weeklyOff / totalEmployeesAssignedToSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                              <span className="font-medium">On Leave</span>
+                              <div className="text-right">
+                                <span className="font-bold text-orange-600 text-lg">{currentDayData.leave}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.leave / totalEmployeesAssignedToSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                              <span className="font-medium">Absent</span>
+                              <div className="text-right">
+                                <span className="font-bold text-red-600 text-lg">{currentDayData.absent}</span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({((currentDayData.absent / totalEmployeesAssignedToSites) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg mt-4 border-t pt-4">
+                              <span className="font-medium text-blue-800">Total Site-Assigned Employees</span>
+                              <span className="font-bold text-blue-600 text-xl">{totalEmployeesAssignedToSites}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
 
-              {/* Main Today's Pie Chart */}
-              <div className="border-t pt-8">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      Today's Overview
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Total Employees: {currentDayData.total} | Attendance Rate: {currentDayData.rate}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handlePreviousDay}
-                      className="h-8 w-8 p-0 hover:scale-105 transition-transform"
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-center mt-4"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground mx-2 min-w-[60px] text-center">
-                      Day {currentDayIndex + 1}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleNextDay}
-                      className="h-8 w-8 p-0 hover:scale-105 transition-transform"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <p className="text-sm text-muted-foreground">
+                        Click on the pie chart to view detailed site-wise attendance for {currentDayData.date}
+                      </p>
+                    </motion.div>
                   </div>
-                </div>
-
-                <motion.div
-                  whileHover={{ scale: 1.01 }}
-                  className="cursor-pointer"
-                  onClick={() => handlePieChartClick(currentDayData.date)}
-                >
-                  <div className="w-full h-80 sm:h-96 bg-gradient-to-br from-blue-50/50 to-green-50/50 rounded-xl p-4 border-2 border-blue-200/50 hover:border-blue-400 transition-colors duration-300 backdrop-blur-sm">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={currentDayPieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={120}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {currentDayPieData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<CustomPieTooltip />} />
-                        <Legend />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-center mt-4"
-                >
-                  <p className="text-sm text-muted-foreground">
-                    Click on the chart to view detailed site-wise attendance for {currentDayData.date}
-                  </p>
-                </motion.div>
-              </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -1191,9 +2079,9 @@ const SuperAdminDashboard = () => {
                             <SelectValue placeholder="Select Site" />
                           </SelectTrigger>
                           <SelectContent>
-                            {siteNames.map(site => (
-                              <SelectItem key={site} value={site}>
-                                {site.split(',')[0]}
+                            {payrollData.map(site => (
+                              <SelectItem key={site.siteName} value={site.siteName}>
+                                {site.siteName.split(',')[0]}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1293,6 +2181,63 @@ const SuperAdminDashboard = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Sites Summary Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Sites Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Total Sites</p>
+                      <p className="text-2xl font-bold text-blue-600">{sites.length}</p>
+                    </div>
+                    <Building className="h-8 w-8 text-blue-500" />
+                  </div>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Active Sites</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {sites.filter(s => s.status === 'active').length}
+                      </p>
+                    </div>
+                    <CheckCircle2 className="h-8 w-8 text-green-500" />
+                  </div>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-800">Site-Assigned Employees</p>
+                      <p className="text-2xl font-bold text-purple-600">{totalEmployeesAssignedToSites}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-purple-500" />
+                  </div>
+                </div>
+                <div className="p-4 bg-amber-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Total Contract Value</p>
+                      <p className="text-2xl font-bold text-amber-600">
+                        {formatCurrency(siteService.getTotalContractValue(sites))}
+                      </p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-amber-500" />
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

@@ -7,6 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Download, 
   FileText, 
@@ -44,10 +50,16 @@ import {
   Award,
   Target,
   Percent,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
+  Menu,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area } from "recharts";
 import taskService, { type Task } from "@/services/TaskService";
 import * as XLSX from 'xlsx';
@@ -164,6 +176,379 @@ interface EmployeeData {
   email: string;
   status: string;
 }
+
+// Mobile responsive filter card
+const MobileFilterCard = ({
+  children,
+  title,
+  icon: Icon,
+  onClear,
+  showClear = false
+}: {
+  children: React.ReactNode;
+  title: string;
+  icon: React.ElementType;
+  onClear?: () => void;
+  showClear?: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <Card className="mb-4 overflow-hidden">
+      <CardHeader 
+        className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Icon className="h-5 w-5 text-primary" />
+            </div>
+            <CardTitle className="text-base">{title}</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            {showClear && onClear && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="p-4 pt-0 border-t">
+          {children}
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+// Mobile responsive stat card
+const MobileStatCard = ({
+  title,
+  value,
+  icon: Icon,
+  color = "blue",
+  prefix = "",
+  suffix = "",
+  trend = null
+}: {
+  title: string;
+  value: number;
+  icon: any;
+  color?: string;
+  prefix?: string;
+  suffix?: string;
+  trend?: number | null;
+}) => {
+  const colorClasses = {
+    blue: "bg-blue-100 text-blue-600",
+    cyan: "bg-cyan-100 text-cyan-600",
+    green: "bg-green-100 text-green-600",
+    orange: "bg-orange-100 text-orange-600",
+    purple: "bg-purple-100 text-purple-600",
+    red: "bg-red-100 text-red-600"
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-muted-foreground">{title}</p>
+            <p className="text-xl font-bold mt-1">
+              {prefix}{value.toLocaleString()}{suffix}
+            </p>
+            {trend !== null && (
+              <div className="flex items-center gap-1 mt-1">
+                {trend > 0 ? (
+                  <>
+                    <ArrowUp className="h-3 w-3 text-green-500" />
+                    <span className="text-xs text-green-600">{trend}%</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDown className="h-3 w-3 text-red-500" />
+                    <span className="text-xs text-red-600">{Math.abs(trend)}%</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <div className={`p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive employee attendance card
+const MobileEmployeeAttendanceCard = ({ record }: { record: AttendanceReportSummary }) => {
+  const [expanded, setExpanded] = useState(false);
+  const percentage = parseFloat(record.percentage);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h3 className="font-semibold">{record.employee}</h3>
+            <p className="text-xs text-muted-foreground">ID: {record.employeeId}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <div className="text-center p-2 bg-green-50 rounded">
+            <p className="text-xs text-green-600">Present</p>
+            <p className="text-sm font-bold text-green-700">{record.present}</p>
+          </div>
+          <div className="text-center p-2 bg-red-50 rounded">
+            <p className="text-xs text-red-600">Absent</p>
+            <p className="text-sm font-bold text-red-700">{record.absent}</p>
+          </div>
+          <div className="text-center p-2 bg-purple-50 rounded">
+            <p className="text-xs text-purple-600">Leave</p>
+            <p className="text-sm font-bold text-purple-700">{record.leaves}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Badge variant="outline" className="bg-blue-50">
+            {record.department}
+          </Badge>
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs">{record.averageHours}</span>
+          </div>
+          <div className={`text-sm font-bold ${
+            percentage >= 90 ? "text-green-600" :
+            percentage >= 75 ? "text-yellow-600" : "text-red-600"
+          }`}>
+            {record.percentage}
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Late Arrivals</p>
+                <p className="text-sm font-medium">{record.lateArrivals}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Overtime Hours</p>
+                <p className="text-sm font-medium">{record.overtimeHours}h</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Days</p>
+                <p className="text-sm font-medium">{record.totalDays}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Early Departures</p>
+                <p className="text-sm font-medium">{record.earlyDepartures}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive task card
+const MobileTaskReportCard = ({ task }: { task: TaskReportData }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <h3 className="font-semibold text-base">{task.title}</h3>
+            <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          <Badge variant={
+            task.priority === 'high' ? 'destructive' :
+            task.priority === 'medium' ? 'default' : 'secondary'
+          } className="text-xs">
+            {task.priority}
+          </Badge>
+          <Badge variant="outline" className={
+            task.status === 'completed' ? 'bg-green-100 text-green-800' :
+            task.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+            task.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-gray-100 text-gray-800'
+          }>
+            {task.status}
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="flex items-center gap-1">
+            <User className="h-3 w-3 text-muted-foreground" />
+            <span className="truncate">{task.assignedToName}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Building className="h-3 w-3 text-muted-foreground" />
+            <span className="truncate">{task.siteName}</span>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Client</p>
+                <p className="text-sm">{task.clientName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Deadline</p>
+                <p className="text-sm">{task.deadline}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Type</p>
+                <p className="text-sm capitalize">{task.taskType}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Created</p>
+                <p className="text-sm">{new Date(task.createdAt).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="bg-blue-50">
+                <Clock className="h-3 w-3 mr-1" />
+                Updates: {task.hourlyUpdatesCount}
+              </Badge>
+              <Badge variant="outline" className="bg-purple-50">
+                <Paperclip className="h-3 w-3 mr-1" />
+                Attachments: {task.attachmentsCount}
+              </Badge>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive expense card
+const MobileExpenseCard = ({ expense }: { expense: ExpenseData }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-3 overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">{expense.expenseId}</h3>
+              <Badge variant="outline" className={
+                expense.status === 'approved' ? 'bg-green-100 text-green-800' :
+                expense.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }>
+                {expense.status}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{expense.description}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <Badge variant="outline" className="bg-blue-50">
+            {expense.category}
+          </Badge>
+          <span className="font-bold text-green-600">{formatCurrency(expense.amount)}</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="flex items-center gap-1">
+            <Building className="h-3 w-3 text-muted-foreground" />
+            <span className="truncate">{expense.site}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span>{new Date(expense.date).toLocaleDateString()}</span>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Vendor</p>
+              <p className="text-sm">{expense.vendor}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Base Amount</p>
+                <p className="text-sm">{formatCurrency(expense.baseAmount)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">GST</p>
+                <p className="text-sm">{formatCurrency(expense.gst)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Payment Method</p>
+                <p className="text-sm">{expense.paymentMethod}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Type</p>
+                <p className="text-sm capitalize">{expense.expenseType}</p>
+              </div>
+            </div>
+            {expense.notes && (
+              <div>
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-sm">{expense.notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 // Animation variants
 const containerVariants = {
@@ -464,6 +849,12 @@ const EnhancedBadge = ({
 };
 
 const Reports = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
   // State for attendance reports
   const [dateFrom, setDateFrom] = useState(() => {
     const date = new Date();
@@ -503,6 +894,18 @@ const Reports = () => {
   const [departments, setDepartments] = useState<string[]>(["All Departments"]);
   const [sites, setSites] = useState<string[]>(["All Sites"]);
   const [activeTab, setActiveTab] = useState("attendance");
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Add tab change animation
   const tabContentVariants = {
@@ -1428,57 +1831,167 @@ const Reports = () => {
     fetchData();
   }, []);
 
+  // Mobile tabs configuration
+  const mobileTabs = [
+    { value: "attendance", label: "Attendance", icon: Users },
+    { value: "tasks", label: "Tasks", icon: CheckSquare },
+    { value: "financial", label: "Financial", icon: Receipt }
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <DashboardHeader title="Reports & Analytics" />
+      <DashboardHeader 
+        title="Reports & Analytics" 
+        onMenuClick={onMenuClick}
+      />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
+        {/* Mobile Tab Selector */}
+        {isMobileView && (
+          <div className="flex items-center bg-muted rounded-lg p-1 mb-4">
+            {mobileTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <Button
+                  key={tab.value}
+                  variant={activeTab === tab.value ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab(tab.value)}
+                  className="flex-1"
+                >
+                  <Icon className="h-4 w-4 mr-2" />
+                  {tab.label}
+                </Button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Report Filters with Enhanced UI */}
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <Card className="border-2 border-blue-100 shadow-lg hover:shadow-xl transition-shadow duration-300 dark:border-blue-900">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Filter className="h-5 w-5 text-[#3b82f6]" />
-                <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
-                  Advanced Report Filters
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4 items-center">
-                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded-lg border shadow-sm">
-                  <Calendar className="h-5 w-5 text-[#3b82f6]" />
-                  <div className="flex gap-2">
-                    <Input 
-                      type="date" 
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                      className="w-40 border-blue-200 focus:border-[#3b82f6] focus:ring-[#3b82f6]"
-                      placeholder="From Date"
-                    />
-                    <span className="text-muted-foreground self-center">to</span>
-                    <Input 
-                      type="date" 
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                      className="w-40 border-blue-200 focus:border-[#3b82f6] focus:ring-[#3b82f6]"
-                      placeholder="To Date"
-                    />
+        {!isMobileView && (
+          <motion.div
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <Card className="border-2 border-blue-100 shadow-lg hover:shadow-xl transition-shadow duration-300 dark:border-blue-900">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Filter className="h-5 w-5 text-[#3b82f6]" />
+                  <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
+                    Advanced Report Filters
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4 items-center">
+                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded-lg border shadow-sm">
+                    <Calendar className="h-5 w-5 text-[#3b82f6]" />
+                    <div className="flex gap-2">
+                      <Input 
+                        type="date" 
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="w-40 border-blue-200 focus:border-[#3b82f6] focus:ring-[#3b82f6]"
+                        placeholder="From Date"
+                      />
+                      <span className="text-muted-foreground self-center">to</span>
+                      <Input 
+                        type="date" 
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="w-40 border-blue-200 focus:border-[#3b82f6] focus:ring-[#3b82f6]"
+                        placeholder="To Date"
+                      />
+                    </div>
                   </div>
+                  
+                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                    <SelectTrigger className="w-48 border-blue-200 focus:border-[#3b82f6] focus:ring-[#3b82f6]">
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept === "All Departments" ? "all" : dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button 
+                    onClick={handleApplyFilters} 
+                    disabled={isLoading}
+                    className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] hover:from-[#2563eb] hover:to-[#0891b2] shadow-md hover:shadow-lg transition-all"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Zap className="mr-2 h-4 w-4" />
+                    )}
+                    Apply Filters
+                  </Button>
                 </div>
-                
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Mobile Filters Toggle */}
+        {isMobileView && (
+          <Button
+            variant="outline"
+            className="w-full mb-4"
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            {showMobileFilters ? 'Hide Filters' : 'Show Filters'}
+            {showMobileFilters ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+          </Button>
+        )}
+
+        {/* Mobile Filters */}
+        {isMobileView && showMobileFilters && (
+          <MobileFilterCard
+            title="Date Range & Department"
+            icon={Calendar}
+            onClear={() => {
+              const date = new Date();
+              date.setDate(1);
+              setDateFrom(date.toISOString().split('T')[0]);
+              setDateTo(new Date().toISOString().split('T')[0]);
+              setSelectedDepartment("all");
+            }}
+            showClear={true}
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">From Date</label>
+                <Input 
+                  type="date" 
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">To Date</label>
+                <Input 
+                  type="date" 
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Department</label>
                 <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger className="w-48 border-blue-200 focus:border-[#3b82f6] focus:ring-[#3b82f6]">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1489,70 +2002,73 @@ const Reports = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                
-                <Button 
-                  onClick={handleApplyFilters} 
-                  disabled={isLoading}
-                  className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] hover:from-[#2563eb] hover:to-[#0891b2] shadow-md hover:shadow-lg transition-all"
-                >
-                  {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Zap className="mr-2 h-4 w-4" />
-                  )}
-                  Apply Filters
-                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Tabs for different reports */}
-        <Tabs defaultValue="attendance" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 p-1 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 rounded-xl">
-            <TabsTrigger 
-              value="attendance" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#3b82f6] data-[state=active]:to-[#06b6d4] data-[state=active]:text-white rounded-lg transition-all"
-            >
-              <Users className="h-4 w-4" />
-              Attendance
-            </TabsTrigger>
-            <TabsTrigger 
-              value="tasks" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#3b82f6] data-[state=active]:to-[#06b6d4] data-[state=active]:text-white rounded-lg transition-all"
-            >
-              <CheckSquare className="h-4 w-4" />
-              Tasks
-            </TabsTrigger>
-            <TabsTrigger 
-              value="financial" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#3b82f6] data-[state=active]:to-[#06b6d4] data-[state=active]:text-white rounded-lg transition-all"
-            >
-              <Receipt className="h-4 w-4" />
-              Financial
-            </TabsTrigger>
-          </TabsList>
-
-          <AnimatePresence mode="wait">
-            {/* Attendance Report Tab */}
-            {activeTab === "attendance" && (
-              <motion.div
-                key="attendance"
-                variants={tabContentVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
+              <Button 
+                onClick={handleApplyFilters} 
+                disabled={isLoading}
+                className="w-full"
               >
-                <TabsContent value="attendance" className="mt-6">
-                  <Card className="border-2 shadow-xl">
-                    <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
-                      <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-                        <CardTitle className="flex items-center gap-2 text-2xl">
-                          <Users className="h-6 w-6 text-[#3b82f6]" />
-                          <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
-                            Attendance Analytics Dashboard
-                          </span>
-                        </CardTitle>
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="mr-2 h-4 w-4" />
+                )}
+                Apply Filters
+              </Button>
+            </div>
+          </MobileFilterCard>
+        )}
+
+        {/* Tabs for different reports - Desktop */}
+        {!isMobileView && (
+          <Tabs defaultValue="attendance" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 p-1 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 rounded-xl">
+              <TabsTrigger 
+                value="attendance" 
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#3b82f6] data-[state=active]:to-[#06b6d4] data-[state=active]:text-white rounded-lg transition-all"
+              >
+                <Users className="h-4 w-4" />
+                Attendance
+              </TabsTrigger>
+              <TabsTrigger 
+                value="tasks" 
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#3b82f6] data-[state=active]:to-[#06b6d4] data-[state=active]:text-white rounded-lg transition-all"
+              >
+                <CheckSquare className="h-4 w-4" />
+                Tasks
+              </TabsTrigger>
+              <TabsTrigger 
+                value="financial" 
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#3b82f6] data-[state=active]:to-[#06b6d4] data-[state=active]:text-white rounded-lg transition-all"
+              >
+                <Receipt className="h-4 w-4" />
+                Financial
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
+        <AnimatePresence mode="wait">
+          {/* Attendance Report Tab */}
+          {activeTab === "attendance" && (
+            <motion.div
+              key="attendance"
+              variants={tabContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <div className="mt-6">
+                <Card className="border-2 shadow-xl">
+                  <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
+                    <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+                      <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
+                        <Users className="h-5 w-5 md:h-6 md:w-6 text-[#3b82f6]" />
+                        <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
+                          Attendance Analytics Dashboard
+                        </span>
+                      </CardTitle>
+                      {!isMobileView && (
                         <div className="flex gap-2">
                           <div className="relative group">
                             <Button 
@@ -1593,62 +2109,100 @@ const Reports = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-8 pt-6">
-                      {isLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="text-center">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#3b82f6] mx-auto" />
-                            <p className="mt-4 text-lg font-medium text-gray-600">Loading attendance data...</p>
-                            <p className="text-sm text-gray-500">Please wait while we fetch your reports</p>
-                          </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6 md:space-y-8 pt-4 md:pt-6">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8 md:py-12">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 md:h-12 md:w-12 animate-spin text-[#3b82f6] mx-auto" />
+                          <p className="mt-4 text-base md:text-lg font-medium text-gray-600">Loading attendance data...</p>
+                          <p className="text-sm text-gray-500">Please wait while we fetch your reports</p>
                         </div>
-                      ) : (
-                        <>
-                          {/* Attendance Statistics Cards */}
-                          <motion.div
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-                          >
-                            <AnimatedStatCard
-                              title="Total Employees"
-                              value={getFilteredAttendanceReport.length}
-                              icon={Users}
-                              color="blue"
-                              delay={0.1}
-                            />
-                            <AnimatedStatCard
-                              title="Average Attendance"
-                              value={getFilteredAttendanceReport.length > 0 ? Math.round(getFilteredAttendanceReport.reduce((sum, record) => {
-                                const perc = parseFloat(record.percentage);
-                                return sum + (isNaN(perc) ? 0 : perc);
-                              }, 0) / getFilteredAttendanceReport.length) : 0}
-                              icon={Percent}
-                              color="cyan"
-                              suffix="%"
-                              delay={0.2}
-                            />
-                            <AnimatedStatCard
-                              title="Late Arrivals"
-                              value={getFilteredAttendanceReport.reduce((sum, record) => sum + record.lateArrivals, 0)}
-                              icon={Clock4}
-                              color="orange"
-                              delay={0.3}
-                            />
-                            <AnimatedStatCard
-                              title="Overtime Hours"
-                              value={getFilteredAttendanceReport.reduce((sum, record) => sum + record.overtimeHours, 0)}
-                              icon={Clock}
-                              color="purple"
-                              suffix="h"
-                              delay={0.4}
-                            />
-                          </motion.div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Attendance Statistics Cards */}
+                        <motion.div
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                          className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
+                        >
+                          {isMobileView ? (
+                            <>
+                              <MobileStatCard
+                                title="Total Employees"
+                                value={getFilteredAttendanceReport.length}
+                                icon={Users}
+                                color="blue"
+                              />
+                              <MobileStatCard
+                                title="Avg Attendance"
+                                value={getFilteredAttendanceReport.length > 0 ? Math.round(getFilteredAttendanceReport.reduce((sum, record) => {
+                                  const perc = parseFloat(record.percentage);
+                                  return sum + (isNaN(perc) ? 0 : perc);
+                                }, 0) / getFilteredAttendanceReport.length) : 0}
+                                icon={Percent}
+                                color="cyan"
+                                suffix="%"
+                              />
+                              <MobileStatCard
+                                title="Late Arrivals"
+                                value={getFilteredAttendanceReport.reduce((sum, record) => sum + record.lateArrivals, 0)}
+                                icon={Clock4}
+                                color="orange"
+                              />
+                              <MobileStatCard
+                                title="Overtime Hours"
+                                value={getFilteredAttendanceReport.reduce((sum, record) => sum + record.overtimeHours, 0)}
+                                icon={Clock}
+                                color="purple"
+                                suffix="h"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <AnimatedStatCard
+                                title="Total Employees"
+                                value={getFilteredAttendanceReport.length}
+                                icon={Users}
+                                color="blue"
+                                delay={0.1}
+                              />
+                              <AnimatedStatCard
+                                title="Average Attendance"
+                                value={getFilteredAttendanceReport.length > 0 ? Math.round(getFilteredAttendanceReport.reduce((sum, record) => {
+                                  const perc = parseFloat(record.percentage);
+                                  return sum + (isNaN(perc) ? 0 : perc);
+                                }, 0) / getFilteredAttendanceReport.length) : 0}
+                                icon={Percent}
+                                color="cyan"
+                                suffix="%"
+                                delay={0.2}
+                              />
+                              <AnimatedStatCard
+                                title="Late Arrivals"
+                                value={getFilteredAttendanceReport.reduce((sum, record) => sum + record.lateArrivals, 0)}
+                                icon={Clock4}
+                                color="orange"
+                                delay={0.3}
+                              />
+                              <AnimatedStatCard
+                                title="Overtime Hours"
+                                value={getFilteredAttendanceReport.reduce((sum, record) => sum + record.overtimeHours, 0)}
+                                icon={Clock}
+                                color="purple"
+                                suffix="h"
+                                delay={0.4}
+                              />
+                            </>
+                          )}
+                        </motion.div>
 
-                          {/* Charts Section */}
+                        {/* Charts Section - Hide on mobile for better performance */}
+                        {!isMobileView && (
                           <motion.div
                             variants={chartVariants}
                             className="grid grid-cols-1 lg:grid-cols-2 gap-6"
@@ -1656,7 +2210,7 @@ const Reports = () => {
                             {/* Department Overview Chart */}
                             <Card className="border-2 border-blue-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-lg">
                                   <BarChartIcon className="h-5 w-5 text-[#3b82f6]" />
                                   Department Attendance Overview
                                 </CardTitle>
@@ -1714,7 +2268,7 @@ const Reports = () => {
                             {/* Daily Trend Chart */}
                             <Card className="border-2 border-cyan-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-lg">
                                   <LineChartIcon className="h-5 w-5 text-[#06b6d4]" />
                                   Daily Attendance Trend
                                 </CardTitle>
@@ -1764,161 +2318,169 @@ const Reports = () => {
                               </CardContent>
                             </Card>
                           </motion.div>
+                        )}
 
-                          {/* Employee Details Table */}
-                          <motion.div
-                            variants={itemVariants}
-                            className="mt-8"
-                          >
-                            <Card className="border-2 shadow-lg">
-                              <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <User className="h-5 w-5 text-[#3b82f6]" />
-                                    Employee Attendance Details
+                        {/* Employee Details Table/Cards */}
+                        <motion.div
+                          variants={itemVariants}
+                          className="mt-4 md:mt-8"
+                        >
+                          <Card className="border-2 shadow-lg">
+                            <CardHeader>
+                              <CardTitle className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-5 w-5 text-[#3b82f6]" />
+                                  <span className="text-base md:text-lg">Employee Attendance Details</span>
+                                </div>
+                                <Badge variant="outline" className="bg-[#3b82f6] text-white text-xs md:text-sm">
+                                  {getFilteredAttendanceReport.length} Employees
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {getFilteredAttendanceReport.length === 0 ? (
+                                <div className="text-center py-8 md:py-12">
+                                  <div className="mx-auto h-12 w-12 md:h-16 md:w-16 text-gray-300 mb-4">
+                                    <Users className="h-12 w-12 md:h-16 md:w-16" />
                                   </div>
-                                  <Badge variant="outline" className="bg-[#3b82f6] text-white">
-                                    {getFilteredAttendanceReport.length} Employees
-                                  </Badge>
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                {getFilteredAttendanceReport.length === 0 ? (
-                                  <div className="text-center py-12">
-                                    <div className="mx-auto h-16 w-16 text-gray-300 mb-4">
-                                      <Users className="h-16 w-16" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-gray-900">No records found</h3>
-                                    <p className="text-gray-500">Try adjusting your filters to see attendance data</p>
+                                  <h3 className="text-base md:text-lg font-medium text-gray-900">No records found</h3>
+                                  <p className="text-sm text-gray-500">Try adjusting your filters to see attendance data</p>
+                                </div>
+                              ) : isMobileView ? (
+                                <div className="space-y-3">
+                                  {getFilteredAttendanceReport.slice(0, 10).map((record) => (
+                                    <MobileEmployeeAttendanceCard key={record.id} record={record} />
+                                  ))}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="overflow-x-auto rounded-lg border">
+                                    <Table>
+                                      <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
+                                        <TableRow>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Employee ID</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Employee Name</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Department</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Present</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Absent</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Leave</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Late</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Avg Hours</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Overtime</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Attendance %</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {getFilteredAttendanceReport.slice(0, 10).map((record, index) => (
+                                          <motion.tr
+                                            key={record.id}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            whileHover={{ backgroundColor: '#f8fafc' }}
+                                            className="border-b hover:bg-blue-50/50 transition-colors"
+                                          >
+                                            <TableCell className="font-semibold whitespace-nowrap">
+                                              <div className="flex items-center gap-2">
+                                                <div className="h-2 w-2 rounded-full bg-[#3b82f6]"></div>
+                                                {record.employeeId}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="font-medium whitespace-nowrap">{record.employee}</TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <EnhancedBadge variant="info">
+                                                {record.department}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <EnhancedBadge variant="success" withAnimation>
+                                                {record.present}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <EnhancedBadge variant="danger" withAnimation>
+                                                {record.absent}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <EnhancedBadge variant="info" withAnimation>
+                                                {record.leaves}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <EnhancedBadge variant="warning" withAnimation>
+                                                {record.lateArrivals}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">{record.averageHours}</TableCell>
+                                            <TableCell className="text-center">
+                                              <Badge variant="outline" className={record.overtimeHours > 0 ? "text-green-600 border-green-200" : ""}>
+                                                {record.overtimeHours}h
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <div className="flex items-center gap-2">
+                                                <span className={`font-bold ${
+                                                  parseFloat(record.percentage) >= 90 ? "text-green-600" :
+                                                  parseFloat(record.percentage) >= 75 ? "text-yellow-600" :
+                                                  "text-red-600"
+                                                }`}>
+                                                  {record.percentage}
+                                                </span>
+                                                {parseFloat(record.percentage) >= 90 ? (
+                                                  <ArrowUp className="h-4 w-4 text-green-600 animate-pulse" />
+                                                ) : parseFloat(record.percentage) < 75 ? (
+                                                  <ArrowDown className="h-4 w-4 text-red-600 animate-pulse" />
+                                                ) : null}
+                                              </div>
+                                            </TableCell>
+                                          </motion.tr>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
                                   </div>
-                                ) : (
-                                  <>
-                                    <div className="overflow-x-auto rounded-lg border">
-                                      <Table>
-                                        <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
-                                          <TableRow>
-                                            <TableHead className="font-bold text-[#3b82f6]">Employee ID</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Employee Name</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Department</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Present Days</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Absent Days</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Leave Days</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Late Arrivals</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Avg Hours</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Overtime</TableHead>
-                                            <TableHead className="font-bold text-[#3b82f6]">Attendance %</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {getFilteredAttendanceReport.slice(0, 10).map((record, index) => (
-                                            <motion.tr
-                                              key={record.id}
-                                              initial={{ opacity: 0, x: -20 }}
-                                              animate={{ opacity: 1, x: 0 }}
-                                              transition={{ delay: index * 0.05 }}
-                                              whileHover={{ backgroundColor: '#f8fafc' }}
-                                              className="border-b hover:bg-blue-50/50 transition-colors"
-                                            >
-                                              <TableCell className="font-semibold">
-                                                <div className="flex items-center gap-2">
-                                                  <div className="h-2 w-2 rounded-full bg-[#3b82f6]"></div>
-                                                  {record.employeeId}
-                                                </div>
-                                              </TableCell>
-                                              <TableCell className="font-medium">{record.employee}</TableCell>
-                                              <TableCell>
-                                                <EnhancedBadge variant="info">
-                                                  {record.department}
-                                                </EnhancedBadge>
-                                              </TableCell>
-                                              <TableCell>
-                                                <EnhancedBadge variant="success" withAnimation>
-                                                  {record.present}
-                                                </EnhancedBadge>
-                                              </TableCell>
-                                              <TableCell>
-                                                <EnhancedBadge variant="danger" withAnimation>
-                                                  {record.absent}
-                                                </EnhancedBadge>
-                                              </TableCell>
-                                              <TableCell>
-                                                <EnhancedBadge variant="info" withAnimation>
-                                                  {record.leaves}
-                                                </EnhancedBadge>
-                                              </TableCell>
-                                              <TableCell>
-                                                <EnhancedBadge variant="warning" withAnimation>
-                                                  {record.lateArrivals}
-                                                </EnhancedBadge>
-                                              </TableCell>
-                                              <TableCell>{record.averageHours}</TableCell>
-                                              <TableCell>
-                                                <Badge variant="outline" className={record.overtimeHours > 0 ? "text-green-600 border-green-200" : ""}>
-                                                  {record.overtimeHours}h
-                                                </Badge>
-                                              </TableCell>
-                                              <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                  <span className={`font-bold ${
-                                                    parseFloat(record.percentage) >= 90 ? "text-green-600" :
-                                                    parseFloat(record.percentage) >= 75 ? "text-yellow-600" :
-                                                    "text-red-600"
-                                                  }`}>
-                                                    {record.percentage}
-                                                  </span>
-                                                  {parseFloat(record.percentage) >= 90 ? (
-                                                    <ArrowUp className="h-4 w-4 text-green-600 animate-pulse" />
-                                                  ) : parseFloat(record.percentage) < 75 ? (
-                                                    <ArrowDown className="h-4 w-4 text-red-600 animate-pulse" />
-                                                  ) : null}
-                                                </div>
-                                              </TableCell>
-                                            </motion.tr>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
-                                    </div>
-                                    {getFilteredAttendanceReport.length > 10 && (
-                                      <motion.div 
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="text-center py-4 text-sm text-muted-foreground"
-                                      >
-                                        Showing 10 of {getFilteredAttendanceReport.length} records. Export full list for complete data.
-                                      </motion.div>
-                                    )}
-                                  </>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </motion.div>
-            )}
+                                  {getFilteredAttendanceReport.length > 10 && (
+                                    <motion.div 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      className="text-center py-4 text-sm text-muted-foreground"
+                                    >
+                                      Showing 10 of {getFilteredAttendanceReport.length} records. Export full list for complete data.
+                                    </motion.div>
+                                  )}
+                                </>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+          )}
 
-            {/* Task Report Tab */}
-            {activeTab === "tasks" && (
-              <motion.div
-                key="tasks"
-                variants={tabContentVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <TabsContent value="tasks" className="mt-6">
-                  <Card className="border-2 shadow-xl">
-                    <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
-                      <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-                        <CardTitle className="flex items-center gap-2 text-2xl">
-                          <CheckSquare className="h-6 w-6 text-[#3b82f6]" />
-                          <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
-                            Task Management Analytics
-                          </span>
-                        </CardTitle>
+          {/* Task Report Tab */}
+          {activeTab === "tasks" && (
+            <motion.div
+              key="tasks"
+              variants={tabContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <div className="mt-6">
+                <Card className="border-2 shadow-xl">
+                  <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
+                    <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+                      <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
+                        <CheckSquare className="h-5 w-5 md:h-6 md:w-6 text-[#3b82f6]" />
+                        <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
+                          Task Management Analytics
+                        </span>
+                      </CardTitle>
+                      {!isMobileView && (
                         <div className="flex gap-2">
                           <div className="relative group">
                             <Button 
@@ -1962,10 +2524,80 @@ const Reports = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-8 pt-6">
-                      {/* Task Filters */}
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6 md:space-y-8 pt-4 md:pt-6">
+                    {/* Task Filters */}
+                    {isMobileView ? (
+                      <MobileFilterCard
+                        title="Task Filters"
+                        icon={Filter}
+                        onClear={() => {
+                          setTaskSearchQuery("");
+                          setTaskFilterStatus("all");
+                          setTaskFilterPriority("all");
+                          setTaskFilterSite("all");
+                        }}
+                        showClear={true}
+                      >
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Search</label>
+                            <Input
+                              placeholder="Search tasks..."
+                              value={taskSearchQuery}
+                              onChange={(e) => setTaskSearchQuery(e.target.value)}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Status</label>
+                            <Select value={taskFilterStatus} onValueChange={setTaskFilterStatus}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="in-progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Priority</label>
+                            <Select value={taskFilterPriority} onValueChange={setTaskFilterPriority}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Priority" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Priority</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="low">Low</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Site</label>
+                            <Select value={taskFilterSite} onValueChange={setTaskFilterSite}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Sites" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {sites.map((site) => (
+                                  <SelectItem key={site} value={site === "All Sites" ? "all" : site}>
+                                    {site}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </MobileFilterCard>
+                    ) : (
                       <motion.div
                         variants={containerVariants}
                         initial="hidden"
@@ -2029,64 +2661,98 @@ const Reports = () => {
                           </Select>
                         </div>
                       </motion.div>
+                    )}
 
-                      {isLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="text-center">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#3b82f6] mx-auto" />
-                            <p className="mt-4 text-lg font-medium text-gray-600">Loading task data...</p>
-                            <p className="text-sm text-gray-500">Analyzing task performance metrics</p>
-                          </div>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8 md:py-12">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 md:h-12 md:w-12 animate-spin text-[#3b82f6] mx-auto" />
+                          <p className="mt-4 text-base md:text-lg font-medium text-gray-600">Loading task data...</p>
+                          <p className="text-sm text-gray-500">Analyzing task performance metrics</p>
                         </div>
-                      ) : taskReportData.length === 0 ? (
-                        <div className="text-center py-12">
-                          <div className="mx-auto h-16 w-16 text-gray-300 mb-4">
-                            <CheckSquare className="h-16 w-16" />
-                          </div>
-                          <h3 className="text-lg font-medium text-gray-900">No tasks found</h3>
-                          <p className="text-gray-500">Try adjusting your filters to see task data</p>
+                      </div>
+                    ) : taskReportData.length === 0 ? (
+                      <div className="text-center py-8 md:py-12">
+                        <div className="mx-auto h-12 w-12 md:h-16 md:w-16 text-gray-300 mb-4">
+                          <CheckSquare className="h-12 w-12 md:h-16 md:w-16" />
                         </div>
-                      ) : (
-                        <>
-                          {/* Task Statistics Cards */}
-                          <motion.div
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-                          >
-                            <AnimatedStatCard
-                              title="Total Tasks"
-                              value={taskStats.total}
-                              icon={CheckSquare}
-                              color="blue"
-                              delay={0.1}
-                            />
-                            <AnimatedStatCard
-                              title="Completed"
-                              value={taskStats.completed}
-                              icon={CheckCircle}
-                              color="cyan"
-                              delay={0.2}
-                              trend={taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}
-                            />
-                            <AnimatedStatCard
-                              title="In Progress"
-                              value={taskStats.inProgress}
-                              icon={Clock}
-                              color="blue"
-                              delay={0.3}
-                            />
-                            <AnimatedStatCard
-                              title="High Priority"
-                              value={taskStats.highPriority}
-                              icon={AlertCircle}
-                              color="red"
-                              delay={0.4}
-                            />
-                          </motion.div>
+                        <h3 className="text-base md:text-lg font-medium text-gray-900">No tasks found</h3>
+                        <p className="text-sm text-gray-500">Try adjusting your filters to see task data</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Task Statistics Cards */}
+                        <motion.div
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                          className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
+                        >
+                          {isMobileView ? (
+                            <>
+                              <MobileStatCard
+                                title="Total Tasks"
+                                value={taskStats.total}
+                                icon={CheckSquare}
+                                color="blue"
+                              />
+                              <MobileStatCard
+                                title="Completed"
+                                value={taskStats.completed}
+                                icon={CheckCircle}
+                                color="cyan"
+                                trend={taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}
+                              />
+                              <MobileStatCard
+                                title="In Progress"
+                                value={taskStats.inProgress}
+                                icon={Clock}
+                                color="blue"
+                              />
+                              <MobileStatCard
+                                title="High Priority"
+                                value={taskStats.highPriority}
+                                icon={AlertCircle}
+                                color="red"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <AnimatedStatCard
+                                title="Total Tasks"
+                                value={taskStats.total}
+                                icon={CheckSquare}
+                                color="blue"
+                                delay={0.1}
+                              />
+                              <AnimatedStatCard
+                                title="Completed"
+                                value={taskStats.completed}
+                                icon={CheckCircle}
+                                color="cyan"
+                                delay={0.2}
+                                trend={taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0}
+                              />
+                              <AnimatedStatCard
+                                title="In Progress"
+                                value={taskStats.inProgress}
+                                icon={Clock}
+                                color="blue"
+                                delay={0.3}
+                              />
+                              <AnimatedStatCard
+                                title="High Priority"
+                                value={taskStats.highPriority}
+                                icon={AlertCircle}
+                                color="red"
+                                delay={0.4}
+                              />
+                            </>
+                          )}
+                        </motion.div>
 
-                          {/* Charts Section */}
+                        {/* Charts Section - Hide on mobile */}
+                        {!isMobileView && (
                           <motion.div
                             variants={chartVariants}
                             className="grid grid-cols-1 lg:grid-cols-2 gap-6"
@@ -2094,7 +2760,7 @@ const Reports = () => {
                             {/* Task Status Distribution */}
                             <Card className="border-2 border-blue-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-lg">
                                   <PieChartIcon className="h-5 w-5 text-[#3b82f6]" />
                                   Task Status Distribution
                                 </CardTitle>
@@ -2127,7 +2793,7 @@ const Reports = () => {
                             {/* Task Priority Distribution */}
                             <Card className="border-2 border-cyan-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-lg">
                                   <BarChartIcon className="h-5 w-5 text-[#06b6d4]" />
                                   Task Priority Distribution
                                 </CardTitle>
@@ -2151,146 +2817,158 @@ const Reports = () => {
                               </CardContent>
                             </Card>
                           </motion.div>
+                        )}
 
-                          {/* Task Details Table */}
-                          <motion.div
-                            variants={itemVariants}
-                            className="mt-8"
-                          >
-                            <Card className="border-2 shadow-lg">
-                              <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Target className="h-5 w-5 text-[#3b82f6]" />
-                                    Task Details
-                                  </div>
-                                  <Badge variant="outline" className="bg-[#3b82f6] text-white">
-                                    {taskReportData.length} Tasks
-                                  </Badge>
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="overflow-x-auto rounded-lg border">
-                                  <Table>
-                                    <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
-                                      <TableRow>
-                                        <TableHead className="font-bold text-[#3b82f6]">Task Title</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Assignee</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Site</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Priority</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Status</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Deadline</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Type</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Updates</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Attachments</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {taskReportData.slice(0, 10).map((task, index) => (
-                                        <motion.tr
-                                          key={task.id}
-                                          initial={{ opacity: 0, x: -20 }}
-                                          animate={{ opacity: 1, x: 0 }}
-                                          transition={{ delay: index * 0.05 }}
-                                          whileHover={{ backgroundColor: '#f0f9ff' }}
-                                          className="border-b hover:bg-blue-50/50 transition-colors"
-                                        >
-                                          <TableCell className="font-medium">
-                                            <div className="max-w-xs truncate" title={task.title}>
-                                              {task.title}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <div className="flex items-center gap-2">
-                                              <User className="h-3 w-3 text-[#3b82f6]" />
-                                              {task.assignedToName}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <div className="flex items-center gap-2">
-                                              <Building className="h-3 w-3 text-[#06b6d4]" />
-                                              {task.siteName}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <EnhancedBadge variant={
-                                              task.priority === 'high' ? 'danger' :
-                                              task.priority === 'medium' ? 'warning' : 'success'
-                                            } withAnimation>
-                                              {task.priority}
-                                            </EnhancedBadge>
-                                          </TableCell>
-                                          <TableCell>
-                                            <EnhancedBadge variant={
-                                              task.status === 'completed' ? 'success' :
-                                              task.status === 'in-progress' ? 'info' :
-                                              task.status === 'pending' ? 'warning' : 'danger'
-                                            } withAnimation>
-                                              {task.status}
-                                            </EnhancedBadge>
-                                          </TableCell>
-                                          <TableCell>{task.deadline}</TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline" className="text-xs border-[#3b82f6] text-[#3b82f6]">
-                                              {task.taskType}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell>
-                                            <div className="flex items-center gap-1">
-                                              <Clock className="h-3 w-3 text-[#3b82f6]" />
-                                              {task.hourlyUpdatesCount}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>
-                                            <div className="flex items-center gap-1">
-                                              <Paperclip className="h-3 w-3 text-gray-500" />
-                                              {task.attachmentsCount}
-                                            </div>
-                                          </TableCell>
-                                        </motion.tr>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
+                        {/* Task Details Table/Cards */}
+                        <motion.div
+                          variants={itemVariants}
+                          className="mt-4 md:mt-8"
+                        >
+                          <Card className="border-2 shadow-lg">
+                            <CardHeader>
+                              <CardTitle className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Target className="h-5 w-5 text-[#3b82f6]" />
+                                  <span className="text-base md:text-lg">Task Details</span>
                                 </div>
-                                {taskReportData.length > 10 && (
-                                  <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-center py-4 text-sm text-muted-foreground"
-                                  >
-                                    Showing 10 of {taskReportData.length} tasks. Export for complete list.
-                                  </motion.div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </motion.div>
-            )}
+                                <Badge variant="outline" className="bg-[#3b82f6] text-white text-xs md:text-sm">
+                                  {taskReportData.length} Tasks
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {isMobileView ? (
+                                <div className="space-y-3">
+                                  {taskReportData.slice(0, 10).map((task) => (
+                                    <MobileTaskReportCard key={task.id} task={task} />
+                                  ))}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="overflow-x-auto rounded-lg border">
+                                    <Table>
+                                      <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
+                                        <TableRow>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Task Title</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Assignee</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Site</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Priority</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Status</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Deadline</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Type</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Updates</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-center whitespace-nowrap">Attachments</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {taskReportData.slice(0, 10).map((task, index) => (
+                                          <motion.tr
+                                            key={task.id}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            whileHover={{ backgroundColor: '#f0f9ff' }}
+                                            className="border-b hover:bg-blue-50/50 transition-colors"
+                                          >
+                                            <TableCell className="font-medium">
+                                              <div className="max-w-xs truncate" title={task.title}>
+                                                {task.title}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <div className="flex items-center gap-2">
+                                                <User className="h-3 w-3 text-[#3b82f6]" />
+                                                {task.assignedToName}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <div className="flex items-center gap-2">
+                                                <Building className="h-3 w-3 text-[#06b6d4]" />
+                                                {task.siteName}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <EnhancedBadge variant={
+                                                task.priority === 'high' ? 'danger' :
+                                                task.priority === 'medium' ? 'warning' : 'success'
+                                              } withAnimation>
+                                                {task.priority}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <EnhancedBadge variant={
+                                                task.status === 'completed' ? 'success' :
+                                                task.status === 'in-progress' ? 'info' :
+                                                task.status === 'pending' ? 'warning' : 'danger'
+                                              } withAnimation>
+                                                {task.status}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">{task.deadline}</TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <Badge variant="outline" className="text-xs border-[#3b82f6] text-[#3b82f6]">
+                                                {task.taskType}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <div className="flex items-center justify-center gap-1">
+                                                <Clock className="h-3 w-3 text-[#3b82f6]" />
+                                                {task.hourlyUpdatesCount}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <div className="flex items-center justify-center gap-1">
+                                                <Paperclip className="h-3 w-3 text-gray-500" />
+                                                {task.attachmentsCount}
+                                              </div>
+                                            </TableCell>
+                                          </motion.tr>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                  {taskReportData.length > 10 && (
+                                    <motion.div 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      className="text-center py-4 text-sm text-muted-foreground"
+                                    >
+                                      Showing 10 of {taskReportData.length} tasks. Export for complete list.
+                                    </motion.div>
+                                  )}
+                                </>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+          )}
 
-            {/* Financial Report Tab */}
-            {activeTab === "financial" && (
-              <motion.div
-                key="financial"
-                variants={tabContentVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <TabsContent value="financial" className="mt-6">
-                  <Card className="border-2 shadow-xl">
-                    <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
-                      <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-                        <CardTitle className="flex items-center gap-2 text-2xl">
-                          <Receipt className="h-6 w-6 text-[#3b82f6]" />
-                          <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
-                            Financial Analytics Dashboard
-                          </span>
-                        </CardTitle>
+          {/* Financial Report Tab */}
+          {activeTab === "financial" && (
+            <motion.div
+              key="financial"
+              variants={tabContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <div className="mt-6">
+                <Card className="border-2 shadow-xl">
+                  <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
+                    <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+                      <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
+                        <Receipt className="h-5 w-5 md:h-6 md:w-6 text-[#3b82f6]" />
+                        <span className="bg-gradient-to-r from-[#3b82f6] to-[#06b6d4] bg-clip-text text-transparent">
+                          Financial Analytics Dashboard
+                        </span>
+                      </CardTitle>
+                      {!isMobileView && (
                         <div className="flex gap-2">
                           <div className="relative group">
                             <Button 
@@ -2334,10 +3012,78 @@ const Reports = () => {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-8 pt-6">
-                      {/* Expense Filters */}
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6 md:space-y-8 pt-4 md:pt-6">
+                    {/* Expense Filters */}
+                    {isMobileView ? (
+                      <MobileFilterCard
+                        title="Expense Filters"
+                        icon={Filter}
+                        onClear={clearExpenseFilters}
+                        showClear={true}
+                      >
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Search</label>
+                            <Input
+                              placeholder="Search expenses..."
+                              value={expenseSearchTerm}
+                              onChange={(e) => setExpenseSearchTerm(e.target.value)}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Status</label>
+                            <Select value={expenseFilterStatus} onValueChange={(value: any) => setExpenseFilterStatus(value)}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Expense Type</label>
+                            <Select value={expenseFilterType} onValueChange={(value: any) => setExpenseFilterType(value)}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Types" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                <SelectItem value="operational">Operational</SelectItem>
+                                <SelectItem value="office">Office</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium mb-1 block">Date Range</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input 
+                                type="date" 
+                                value={expenseDateFrom}
+                                onChange={(e) => setExpenseDateFrom(e.target.value)}
+                                className="w-full"
+                                placeholder="From"
+                              />
+                              <Input 
+                                type="date" 
+                                value={expenseDateTo}
+                                onChange={(e) => setExpenseDateTo(e.target.value)}
+                                className="w-full"
+                                placeholder="To"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </MobileFilterCard>
+                    ) : (
                       <motion.div
                         variants={containerVariants}
                         initial="hidden"
@@ -2426,59 +3172,89 @@ const Reports = () => {
                           </CardContent>
                         </Card>
                       </motion.div>
+                    )}
 
-                      {expenseLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="text-center">
-                            <Loader2 className="h-12 w-12 animate-spin text-[#3b82f6] mx-auto" />
-                            <p className="mt-4 text-lg font-medium text-gray-600">Loading expense data...</p>
-                            <p className="text-sm text-gray-500">Processing financial records</p>
-                          </div>
+                    {expenseLoading ? (
+                      <div className="flex items-center justify-center py-8 md:py-12">
+                        <div className="text-center">
+                          <Loader2 className="h-8 w-8 md:h-12 md:w-12 animate-spin text-[#3b82f6] mx-auto" />
+                          <p className="mt-4 text-base md:text-lg font-medium text-gray-600">Loading expense data...</p>
+                          <p className="text-sm text-gray-500">Processing financial records</p>
                         </div>
-                      ) : filteredExpenses.length === 0 ? (
-                        <div className="text-center py-12">
-                          <div className="mx-auto h-16 w-16 text-gray-300 mb-4">
-                            <Receipt className="h-16 w-16" />
-                          </div>
-                          <h3 className="text-lg font-medium text-gray-900">No expenses found</h3>
-                          <p className="text-gray-500">Try adjusting your filters to see expense data</p>
+                      </div>
+                    ) : filteredExpenses.length === 0 ? (
+                      <div className="text-center py-8 md:py-12">
+                        <div className="mx-auto h-12 w-12 md:h-16 md:w-16 text-gray-300 mb-4">
+                          <Receipt className="h-12 w-12 md:h-16 md:w-16" />
                         </div>
-                      ) : (
-                        <>
-                          {/* Expense Statistics Cards */}
-                          <motion.div
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="grid grid-cols-1 md:grid-cols-3 gap-4"
-                          >
-                            <AnimatedStatCard
-                              title="Total Expenses"
-                              value={expenseStats.totalExpenses}
-                              icon={DollarSign}
-                              color="blue"
-                              prefix="₹"
-                              delay={0.1}
-                            />
-                            <AnimatedStatCard
-                              title="Operational Expenses"
-                              value={expenseStats.operationalExpenses}
-                              icon={Building}
-                              color="cyan"
-                              prefix="₹"
-                              delay={0.2}
-                            />
-                            <AnimatedStatCard
-                              title="Office Expenses"
-                              value={expenseStats.officeExpenses}
-                              icon={Briefcase}
-                              color="blue"
-                              prefix="₹"
-                              delay={0.3}
-                            />
-                          </motion.div>
+                        <h3 className="text-base md:text-lg font-medium text-gray-900">No expenses found</h3>
+                        <p className="text-sm text-gray-500">Try adjusting your filters to see expense data</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Expense Statistics Cards */}
+                        <motion.div
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                          className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4"
+                        >
+                          {isMobileView ? (
+                            <>
+                              <MobileStatCard
+                                title="Total Expenses"
+                                value={expenseStats.totalExpenses}
+                                icon={DollarSign}
+                                color="blue"
+                                prefix="₹"
+                              />
+                              <MobileStatCard
+                                title="Operational"
+                                value={expenseStats.operationalExpenses}
+                                icon={Building}
+                                color="cyan"
+                                prefix="₹"
+                              />
+                              <MobileStatCard
+                                title="Office"
+                                value={expenseStats.officeExpenses}
+                                icon={Briefcase}
+                                color="blue"
+                                prefix="₹"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <AnimatedStatCard
+                                title="Total Expenses"
+                                value={expenseStats.totalExpenses}
+                                icon={DollarSign}
+                                color="blue"
+                                prefix="₹"
+                                delay={0.1}
+                              />
+                              <AnimatedStatCard
+                                title="Operational Expenses"
+                                value={expenseStats.operationalExpenses}
+                                icon={Building}
+                                color="cyan"
+                                prefix="₹"
+                                delay={0.2}
+                              />
+                              <AnimatedStatCard
+                                title="Office Expenses"
+                                value={expenseStats.officeExpenses}
+                                icon={Briefcase}
+                                color="blue"
+                                prefix="₹"
+                                delay={0.3}
+                              />
+                            </>
+                          )}
+                        </motion.div>
 
-                          {/* Charts Section */}
+                        {/* Charts Section - Hide on mobile */}
+                        {!isMobileView && (
                           <motion.div
                             variants={chartVariants}
                             className="grid grid-cols-1 lg:grid-cols-2 gap-6"
@@ -2486,7 +3262,7 @@ const Reports = () => {
                             {/* Expense Categories Distribution */}
                             <Card className="border-2 border-blue-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-lg">
                                   <PieChartIcon className="h-5 w-5 text-[#3b82f6]" />
                                   Expense Categories Distribution
                                 </CardTitle>
@@ -2519,7 +3295,7 @@ const Reports = () => {
                             {/* Expense by Type */}
                             <Card className="border-2 border-cyan-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-lg">
                                   <BarChartIcon className="h-5 w-5 text-[#06b6d4]" />
                                   Expense by Type
                                 </CardTitle>
@@ -2543,148 +3319,158 @@ const Reports = () => {
                               </CardContent>
                             </Card>
                           </motion.div>
+                        )}
 
-                          {/* Monthly Trend Chart */}
-                          {expenseStats.monthlyData.length > 0 && (
-                            <motion.div
-                              variants={chartVariants}
-                            >
-                              <Card className="border-2 border-blue-100 shadow-lg">
-                                <CardHeader>
-                                  <CardTitle className="flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-[#3b82f6]" />
-                                    Monthly Expense Trend
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="h-80">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                      <LineChart data={expenseStats.monthlyData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                        <XAxis dataKey="month" />
-                                        <YAxis />
-                                        <Tooltip formatter={(value) => [formatCurrency(value as number), 'Amount']} />
-                                        <Legend />
-                                        <Line 
-                                          type="monotone" 
-                                          dataKey="amount" 
-                                          stroke="#3b82f6" 
-                                          strokeWidth={2}
-                                          activeDot={{ r: 8 }} 
-                                        />
-                                      </LineChart>
-                                    </ResponsiveContainer>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          )}
-
-                          {/* Expense Details Table */}
+                        {/* Monthly Trend Chart - Hide on mobile */}
+                        {expenseStats.monthlyData.length > 0 && !isMobileView && (
                           <motion.div
-                            variants={itemVariants}
-                            className="mt-8"
+                            variants={chartVariants}
                           >
-                            <Card className="border-2 shadow-lg">
+                            <Card className="border-2 border-blue-100 shadow-lg">
                               <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Award className="h-5 w-5 text-[#3b82f6]" />
-                                    Expense Details
-                                  </div>
-                                  <Badge variant="outline" className="bg-[#3b82f6] text-white">
-                                    {filteredExpenses.length} Transactions
-                                  </Badge>
+                                <CardTitle className="flex items-center gap-2 text-lg">
+                                  <TrendingUp className="h-5 w-5 text-[#3b82f6]" />
+                                  Monthly Expense Trend
                                 </CardTitle>
                               </CardHeader>
                               <CardContent>
-                                <div className="overflow-x-auto rounded-lg border">
-                                  <Table>
-                                    <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
-                                      <TableRow>
-                                        <TableHead className="font-bold text-[#3b82f6]">Expense ID</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Category</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Description</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Vendor</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Site</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Amount</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Date</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Status</TableHead>
-                                        <TableHead className="font-bold text-[#3b82f6]">Type</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {filteredExpenses.slice(0, 10).map((expense, index) => (
-                                        <motion.tr
-                                          key={expense._id}
-                                          initial={{ opacity: 0, x: -20 }}
-                                          animate={{ opacity: 1, x: 0 }}
-                                          transition={{ delay: index * 0.05 }}
-                                          whileHover={{ backgroundColor: '#f0f9ff' }}
-                                          className="border-b hover:bg-blue-50/50 transition-colors"
-                                        >
-                                          <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                              <div className="h-2 w-2 rounded-full bg-[#3b82f6]"></div>
-                                              {expense.expenseId}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell>{expense.category}</TableCell>
-                                          <TableCell className="max-w-xs truncate" title={expense.description}>
-                                            {expense.description}
-                                          </TableCell>
-                                          <TableCell>{expense.vendor}</TableCell>
-                                          <TableCell>
-                                            <Badge variant="outline" className="text-xs border-[#3b82f6] text-[#3b82f6]">
-                                              {expense.site}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="font-bold text-green-600">
-                                            {formatCurrency(expense.amount)}
-                                          </TableCell>
-                                          <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
-                                          <TableCell>
-                                            <EnhancedBadge variant={
-                                              expense.status === 'approved' ? 'success' :
-                                              expense.status === 'pending' ? 'warning' : 'danger'
-                                            } withAnimation>
-                                              {expense.status}
-                                            </EnhancedBadge>
-                                          </TableCell>
-                                          <TableCell>
-                                            <EnhancedBadge variant={
-                                              expense.expenseType === 'operational' ? 'info' :
-                                              expense.expenseType === 'office' ? 'success' : 'default'
-                                            } withAnimation>
-                                              {expense.expenseType}
-                                            </EnhancedBadge>
-                                          </TableCell>
-                                        </motion.tr>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
+                                <div className="h-80">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={expenseStats.monthlyData}>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                      <XAxis dataKey="month" />
+                                      <YAxis />
+                                      <Tooltip formatter={(value) => [formatCurrency(value as number), 'Amount']} />
+                                      <Legend />
+                                      <Line 
+                                        type="monotone" 
+                                        dataKey="amount" 
+                                        stroke="#3b82f6" 
+                                        strokeWidth={2}
+                                        activeDot={{ r: 8 }} 
+                                      />
+                                    </LineChart>
+                                  </ResponsiveContainer>
                                 </div>
-                                {filteredExpenses.length > 10 && (
-                                  <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-center py-4 text-sm text-muted-foreground"
-                                  >
-                                    Showing 10 of {filteredExpenses.length} expenses. Export for complete list.
-                                  </motion.div>
-                                )}
                               </CardContent>
                             </Card>
                           </motion.div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Tabs>
+                        )}
+
+                        {/* Expense Details Table/Cards */}
+                        <motion.div
+                          variants={itemVariants}
+                          className="mt-4 md:mt-8"
+                        >
+                          <Card className="border-2 shadow-lg">
+                            <CardHeader>
+                              <CardTitle className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Award className="h-5 w-5 text-[#3b82f6]" />
+                                  <span className="text-base md:text-lg">Expense Details</span>
+                                </div>
+                                <Badge variant="outline" className="bg-[#3b82f6] text-white text-xs md:text-sm">
+                                  {filteredExpenses.length} Transactions
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {isMobileView ? (
+                                <div className="space-y-3">
+                                  {filteredExpenses.slice(0, 10).map((expense) => (
+                                    <MobileExpenseCard key={expense._id} expense={expense} />
+                                  ))}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="overflow-x-auto rounded-lg border">
+                                    <Table>
+                                      <TableHeader className="bg-gradient-to-r from-blue-50 to-cyan-50">
+                                        <TableRow>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Expense ID</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Category</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Description</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Vendor</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Site</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] text-right whitespace-nowrap">Amount</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Date</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Status</TableHead>
+                                          <TableHead className="font-bold text-[#3b82f6] whitespace-nowrap">Type</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {filteredExpenses.slice(0, 10).map((expense, index) => (
+                                          <motion.tr
+                                            key={expense._id}
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            whileHover={{ backgroundColor: '#f0f9ff' }}
+                                            className="border-b hover:bg-blue-50/50 transition-colors"
+                                          >
+                                            <TableCell className="font-medium whitespace-nowrap">
+                                              <div className="flex items-center gap-2">
+                                                <div className="h-2 w-2 rounded-full bg-[#3b82f6]"></div>
+                                                {expense.expenseId}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">{expense.category}</TableCell>
+                                            <TableCell className="max-w-xs truncate" title={expense.description}>
+                                              {expense.description}
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">{expense.vendor}</TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <Badge variant="outline" className="text-xs border-[#3b82f6] text-[#3b82f6]">
+                                                {expense.site}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="font-bold text-green-600 text-right whitespace-nowrap">
+                                              {formatCurrency(expense.amount)}
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">{new Date(expense.date).toLocaleDateString()}</TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <EnhancedBadge variant={
+                                                expense.status === 'approved' ? 'success' :
+                                                expense.status === 'pending' ? 'warning' : 'danger'
+                                              } withAnimation>
+                                                {expense.status}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                            <TableCell className="whitespace-nowrap">
+                                              <EnhancedBadge variant={
+                                                expense.expenseType === 'operational' ? 'info' :
+                                                expense.expenseType === 'office' ? 'success' : 'default'
+                                              } withAnimation>
+                                                {expense.expenseType}
+                                              </EnhancedBadge>
+                                            </TableCell>
+                                          </motion.tr>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                  {filteredExpenses.length > 10 && (
+                                    <motion.div 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      className="text-center py-4 text-sm text-muted-foreground"
+                                    >
+                                      Showing 10 of {filteredExpenses.length} expenses. Export for complete list.
+                                    </motion.div>
+                                  )}
+                                </>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

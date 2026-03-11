@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ interface TaxInvoiceFormProps {
   onClose: () => void;
   onInvoiceCreate: (invoice: Invoice) => void;
   taxInvoicesCount: number;
+  userId?: string;  // Add this
+  userRole?: string; // Add this
 }
 
 export const TaxInvoiceForm: React.FC<TaxInvoiceFormProps> = ({
@@ -291,7 +294,7 @@ export const TaxInvoiceForm: React.FC<TaxInvoiceFormProps> = ({
           {/* Client and Service Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="clientName">Client Name *</Label>
+              <Label htmlFor="clientName">Client Name </Label>
               <Select 
                 value={formData.clientName}
                 onValueChange={(value) => handleInputChange("clientName", value)}
@@ -695,3 +698,13 @@ export const TaxInvoiceForm: React.FC<TaxInvoiceFormProps> = ({
     </Dialog>
   );
 };
+
+
+
+
+
+
+
+
+
+

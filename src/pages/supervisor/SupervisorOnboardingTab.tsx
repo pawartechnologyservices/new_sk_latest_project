@@ -12,7 +12,7 @@ import axios from "axios";
 
 // Define the API Base URL
 const API_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:5001/api' 
+  ? `http://${window.location.hostname}:5001/api` 
   : '/api';
 
 // Types

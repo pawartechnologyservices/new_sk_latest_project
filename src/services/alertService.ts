@@ -49,7 +49,7 @@ export const alertService = {
     try {
       console.log('🔍 Testing API connection...');
       // Test the root endpoint of your backend
-      const response = await axios.get('http://localhost:5001/');
+      const response = await axios.get(`http://${window.location.hostname}:5001/api`);
       console.log('✅ Backend is running:', response.data.message);
       
       // Also test alerts endpoint

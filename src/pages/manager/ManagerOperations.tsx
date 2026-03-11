@@ -1,9 +1,20 @@
-import { useState } from "react";
+// src/pages/ManagerOperations/ManagerOperations.tsx
+import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building, Calculator } from "lucide-react";
+import { Building, Calculator, ClipboardList, ChevronDown, ChevronUp, Menu, Filter } from "lucide-react";
 import { motion } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import { StatsCards } from "./components/StatsCards";
 import TasksSection from "./components/TasksSection";
 import SitesSection from "./components/SitesSection";
@@ -13,54 +24,162 @@ import AlertsSection from "./components/AlertsSection";
 import PriceCalculator from "./components/PriceCalculator";
 import { initialTasks, initialSites, initialRoster, serviceTypes, initialAlerts } from "./data";
 
+// Mobile responsive tab selector
+const MobileTabSelector = ({
+  activeTab,
+  onTabChange,
+  tabs
+}: {
+  activeTab: string;
+  onTabChange: (value: string) => void;
+  tabs: { value: string; label: string; icon?: React.ReactNode }[];
+}) => {
+  const [open, setOpen] = useState(false);
+  const currentTab = tabs.find(t => t.value === activeTab);
+
+  return (
+    <div className="lg:hidden mb-4">
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center">
+              {currentTab?.icon}
+              <span className="ml-2">{currentTab?.label || 'Select Tab'}</span>
+            </span>
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-[calc(100vw-2rem)] sm:w-[400px]">
+          {tabs.map((tab) => (
+            <DropdownMenuItem
+              key={tab.value}
+              onClick={() => {
+                onTabChange(tab.value);
+                setOpen(false);
+              }}
+              className={activeTab === tab.value ? "bg-muted" : ""}
+            >
+              {tab.icon}
+              <span className="ml-2">{tab.label}</span>
+              {activeTab === tab.value && (
+                <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                  Active
+                </span>
+              )}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
+
 const ManagerOperations = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [activeTab, setActiveTab] = useState("tasks");
   const [tasks] = useState(initialTasks);
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 1024);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Define tabs for mobile selector (without My Tasks)
+  const tabs = [
+    { value: "tasks", label: "All Tasks", icon: <ClipboardList className="h-4 w-4" /> },
+    { value: "sites", label: "Sites", icon: <Building className="h-4 w-4" /> },
+    { value: "roster", label: "Roster", icon: <ClipboardList className="h-4 w-4" /> },
+    { value: "services", label: "Services", icon: <ClipboardList className="h-4 w-4" /> },
+    { value: "alerts", label: "Alerts & Issues", icon: <ClipboardList className="h-4 w-4" /> },
+    { value: "calculator", label: "Training", icon: <Calculator className="h-4 w-4" /> },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader title="Operations & Task Management" />
+      <DashboardHeader 
+        title="Operations & Task Management" 
+        onMenuClick={onMenuClick}
+      />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
         <StatsCards tasks={tasks} sites={initialSites} />
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="sites">Sites</TabsTrigger>
-            <TabsTrigger value="roster">Roster</TabsTrigger>
-            <TabsTrigger value="services">Services</TabsTrigger>
-            <TabsTrigger value="alerts">Alerts & Issues</TabsTrigger>
-            <TabsTrigger value="Training">
+        {/* Mobile Tab Selector */}
+        <MobileTabSelector
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          tabs={tabs}
+        />
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
+          {/* Desktop Tabs - Hidden on mobile (without My Tasks) */}
+          <TabsList className="hidden lg:grid w-full grid-cols-6">
+            <TabsTrigger value="tasks" className="text-sm">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              All Tasks
+            </TabsTrigger>
+            <TabsTrigger value="sites" className="text-sm">
+              <Building className="h-4 w-4 mr-2" />
+              Sites
+            </TabsTrigger>
+            <TabsTrigger value="roster" className="text-sm">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Roster
+            </TabsTrigger>
+            <TabsTrigger value="services" className="text-sm">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Services
+            </TabsTrigger>
+            <TabsTrigger value="alerts" className="text-sm">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Alerts & Issues
+            </TabsTrigger>
+            <TabsTrigger value="calculator" className="text-sm">
               <Calculator className="h-4 w-4 mr-2" />
               Training
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tasks">
+          {/* Tasks Tab */}
+          <TabsContent value="tasks" className="space-y-4 md:space-y-6">
             <TasksSection />
           </TabsContent>
 
+          {/* Sites Tab */}
           <TabsContent value="sites">
             <SitesSection />
           </TabsContent>
 
+          {/* Roster Tab */}
           <TabsContent value="roster">
             <RosterSection />
           </TabsContent>
 
+          {/* Services Tab */}
           <TabsContent value="services">
             <ServicesSection />
           </TabsContent>
 
+          {/* Alerts Tab */}
           <TabsContent value="alerts">
             <AlertsSection />
           </TabsContent>
 
+          {/* Calculator/Training Tab */}
           <TabsContent value="calculator">
             <PriceCalculator />
           </TabsContent>

@@ -9,12 +9,11 @@ const router = express.Router();
 
 // ==================== MULTER CONFIGURATIONS ====================
 
-// For employee photos and signatures (memory storage)
 const imageStorage = multer.memoryStorage();
 const imageUpload = multer({
   storage: imageStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per file
+    fileSize: 5 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -25,7 +24,6 @@ const imageUpload = multer({
   }
 });
 
-// For Excel import files (disk storage)
 const excelStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = './uploads/excel';
@@ -51,14 +49,39 @@ const excelUpload = multer({
     cb(null, true);
   },
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024
   }
 });
 
-// ==================== BULK OPERATIONS ROUTES ====================
-// THESE MUST COME FIRST - BEFORE ANY /:id ROUTES
+// Helper function to update site history
+const updateSiteHistory = (employee: IEmployee, newSiteName: string): IEmployee => {
+  const today = new Date();
+  const siteHistory = employee.siteHistory || [];
+  
+  if (employee.siteName && employee.siteName !== newSiteName && employee.siteName !== "") {
+    const lastEntryIndex = siteHistory.findIndex(entry => !entry.leftDate);
+    if (lastEntryIndex !== -1) {
+      const lastEntry = siteHistory[lastEntryIndex];
+      const daysWorked = Math.floor((today.getTime() - new Date(lastEntry.assignedDate).getTime()) / (1000 * 60 * 60 * 24));
+      siteHistory[lastEntryIndex] = {
+        ...lastEntry,
+        leftDate: today,
+        daysWorked: daysWorked
+      };
+    }
+  }
+  
+  siteHistory.push({
+    siteName: newSiteName,
+    assignedDate: today
+  });
+  
+  employee.siteHistory = siteHistory;
+  return employee;
+};
 
-// Bulk update employees site
+// ==================== BULK OPERATIONS ROUTES ====================
+
 router.patch('/bulk/site', async (req: any, res: any) => {
   try {
     const { employeeIds, siteName } = req.body;
@@ -77,7 +100,6 @@ router.patch('/bulk/site', async (req: any, res: any) => {
       });
     }
     
-    // Validate that all employee IDs exist
     const employees = await Employee.find({ _id: { $in: employeeIds } });
     
     if (employees.length !== employeeIds.length) {
@@ -89,18 +111,31 @@ router.patch('/bulk/site', async (req: any, res: any) => {
       });
     }
     
-    // Update all employees with the given IDs
-    const result = await Employee.updateMany(
-      { _id: { $in: employeeIds } },
-      { $set: { siteName: siteName } }
-    );
+    const updatePromises = employees.map(async (employee) => {
+      if (employee.siteName !== siteName) {
+        const updatedEmployee = updateSiteHistory(employee, siteName);
+        return await Employee.findByIdAndUpdate(
+          employee._id,
+          { 
+            $set: { 
+              siteName: siteName,
+              siteHistory: updatedEmployee.siteHistory 
+            } 
+          },
+          { new: true }
+        );
+      }
+      return employee;
+    });
+    
+    const updatedEmployees = await Promise.all(updatePromises);
     
     res.status(200).json({
       success: true,
-      message: `Successfully updated ${result.modifiedCount} employees`,
+      message: `Successfully updated ${updatedEmployees.length} employees`,
       data: {
-        modifiedCount: result.modifiedCount,
-        matchedCount: result.matchedCount
+        modifiedCount: updatedEmployees.length,
+        employees: updatedEmployees
       }
     });
   } catch (error: any) {
@@ -113,7 +148,6 @@ router.patch('/bulk/site', async (req: any, res: any) => {
   }
 });
 
-// Bulk delete employees
 router.delete('/bulk', async (req: any, res: any) => {
   try {
     const { employeeIds } = req.body;
@@ -125,19 +159,6 @@ router.delete('/bulk', async (req: any, res: any) => {
       });
     }
     
-    // Validate that all employee IDs exist
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
-    
-    if (employees.length !== employeeIds.length) {
-      const foundIds = employees.map(emp => emp._id.toString());
-      const missingIds = employeeIds.filter(id => !foundIds.includes(id));
-      return res.status(404).json({ 
-        success: false, 
-        message: `Some employees not found: ${missingIds.join(', ')}` 
-      });
-    }
-    
-    // Delete all employees with the given IDs
     const result = await Employee.deleteMany({ _id: { $in: employeeIds } });
     
     res.status(200).json({
@@ -157,7 +178,6 @@ router.delete('/bulk', async (req: any, res: any) => {
   }
 });
 
-// Bulk update employees status
 router.patch('/bulk/status', async (req: any, res: any) => {
   try {
     const { employeeIds, status } = req.body;
@@ -178,12 +198,10 @@ router.patch('/bulk/status', async (req: any, res: any) => {
     
     const updateData: any = { status };
     
-    // If marking as left, add exit date
     if (status === 'left') {
       updateData.dateOfExit = new Date();
     }
     
-    // Update all employees with the given IDs
     const result = await Employee.updateMany(
       { _id: { $in: employeeIds } },
       { $set: updateData }
@@ -207,7 +225,6 @@ router.patch('/bulk/status', async (req: any, res: any) => {
   }
 });
 
-// Get employees by IDs (for verification)
 router.post('/bulk/get', async (req: any, res: any) => {
   try {
     const { employeeIds } = req.body;
@@ -220,7 +237,7 @@ router.post('/bulk/get', async (req: any, res: any) => {
     }
     
     const employees = await Employee.find({ _id: { $in: employeeIds } })
-      .select('employeeId name department siteName status');
+      .select('employeeId name department siteName status siteHistory');
     
     res.status(200).json({
       success: true,
@@ -236,315 +253,122 @@ router.post('/bulk/get', async (req: any, res: any) => {
   }
 });
 
-// ==================== CRUD ROUTES ====================
+// ==================== STATISTICS ROUTES ====================
 
-// Create employee
-router.post('/',
-  imageUpload.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'employeeSignature', maxCount: 1 },
-    { name: 'authorizedSignature', maxCount: 1 }
-  ]),
-  async (req: any, res: any) => {
-    try {
-      const employeeData = req.body;
-      
-      // Check if employee already exists
-      const existingEmployee = await Employee.findOne({ 
-        $or: [
-          { email: employeeData.email },
-          { aadharNumber: employeeData.aadharNumber }
-        ] 
-      });
-
-      if (existingEmployee) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Employee with same email or Aadhar already exists' 
-        });
-      }
-
-      // Generate employee ID if not provided
-      if (!employeeData.employeeId) {
-        const date = new Date();
-        const dateStr = date.getFullYear().toString().slice(2) + 
-                      (date.getMonth() + 1).toString().padStart(2, '0') + 
-                      date.getDate().toString().padStart(2, '0');
-        const random = Math.floor(1000 + Math.random() * 9000);
-        employeeData.employeeId = `EMP${dateStr}${random}`;
-      }
-
-      // Handle file uploads
-      if (req.files) {
-        if (req.files['photo']) {
-          employeeData.photo = req.files['photo'][0].buffer.toString('base64');
-        }
-        if (req.files['employeeSignature']) {
-          employeeData.employeeSignature = req.files['employeeSignature'][0].buffer.toString('base64');
-        }
-        if (req.files['authorizedSignature']) {
-          employeeData.authorizedSignature = req.files['authorizedSignature'][0].buffer.toString('base64');
-        }
-      }
-
-      const newEmployee = new Employee(employeeData);
-      await newEmployee.save();
-
-      res.status(201).json({
-        success: true,
-        message: 'Employee created successfully',
-        data: newEmployee
-      });
-    } catch (error: any) {
-      console.error('Create employee error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Error creating employee',
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Get all employees
-router.get('/', async (req: any, res: any) => {
+router.get('/stats', async (req: any, res: any) => {
   try {
-    const { 
-      page = 1, 
-      limit = 10, 
-      search, 
-      department, 
-      siteName, 
-      dateOfJoining,
-      status,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
-
-    const query: any = {};
-
-    // Search filter
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { employeeId: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    // Department filter
-    if (department && department !== 'all') {
-      query.department = department;
-    }
-
-    // Site filter
-    if (siteName && siteName !== 'all') {
-      query.siteName = siteName;
-    }
-
-    // Date filter
-    if (dateOfJoining) {
-      query.dateOfJoining = new Date(dateOfJoining);
-    }
-
-    // Status filter
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-
-    // Sort options
-    const sort: any = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-    // Pagination
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
-
-    const employees = await Employee.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
-      .select('-__v');
-
-    const total = await Employee.countDocuments(query);
-
-    res.json({
-      success: true,
-      data: employees,
-      pagination: {
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum)
-      }
-    });
-  } catch (error: any) {
-    console.error('Get employees error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error fetching employees',
-      error: error.message 
-    });
-  }
-});
-
-// Get single employee by ID
-router.get('/:id', async (req: any, res: any) => {
-  try {
-    const employee = await Employee.findById(req.params.id).select('-__v');
+    const totalEmployees = await Employee.countDocuments();
+    const activeEmployees = await Employee.countDocuments({ status: 'active' });
+    const inactiveEmployees = await Employee.countDocuments({ status: 'inactive' });
+    const leftEmployees = await Employee.countDocuments({ status: 'left' });
     
-    if (!employee) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Employee not found' 
-      });
-    }
+    const departmentStats = await Employee.aggregate([
+      {
+        $group: {
+          _id: '$department',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    const siteStats = await Employee.aggregate([
+      {
+        $match: { siteName: { $exists: true, $ne: '' } }
+      },
+      {
+        $group: {
+          _id: '$siteName',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
 
     res.json({
       success: true,
-      data: employee
-    });
-  } catch (error: any) {
-    console.error('Get employee error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error fetching employee',
-      error: error.message 
-    });
-  }
-});
-
-// Update employee
-router.put('/:id',
-  imageUpload.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'employeeSignature', maxCount: 1 },
-    { name: 'authorizedSignature', maxCount: 1 }
-  ]),
-  async (req: any, res: any) => {
-    try {
-      const employeeData = req.body;
-      
-      // Handle file uploads
-      if (req.files) {
-        if (req.files['photo']) {
-          employeeData.photo = req.files['photo'][0].buffer.toString('base64');
-        }
-        if (req.files['employeeSignature']) {
-          employeeData.employeeSignature = req.files['employeeSignature'][0].buffer.toString('base64');
-        }
-        if (req.files['authorizedSignature']) {
-          employeeData.authorizedSignature = req.files['authorizedSignature'][0].buffer.toString('base64');
-        }
+      data: {
+        total: totalEmployees,
+        active: activeEmployees,
+        inactive: inactiveEmployees,
+        left: leftEmployees,
+        departments: departmentStats,
+        sites: siteStats
       }
-
-      const updatedEmployee = await Employee.findByIdAndUpdate(
-        req.params.id,
-        employeeData,
-        { new: true, runValidators: true }
-      ).select('-__v');
-
-      if (!updatedEmployee) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Employee not found' 
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Employee updated successfully',
-        data: updatedEmployee
-      });
-    } catch (error: any) {
-      console.error('Update employee error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Error updating employee',
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Delete employee
-router.delete('/:id', async (req: any, res: any) => {
-  try {
-    const deletedEmployee = await Employee.findByIdAndDelete(req.params.id);
-
-    if (!deletedEmployee) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Employee not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Employee deleted successfully'
     });
   } catch (error: any) {
-    console.error('Delete employee error:', error);
+    console.error('Stats error:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error deleting employee',
+      message: 'Error fetching statistics',
       error: error.message 
     });
   }
 });
 
-// Update employee status
-router.patch('/:id/status', async (req: any, res: any) => {
+router.get('/template', async (req: any, res: any) => {
   try {
-    const { status } = req.body;
+    const templateData = [{
+      'employeeId': 'SKEMP0001',
+      'name': 'John Doe',
+      'email': 'john.doe@example.com',
+      'phone': '9876543210',
+      'aadharNumber': '123456789012',
+      'panNumber': 'ABCDE1234F',
+      'uanNumber': '123456789012',
+      'esicNumber': '123456789012345',
+      'dateOfBirth': '1990-01-01',
+      'dateOfJoining': '2024-01-01',
+      'dateOfExit': '',
+      'gender': 'Male',
+      'maritalStatus': 'Married',
+      'bloodGroup': 'O+',
+      'permanentAddress': '123 Main Street, Mumbai',
+      'permanentPincode': '400001',
+      'localAddress': '456 Local Street, Mumbai',
+      'localPincode': '400002',
+      'bankName': 'State Bank of India',
+      'accountNumber': '12345678901234',
+      'ifscCode': 'SBIN0001234',
+      'branchName': 'Main Branch',
+      'fatherName': 'Robert Doe',
+      'motherName': 'Jane Doe',
+      'spouseName': 'Alice Doe',
+      'numberOfChildren': '2',
+      'emergencyContactName': 'Robert Doe',
+      'emergencyContactPhone': '9876543211',
+      'emergencyContactRelation': 'Father',
+      'nomineeName': 'Alice Doe',
+      'nomineeRelation': 'Spouse',
+      'department': 'Housekeeping',
+      'position': 'Supervisor',
+      'siteName': 'Corporate Office',
+      'salary': '25000',
+      'status': 'active'
+    }];
+
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.json_to_sheet(templateData);
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Template');
+
+    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="employee_import_template.xlsx"');
     
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status is required'
-      });
-    }
-
-    const updateData: any = { status };
-    
-    // If marking as left, add exit date
-    if (status === 'left') {
-      updateData.dateOfExit = new Date();
-    }
-
-    const employee = await Employee.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    ).select('-__v');
-
-    if (!employee) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Employee not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Employee status updated successfully',
-      data: employee
-    });
+    res.send(buffer);
   } catch (error: any) {
-    console.error('Update status error:', error);
+    console.error('Template error:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error updating employee status',
+      message: 'Error generating template',
       error: error.message 
     });
   }
 });
 
-// ==================== IMPORT/EXPORT ROUTES ====================
+// ==================== IMPORT ROUTES ====================
 
-// Import employees from Excel
 router.post('/import', excelUpload.single('file'), async (req: any, res: any) => {
   try {
     if (!req.file) {
@@ -556,7 +380,6 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
 
     console.log('Processing import file:', req.file.filename);
 
-    // Read Excel file
     const filePath = req.file.path;
     const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
@@ -582,7 +405,6 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
       const rowNum = i + 2;
       
       try {
-        // Validate required fields
         const requiredFields = ['name', 'email', 'phone', 'aadharNumber', 'department', 'position'];
         const missingFields = requiredFields.filter(field => !row[field]);
         
@@ -591,18 +413,6 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
           continue;
         }
 
-        // Generate employee ID
-        let employeeId = row.employeeId;
-        if (!employeeId || employeeId.toString().trim() === '') {
-          const date = new Date();
-          const dateStr = date.getFullYear().toString().slice(2) + 
-                        (date.getMonth() + 1).toString().padStart(2, '0') + 
-                        date.getDate().toString().padStart(2, '0');
-          const random = Math.floor(1000 + Math.random() * 9000);
-          employeeId = `EMP${dateStr}${random}`;
-        }
-
-        // Check if employee already exists
         const existingEmployee = await Employee.findOne({ 
           $or: [
             { email: row.email.toString().toLowerCase().trim() },
@@ -620,39 +430,37 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
           continue;
         }
 
-        // Create employee
         const employeeData: any = {
-          employeeId: employeeId.toString().trim(),
           name: row.name.toString().trim(),
           email: row.email.toString().toLowerCase().trim(),
           phone: row.phone.toString().trim(),
           aadharNumber: row.aadharNumber.toString().replace(/\s/g, ''),
-          panNumber: row.panNumber ? row.panNumber.toString().trim().toUpperCase() : '',
-          esicNumber: row.esicNumber ? row.esicNumber.toString().trim() : '',
-          uanNumber: row.uanNumber ? row.uanNumber.toString().trim() : '',
-          dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : undefined,
+          panNumber: row.panNumber ? row.panNumber.toString().trim().toUpperCase() : null,
+          esicNumber: row.esicNumber ? row.esicNumber.toString().trim() : null,
+          uanNumber: row.uanNumber ? row.uanNumber.toString().trim() : null,
+          dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
           dateOfJoining: row.dateOfJoining ? new Date(row.dateOfJoining) : new Date(),
-          dateOfExit: row.dateOfExit ? new Date(row.dateOfExit) : undefined,
-          bloodGroup: row.bloodGroup || '',
-          gender: row.gender || '',
-          maritalStatus: row.maritalStatus || '',
-          permanentAddress: row.permanentAddress || '',
-          permanentPincode: row.permanentPincode || '',
-          localAddress: row.localAddress || '',
-          localPincode: row.localPincode || '',
-          bankName: row.bankName || '',
-          accountNumber: row.accountNumber || '',
-          ifscCode: row.ifscCode || '',
-          branchName: row.branchName || '',
-          fatherName: row.fatherName || '',
-          motherName: row.motherName || '',
-          spouseName: row.spouseName || '',
+          dateOfExit: row.dateOfExit ? new Date(row.dateOfExit) : null,
+          bloodGroup: row.bloodGroup || null,
+          gender: row.gender || null,
+          maritalStatus: row.maritalStatus || null,
+          permanentAddress: row.permanentAddress || null,
+          permanentPincode: row.permanentPincode || null,
+          localAddress: row.localAddress || null,
+          localPincode: row.localPincode || null,
+          bankName: row.bankName || null,
+          accountNumber: row.accountNumber || null,
+          ifscCode: row.ifscCode || null,
+          branchName: row.branchName || null,
+          fatherName: row.fatherName || null,
+          motherName: row.motherName || null,
+          spouseName: row.spouseName || null,
           numberOfChildren: parseInt(row.numberOfChildren) || 0,
-          emergencyContactName: row.emergencyContactName || '',
-          emergencyContactPhone: row.emergencyContactPhone || '',
-          emergencyContactRelation: row.emergencyContactRelation || '',
-          nomineeName: row.nomineeName || '',
-          nomineeRelation: row.nomineeRelation || '',
+          emergencyContactName: row.emergencyContactName || null,
+          emergencyContactPhone: row.emergencyContactPhone || null,
+          emergencyContactRelation: row.emergencyContactRelation || null,
+          nomineeName: row.nomineeName || null,
+          nomineeRelation: row.nomineeRelation || null,
           department: row.department.toString().trim(),
           position: row.position.toString().trim(),
           siteName: row.siteName || '',
@@ -663,7 +471,11 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
           role: 'employee',
           idCardIssued: false,
           westcoatIssued: false,
-          apronIssued: false
+          apronIssued: false,
+          siteHistory: row.siteName ? [{
+            siteName: row.siteName,
+            assignedDate: new Date()
+          }] : []
         };
 
         const newEmployee = new Employee(employeeData);
@@ -681,7 +493,6 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
       }
     }
 
-    // Clean up file
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
@@ -697,14 +508,13 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
       },
       importedCount: importedEmployees.length,
       imported: importedEmployees,
-      errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Limit to 10 errors
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       skipped: skippedEmployees.length > 0 ? skippedEmployees.slice(0, 10) : undefined
     });
 
   } catch (error: any) {
     console.error('Import error:', error);
     
-    // Clean up file if exists
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
@@ -721,7 +531,8 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
   }
 });
 
-// Export employees to Excel
+// ==================== EXPORT ROUTES ====================
+
 router.get('/export', async (req: any, res: any) => {
   try {
     const { department, status } = req.query;
@@ -743,7 +554,6 @@ router.get('/export', async (req: any, res: any) => {
       });
     }
 
-    // Prepare data
     const data = employees.map(emp => ({
       'Employee ID': emp.employeeId,
       'Name': emp.name,
@@ -785,7 +595,6 @@ router.get('/export', async (req: any, res: any) => {
     res.setHeader('Content-Disposition', `attachment; filename="employees_export_${new Date().toISOString().split('T')[0]}.xlsx"`);
     
     res.send(buffer);
-
   } catch (error: any) {
     console.error('Export error:', error);
     res.status(500).json({ 
@@ -796,120 +605,414 @@ router.get('/export', async (req: any, res: any) => {
   }
 });
 
-// Download import template
-router.get('/template', async (req: any, res: any) => {
+// ==================== SINGLE EMPLOYEE CRUD ROUTES ====================
+
+router.get('/', async (req: any, res: any) => {
   try {
-    const templateData = [{
-      'employeeId': 'EMP2401011001', // Optional - will auto-generate if empty
-      'name': 'John Doe',
-      'email': 'john.doe@example.com',
-      'phone': '9876543210',
-      'aadharNumber': '123456789012',
-      'panNumber': 'ABCDE1234F',
-      'uanNumber': '123456789012',
-      'esicNumber': '123456789012345',
-      'dateOfBirth': '1990-01-01',
-      'dateOfJoining': '2024-01-01',
-      'dateOfExit': '',
-      'gender': 'Male',
-      'maritalStatus': 'Married',
-      'bloodGroup': 'O+',
-      'permanentAddress': '123 Main Street, Mumbai',
-      'permanentPincode': '400001',
-      'localAddress': '456 Local Street, Mumbai',
-      'localPincode': '400002',
-      'bankName': 'State Bank of India',
-      'accountNumber': '12345678901234',
-      'ifscCode': 'SBIN0001234',
-      'branchName': 'Main Branch',
-      'fatherName': 'Robert Doe',
-      'motherName': 'Jane Doe',
-      'spouseName': 'Alice Doe',
-      'numberOfChildren': '2',
-      'emergencyContactName': 'Robert Doe',
-      'emergencyContactPhone': '9876543211',
-      'emergencyContactRelation': 'Father',
-      'nomineeName': 'Alice Doe',
-      'nomineeRelation': 'Spouse',
-      'department': 'Housekeeping Management',
-      'position': 'Supervisor',
-      'siteName': 'Corporate Office',
-      'salary': '25000',
-      'status': 'active'
-    }];
+    const { 
+      page = 1, 
+      limit = 10, 
+      search, 
+      department, 
+      siteName, 
+      dateOfJoining,
+      status,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
 
-    const workbook = xlsx.utils.book_new();
-    const worksheet = xlsx.utils.json_to_sheet(templateData);
-    xlsx.utils.book_append_sheet(workbook, worksheet, 'Template');
+    const query: any = {};
 
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { employeeId: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="employee_import_template.xlsx"');
-    
-    res.send(buffer);
+    if (department && department !== 'all') {
+      query.department = department;
+    }
 
+    if (siteName && siteName !== 'all') {
+      query.siteName = siteName;
+    }
+
+    if (dateOfJoining) {
+      const date = new Date(dateOfJoining);
+      date.setHours(0, 0, 0, 0);
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      query.dateOfJoining = {
+        $gte: date,
+        $lt: nextDate
+      };
+    }
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const sort: any = {};
+    sort[sortBy as string] = sortOrder === 'desc' ? -1 : 1;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const employees = await Employee.find(query)
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .select('-__v');
+
+    const total = await Employee.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: employees,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error: any) {
-    console.error('Template error:', error);
+    console.error('Get employees error:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error generating template',
+      message: 'Error fetching employees',
       error: error.message 
     });
   }
 });
 
-// ==================== STATISTICS ROUTES ====================
+router.post('/',
+  imageUpload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'employeeSignature', maxCount: 1 },
+    { name: 'authorizedSignature', maxCount: 1 }
+  ]),
+  async (req: any, res: any) => {
+    try {
+      const employeeData = req.body;
+      
+      const existingEmployee = await Employee.findOne({ 
+        $or: [
+          { email: employeeData.email },
+          { aadharNumber: employeeData.aadharNumber }
+        ] 
+      });
 
-// Get employee statistics
-router.get('/stats', async (req: any, res: any) => {
+      if (existingEmployee) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Employee with same email or Aadhar already exists' 
+        });
+      }
+
+      if (req.files) {
+        if (req.files['photo']) {
+          employeeData.photo = req.files['photo'][0].buffer.toString('base64');
+        }
+        if (req.files['employeeSignature']) {
+          employeeData.employeeSignature = req.files['employeeSignature'][0].buffer.toString('base64');
+        }
+        if (req.files['authorizedSignature']) {
+          employeeData.authorizedSignature = req.files['authorizedSignature'][0].buffer.toString('base64');
+        }
+      }
+
+      if (employeeData.siteName) {
+        employeeData.siteHistory = [{
+          siteName: employeeData.siteName,
+          assignedDate: new Date()
+        }];
+      }
+
+      const newEmployee = new Employee(employeeData);
+      await newEmployee.save();
+
+      res.status(201).json({
+        success: true,
+        message: 'Employee created successfully',
+        data: newEmployee
+      });
+    } catch (error: any) {
+      console.error('Create employee error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error creating employee',
+        error: error.message 
+      });
+    }
+  }
+);
+
+router.get('/:id', async (req: any, res: any) => {
   try {
-    const totalEmployees = await Employee.countDocuments();
-    const activeEmployees = await Employee.countDocuments({ status: 'active' });
-    const inactiveEmployees = await Employee.countDocuments({ status: 'inactive' });
-    const leftEmployees = await Employee.countDocuments({ status: 'left' });
+    const employee = await Employee.findById(req.params.id).select('-__v');
     
-    // Department-wise count
-    const departmentStats = await Employee.aggregate([
-      {
-        $group: {
-          _id: '$department',
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { count: -1 } }
-    ]);
-
-    // Site-wise count
-    const siteStats = await Employee.aggregate([
-      {
-        $match: { siteName: { $exists: true, $ne: '' } }
-      },
-      {
-        $group: {
-          _id: '$siteName',
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { count: -1 } }
-    ]);
+    if (!employee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Employee not found' 
+      });
+    }
 
     res.json({
       success: true,
-      data: {
-        total: totalEmployees,
-        active: activeEmployees,
-        inactive: inactiveEmployees,
-        left: leftEmployees,
-        departments: departmentStats,
-        sites: siteStats
-      }
+      data: employee
     });
   } catch (error: any) {
-    console.error('Stats error:', error);
+    console.error('Get employee error:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error fetching statistics',
+      message: 'Error fetching employee',
+      error: error.message 
+    });
+  }
+});
+
+// FIXED: Support both PUT and PATCH methods
+// Update the updateEmployeeHandler in your routes file with better error handling:
+
+const updateEmployeeHandler = async (req: any, res: any) => {
+  try {
+    const employeeData = req.body;
+    console.log('Updating employee with data:', employeeData);
+    
+    const existingEmployee = await Employee.findById(req.params.id);
+    
+    if (!existingEmployee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Employee not found' 
+      });
+    }
+
+    if (req.files) {
+      if (req.files['photo']) {
+        employeeData.photo = req.files['photo'][0].buffer.toString('base64');
+      }
+      if (req.files['employeeSignature']) {
+        employeeData.employeeSignature = req.files['employeeSignature'][0].buffer.toString('base64');
+      }
+      if (req.files['authorizedSignature']) {
+        employeeData.authorizedSignature = req.files['authorizedSignature'][0].buffer.toString('base64');
+      }
+    }
+
+    // Check if site is being updated
+    if (employeeData.siteName && employeeData.siteName !== existingEmployee.siteName) {
+      const today = new Date();
+      const siteHistory = existingEmployee.siteHistory || [];
+      
+      if (existingEmployee.siteName && existingEmployee.siteName !== '') {
+        const lastEntryIndex = siteHistory.findIndex(entry => !entry.leftDate);
+        if (lastEntryIndex !== -1) {
+          const lastEntry = siteHistory[lastEntryIndex];
+          const daysWorked = Math.floor((today.getTime() - new Date(lastEntry.assignedDate).getTime()) / (1000 * 60 * 60 * 24));
+          siteHistory[lastEntryIndex] = {
+            ...lastEntry,
+            leftDate: today,
+            daysWorked: daysWorked
+          };
+        }
+      }
+      
+      siteHistory.push({
+        siteName: employeeData.siteName,
+        assignedDate: today
+      });
+      
+      employeeData.siteHistory = siteHistory;
+    }
+
+    // Clean up data to match schema expectations
+    // Convert empty strings to null for optional fields
+    const optionalFields = ['panNumber', 'esicNumber', 'uanNumber', 'permanentAddress', 'localAddress', 
+                           'bankName', 'accountNumber', 'ifscCode', 'branchName', 'fatherName', 
+                           'motherName', 'spouseName', 'emergencyContactName', 'emergencyContactPhone',
+                           'emergencyContactRelation', 'nomineeName', 'nomineeRelation', 'bloodGroup',
+                           'gender', 'maritalStatus', 'pantSize', 'shirtSize', 'capSize'];
+    
+    optionalFields.forEach(field => {
+      if (employeeData[field] === '' || employeeData[field] === undefined) {
+        employeeData[field] = null;
+      }
+    });
+
+    // Ensure enum fields match schema
+    if (employeeData.department) {
+      const validDepartments = [
+        'Housekeeping', 'Security', 'Parking Management', 'Waste Management',
+        'STP Tank Cleaning', 'Consumables Management', 'Administration',
+        'Finance', 'HR', 'IT', 'Operations', 'Maintenance', 'Driver',
+        'Supervisor', 'Sales', 'General Staff'
+      ];
+      if (!validDepartments.includes(employeeData.department)) {
+        employeeData.department = 'General Staff';
+      }
+    }
+
+    // Parse numeric fields
+    if (employeeData.salary) employeeData.salary = parseFloat(employeeData.salary);
+    if (employeeData.numberOfChildren) employeeData.numberOfChildren = parseInt(employeeData.numberOfChildren);
+
+    // Parse boolean fields
+    if (employeeData.idCardIssued !== undefined) {
+      employeeData.idCardIssued = employeeData.idCardIssued === true || employeeData.idCardIssued === 'true';
+    }
+    if (employeeData.westcoatIssued !== undefined) {
+      employeeData.westcoatIssued = employeeData.westcoatIssued === true || employeeData.westcoatIssued === 'true';
+    }
+    if (employeeData.apronIssued !== undefined) {
+      employeeData.apronIssued = employeeData.apronIssued === true || employeeData.apronIssued === 'true';
+    }
+
+    // Parse date fields
+    if (employeeData.dateOfBirth) employeeData.dateOfBirth = employeeData.dateOfBirth ? new Date(employeeData.dateOfBirth) : null;
+    if (employeeData.dateOfJoining) employeeData.dateOfJoining = employeeData.dateOfJoining ? new Date(employeeData.dateOfJoining) : new Date();
+    if (employeeData.dateOfExit) employeeData.dateOfExit = employeeData.dateOfExit ? new Date(employeeData.dateOfExit) : null;
+
+    console.log('Cleaned employee data for update:', employeeData);
+
+    const updatedEmployee = await Employee.findByIdAndUpdate(
+      req.params.id,
+      { $set: employeeData },
+      { new: true, runValidators: true }
+    ).select('-__v');
+
+    res.json({
+      success: true,
+      message: 'Employee updated successfully',
+      data: updatedEmployee
+    });
+  } catch (error: any) {
+    console.error('Update employee error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      errors: error.errors
+    });
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err: any) => err.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Validation error',
+        errors: messages
+      });
+    }
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({ 
+        success: false, 
+        message: `Duplicate value for ${field}`,
+        error: error.message 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating employee',
+      error: error.message 
+    });
+  }
+};
+
+// Add both PUT and PATCH routes
+router.put('/:id',
+  imageUpload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'employeeSignature', maxCount: 1 },
+    { name: 'authorizedSignature', maxCount: 1 }
+  ]),
+  updateEmployeeHandler
+);
+
+router.patch('/:id',
+  imageUpload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'employeeSignature', maxCount: 1 },
+    { name: 'authorizedSignature', maxCount: 1 }
+  ]),
+  updateEmployeeHandler
+);
+
+router.delete('/:id', async (req: any, res: any) => {
+  try {
+    const deletedEmployee = await Employee.findByIdAndDelete(req.params.id);
+
+    if (!deletedEmployee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Employee not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Employee deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Delete employee error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error deleting employee',
+      error: error.message 
+    });
+  }
+});
+
+router.patch('/:id/status', async (req: any, res: any) => {
+  try {
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required'
+      });
+    }
+
+    const updateData: any = { status };
+    
+    if (status === 'left') {
+      updateData.dateOfExit = new Date();
+    }
+
+    const employee = await Employee.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).select('-__v');
+
+    if (!employee) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Employee not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Employee status updated successfully',
+      data: employee
+    });
+  } catch (error: any) {
+    console.error('Update status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating employee status',
       error: error.message 
     });
   }

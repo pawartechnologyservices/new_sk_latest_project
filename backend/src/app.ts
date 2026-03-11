@@ -43,6 +43,7 @@ import trainingRoutes from './routes/trainingRoutes';
 import briefingRoutes from './routes/briefingRoutes';
 import settingsRoutes from './routes/settings';
 import managerAttendanceRoutes from './routes/managerAttendanceRoutes';
+import assignTaskRoutes from './routes/assignTaskRoutes';
 
 const app: Application = express();
 
@@ -232,6 +233,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/supervisors', supervisorRoutes);
 app.use('/api/trainings', trainingRoutes);
 app.use('/api/briefings', briefingRoutes);
+app.use('/api/assign-tasks', assignTaskRoutes);
 app.use('/api/manager-attendance', managerAttendanceRoutes);
 
 

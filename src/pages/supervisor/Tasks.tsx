@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,19 +26,202 @@ import {
   Building,
   Filter,
   Loader2,
-  FileText
+  FileText,
+  Menu,
+  X,
+  Home,
+  Users,
+  BarChart3,
+  LogOut,
+  Trash2,
+  Settings
 } from "lucide-react";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRole } from "@/context/RoleContext";
 import taskService, { Task, Attachment } from "@/services/TaskService";
 import { siteService, Site } from "@/services/SiteService";
 
+// Dashboard Header Component with Hamburger Menu
+interface DashboardHeaderProps {
+  title: string;
+  subtitle?: string;
+  onMenuClick?: () => void;
+  showMenu?: boolean;
+}
+
+const DashboardHeader = ({ title, subtitle, onMenuClick, showMenu = true }: DashboardHeaderProps) => {
+  return (
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-4 sticky top-0 z-40 shadow-sm"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Hamburger Menu for Mobile */}
+          {showMenu && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMenuClick}
+              className="lg:hidden hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Toggle menu"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+            {subtitle && (
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Mobile Menu Button Alternative (if needed) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onMenuClick}
+            aria-label="Menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+    </motion.header>
+  );
+};
+
+// Mobile Navigation Drawer Component
+interface MobileNavDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onNavigate: (path: string) => void;
+  userName: string;
+  userRole: string;
+}
+
+const MobileNavDrawer = ({ isOpen, onClose, onNavigate, userName, userRole }: MobileNavDrawerProps) => {
+  const navItems = [
+    { icon: Home, label: 'Dashboard', path: '/supervisor' },
+    { icon: Users, label: 'Employees', path: '/supervisor/employees' },
+    { icon: FileText, label: 'Tasks', path: '/supervisor/tasks' },
+    { icon: User, label: 'Profile', path: '/supervisor/profile' },
+    { icon: BarChart3, label: 'Reports', path: '/supervisor/reports' },
+    { icon: Settings, label: 'Settings', path: '/supervisor/settings' },
+  ];
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 z-50 lg:hidden"
+          />
+          
+          {/* Drawer */}
+          <motion.div
+            initial={{ x: -300 }}
+            animate={{ x: 0 }}
+            exit={{ x: -300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-800 shadow-xl z-50 lg:hidden"
+          >
+            <div className="flex flex-col h-full">
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Menu</h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onClose}
+                    className="hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                {/* User Info */}
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                    {userName?.charAt(0) || 'S'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {userName}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {userRole}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation Links */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <nav className="space-y-2">
+                  {navItems.map((item) => (
+                    <Button
+                      key={item.path}
+                      variant="ghost"
+                      className="w-full justify-start gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => {
+                        onNavigate(item.path);
+                        onClose();
+                      }}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => {
+                    localStorage.removeItem('sk_user');
+                    window.location.href = '/login';
+                  }}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Main Supervisor Tasks Section Component
 const SupervisorTasksSection = () => {
+  const navigate = useNavigate();
+  const outletContext = useOutletContext<{ onMenuClick?: () => void }>();
   const { user: authUser, isAuthenticated } = useRole();
+  
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [assignedSites, setAssignedSites] = useState<Site[]>([]); // Only sites where supervisor has tasks
+  const [assignedSites, setAssignedSites] = useState<Site[]>([]);
   const [selectedSite, setSelectedSite] = useState<string>("all");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showUpdatesDialog, setShowUpdatesDialog] = useState(false);
@@ -46,6 +229,8 @@ const SupervisorTasksSection = () => {
   const [showTaskDetails, setShowTaskDetails] = useState(false);
   const [hourlyUpdateText, setHourlyUpdateText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
   const [stats, setStats] = useState({
     totalTasks: 0,
     completedTasks: 0,
@@ -53,6 +238,18 @@ const SupervisorTasksSection = () => {
     inProgressTasks: 0,
     overdueTasks: 0
   });
+
+  // Check if mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (authUser && isAuthenticated) {
@@ -233,6 +430,18 @@ const SupervisorTasksSection = () => {
     setShowTaskDetails(true);
   };
 
+  const handleMenuClick = () => {
+    if (outletContext?.onMenuClick) {
+      outletContext.onMenuClick();
+    } else {
+      setMobileMenuOpen(true);
+    }
+  };
+
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
   const getSupervisorName = () => {
     return authUser?.name || "Supervisor";
   };
@@ -354,17 +563,28 @@ const SupervisorTasksSection = () => {
 
   if (!isAuthenticated && !loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <DashboardHeader title="My Tasks" subtitle="Tasks assigned to you" />
-        <div className="p-6 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <DashboardHeader 
+          title="My Tasks" 
+          subtitle="Tasks assigned to you"
+          onMenuClick={handleMenuClick}
+        />
+        <MobileNavDrawer
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          onNavigate={handleNavigate}
+          userName={getSupervisorName()}
+          userRole="Supervisor"
+        />
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
           <Card>
-            <CardContent className="p-8 text-center">
-              <AlertCircle className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
-              <h2 className="text-xl font-bold mb-2">Authentication Required</h2>
-              <p className="text-muted-foreground mb-4">
+            <CardContent className="p-6 md:p-8 text-center">
+              <AlertCircle className="h-12 w-12 md:h-16 md:w-16 mx-auto text-yellow-500 mb-4" />
+              <h2 className="text-lg md:text-xl font-bold mb-2">Authentication Required</h2>
+              <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mb-4">
                 Please log in to view your tasks.
               </p>
-              <Button onClick={() => window.location.href = '/login'}>
+              <Button onClick={() => window.location.href = '/login'} className="w-full sm:w-auto">
                 Go to Login
               </Button>
             </CardContent>
@@ -376,12 +596,23 @@ const SupervisorTasksSection = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <DashboardHeader title="My Tasks" subtitle="Loading your assigned tasks..." />
-        <div className="p-6 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <DashboardHeader 
+          title="My Tasks" 
+          subtitle="Loading your assigned tasks..."
+          onMenuClick={handleMenuClick}
+        />
+        <MobileNavDrawer
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          onNavigate={handleNavigate}
+          userName={getSupervisorName()}
+          userRole="Supervisor"
+        />
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-3 text-muted-foreground">Loading your tasks...</p>
+            <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+            <p className="ml-3 text-sm md:text-base text-gray-500 dark:text-gray-400">Loading your tasks...</p>
           </div>
         </div>
       </div>
@@ -389,117 +620,126 @@ const SupervisorTasksSection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader 
         title="My Tasks" 
-        subtitle="View and manage tasks assigned to you" 
+        subtitle="View and manage tasks assigned to you"
+        onMenuClick={handleMenuClick}
       />
 
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <MobileNavDrawer
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        onNavigate={handleNavigate}
+        userName={getSupervisorName()}
+        userRole="Supervisor"
+      />
+
+      <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4 md:space-y-6">
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 md:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <CardTitle>My Assigned Tasks</CardTitle>
-                <div className="flex items-center gap-2 mt-2">
+                <CardTitle className="text-lg md:text-xl">My Assigned Tasks</CardTitle>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <Shield className="h-4 w-4 text-green-600" />
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
                     Logged in as <span className="font-medium text-green-600">{getSupervisorName()}</span>
                   </p>
-                  <Badge variant="outline" className="ml-2">
+                  <Badge variant="outline" className="ml-0 sm:ml-2 text-xs">
                     Supervisor
                   </Badge>
                 </div>
               </div>
-              <Button variant="outline" onClick={fetchData}>
+              <Button variant="outline" onClick={fetchData} size={isMobileView ? "sm" : "default"} className="w-full sm:w-auto">
                 <Loader2 className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {/* Supervisor Dashboard Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+            <div className="space-y-4 md:space-y-6">
+              {/* Supervisor Dashboard Summary - Mobile Optimized */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
                 <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="pt-6">
+                  <CardContent className="p-3 md:p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-blue-700">Total Tasks</p>
-                        <p className="text-2xl font-bold text-blue-900">{stats.totalTasks}</p>
+                        <p className="text-xs md:text-sm font-medium text-blue-700">Total</p>
+                        <p className="text-lg md:text-2xl font-bold text-blue-900">{stats.totalTasks}</p>
                       </div>
-                      <FileText className="h-8 w-8 text-blue-600" />
+                      <FileText className="h-5 w-5 md:h-8 md:w-8 text-blue-600" />
                     </div>
                   </CardContent>
                 </Card>
                 
                 <Card className="bg-green-50 border-green-200">
-                  <CardContent className="pt-6">
+                  <CardContent className="p-3 md:p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-green-700">Completed</p>
-                        <p className="text-2xl font-bold text-green-900">{stats.completedTasks}</p>
+                        <p className="text-xs md:text-sm font-medium text-green-700">Done</p>
+                        <p className="text-lg md:text-2xl font-bold text-green-900">{stats.completedTasks}</p>
                       </div>
-                      <CheckCircle className="h-8 w-8 text-green-600" />
+                      <CheckCircle className="h-5 w-5 md:h-8 md:w-8 text-green-600" />
                     </div>
                   </CardContent>
                 </Card>
                 
                 <Card className="bg-yellow-50 border-yellow-200">
-                  <CardContent className="pt-6">
+                  <CardContent className="p-3 md:p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-yellow-700">In Progress</p>
-                        <p className="text-2xl font-bold text-yellow-900">{stats.inProgressTasks}</p>
+                        <p className="text-xs md:text-sm font-medium text-yellow-700">Progress</p>
+                        <p className="text-lg md:text-2xl font-bold text-yellow-900">{stats.inProgressTasks}</p>
                       </div>
-                      <Clock className="h-8 w-8 text-yellow-600" />
+                      <Clock className="h-5 w-5 md:h-8 md:w-8 text-yellow-600" />
                     </div>
                   </CardContent>
                 </Card>
                 
                 <Card className="bg-purple-50 border-purple-200">
-                  <CardContent className="pt-6">
+                  <CardContent className="p-3 md:p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-purple-700">Pending</p>
-                        <p className="text-2xl font-bold text-purple-900">{stats.pendingTasks}</p>
+                        <p className="text-xs md:text-sm font-medium text-purple-700">Pending</p>
+                        <p className="text-lg md:text-2xl font-bold text-purple-900">{stats.pendingTasks}</p>
                       </div>
-                      <AlertCircle className="h-8 w-8 text-purple-600" />
+                      <AlertCircle className="h-5 w-5 md:h-8 md:w-8 text-purple-600" />
                     </div>
                   </CardContent>
                 </Card>
                 
-                <Card className="bg-red-50 border-red-200">
-                  <CardContent className="pt-6">
+                <Card className="bg-red-50 border-red-200 col-span-2 md:col-span-1">
+                  <CardContent className="p-3 md:p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-red-700">Overdue</p>
-                        <p className="text-2xl font-bold text-red-900">{stats.overdueTasks}</p>
+                        <p className="text-xs md:text-sm font-medium text-red-700">Overdue</p>
+                        <p className="text-lg md:text-2xl font-bold text-red-900">{stats.overdueTasks}</p>
                       </div>
-                      <AlertCircle className="h-8 w-8 text-red-600" />
+                      <AlertCircle className="h-5 w-5 md:h-8 md:w-8 text-red-600" />
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              {/* Filters - Mobile Optimized */}
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                     <Input
-                      placeholder="Search your tasks by title, description, site..."
+                      placeholder="Search tasks..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8"
+                      className="pl-8 text-sm"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[160px] md:w-[180px]">
                       <Filter className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Filter by status" />
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
@@ -510,11 +750,10 @@ const SupervisorTasksSection = () => {
                     </SelectContent>
                   </Select>
                   
-                  {/* Site filter now only shows sites where supervisor has tasks */}
                   <Select value={selectedSite} onValueChange={setSelectedSite}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[160px] md:w-[180px]">
                       <Building className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Filter by site" />
+                      <SelectValue placeholder="Site" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Sites ({assignedSites.length})</SelectItem>
@@ -522,7 +761,7 @@ const SupervisorTasksSection = () => {
                         <SelectItem key={site._id} value={site._id}>
                           <div className="flex items-center gap-2">
                             <Building className="h-3 w-3" />
-                            {site.name}
+                            <span className="truncate max-w-[120px]">{site.name}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -531,13 +770,13 @@ const SupervisorTasksSection = () => {
                 </div>
               </div>
               
-              {/* Tasks Table */}
+              {/* Tasks Table/Grid - Mobile Optimized */}
               {filteredTasks.length === 0 ? (
                 <Card className="border-dashed">
-                  <CardContent className="pt-6 text-center">
-                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No Tasks Found</h3>
-                    <p className="text-muted-foreground mb-4">
+                  <CardContent className="p-6 md:p-8 text-center">
+                    <FileText className="h-10 w-10 md:h-12 md:w-12 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-base md:text-lg font-medium mb-2">No Tasks Found</h3>
+                    <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mb-4">
                       {tasks.length === 0 ? (
                         "You don't have any tasks assigned to you yet."
                       ) : (
@@ -545,7 +784,7 @@ const SupervisorTasksSection = () => {
                       )}
                     </p>
                     {tasks.length > 0 && (
-                      <Button variant="outline" onClick={() => {
+                      <Button variant="outline" size="sm" onClick={() => {
                         setSearchQuery("");
                         setStatusFilter("all");
                         setSelectedSite("all");
@@ -556,114 +795,95 @@ const SupervisorTasksSection = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Task Details</TableHead>
-                        <TableHead>Site & Client</TableHead>
-                        <TableHead>Assigned By</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>My Status</TableHead>
-                        <TableHead>Due Date & Time</TableHead>
-                        <TableHead>Updates</TableHead>
-                        <TableHead>Attachments</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                <>
+                  {/* Mobile View - Card Grid */}
+                  {isMobileView ? (
+                    <div className="space-y-3">
                       {filteredTasks.map((task) => {
                         const taskStatus = getTaskSpecificStatus(task);
                         const overdue = isOverdue(task);
                         
                         return (
-                          <TableRow key={task._id} className={overdue ? "bg-red-50/50" : ""}>
-                            <TableCell className="font-medium">
-                              <div>
-                                <div className="font-semibold flex items-center gap-2">
-                                  {task.title || "Untitled Task"}
-                                  {overdue && (
-                                    <Badge variant="destructive" className="text-xs">
-                                      Overdue
-                                    </Badge>
-                                  )}
+                          <Card key={task._id} className={`overflow-hidden ${overdue ? 'border-red-200 bg-red-50/50' : ''}`}>
+                            <CardContent className="p-4">
+                              {/* Task Header */}
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                                    {task.title || "Untitled Task"}
+                                    {overdue && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Overdue
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-500 line-clamp-2 mt-1">
+                                    {task.description || "No description"}
+                                  </div>
                                 </div>
-                                <div className="text-sm text-muted-foreground line-clamp-2">
-                                  {task.description || "No description"}
-                                </div>
+                                <Badge variant={getPriorityColor(task.priority) as any} className="ml-2">
+                                  {task.priority}
+                                </Badge>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1">
-                                  <Building className="h-3 w-3" />
+
+                              {/* Task Details */}
+                              <div className="space-y-2 mt-3">
+                                <div className="flex items-center gap-2 text-xs">
+                                  <Building className="h-3 w-3 text-gray-500" />
                                   <span className="font-medium">{getSiteName(task.siteId)}</span>
+                                  <span className="text-gray-400">•</span>
+                                  <span className="text-gray-600">{task.clientName}</span>
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {task.clientName}
+                                
+                                <div className="flex items-center gap-2 text-xs">
+                                  <User className="h-3 w-3 text-gray-500" />
+                                  <span>Assigned by: {getAssignedByName(task)}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 text-xs">
+                                  <Calendar className="h-3 w-3 text-gray-500" />
+                                  <span>Due: {formatDate(task.dueDateTime)}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between mt-2">
+                                  <Badge variant={getStatusColor(taskStatus) as any}>
+                                    <span className="flex items-center gap-1">
+                                      {getStatusIcon(taskStatus)}
+                                      {taskStatus}
+                                    </span>
+                                  </Badge>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2"
+                                      onClick={() => {
+                                        setSelectedTask(task);
+                                        setShowUpdatesDialog(true);
+                                      }}
+                                    >
+                                      <MessageSquare className="h-3 w-3 mr-1" />
+                                      {getHourlyUpdatesCount(task)}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2"
+                                      onClick={() => {
+                                        setSelectedTask(task);
+                                        setShowAttachmentsDialog(true);
+                                      }}
+                                    >
+                                      <Paperclip className="h-3 w-3 mr-1" />
+                                      {getAttachmentsCount(task)}
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-blue-600" />
-                                <span className="font-medium">{getAssignedByName(task)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getPriorityColor(task.priority) as any}>
-                                {task.priority === "high" && <AlertCircle className="mr-1 h-3 w-3" />}
-                                {task.priority}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusColor(taskStatus) as any}>
-                                <span className="flex items-center gap-1">
-                                  {getStatusIcon(taskStatus)}
-                                  {taskStatus}
-                                </span>
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {formatDate(task.dueDateTime)}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="flex items-center gap-1"
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setShowUpdatesDialog(true);
-                                }}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                                {getHourlyUpdatesCount(task)}
-                                <span className="sr-only">View updates</span>
-                              </Button>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="flex items-center gap-1"
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setShowAttachmentsDialog(true);
-                                }}
-                              >
-                                <Paperclip className="h-4 w-4" />
-                                {getAttachmentsCount(task)}
-                                <span className="sr-only">View attachments</span>
-                              </Button>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex justify-end gap-2">
+
+                              {/* Action Buttons */}
+                              <div className="grid grid-cols-2 gap-2 mt-4">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -680,79 +900,230 @@ const SupervisorTasksSection = () => {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleUpdateStatus(task._id, "in-progress")}
-                                        className="text-blue-600"
+                                        className="text-blue-600 border-blue-200"
                                       >
                                         <Clock className="h-3 w-3 mr-1" />
                                         Start
                                       </Button>
                                     )}
                                     
-                                    <Button 
-                                      size="sm"
-                                      onClick={() => handleUpdateStatus(task._id, "completed")}
-                                      className="text-green-600"
-                                    >
-                                      <CheckCircle className="h-3 w-3 mr-1" />
-                                      Complete
-                                    </Button>
+                                    {taskStatus === "in-progress" && (
+                                      <Button 
+                                        size="sm"
+                                        onClick={() => handleUpdateStatus(task._id, "completed")}
+                                        className="text-green-600 bg-green-50 border-green-200 hover:bg-green-100"
+                                      >
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Complete
+                                      </Button>
+                                    )}
                                   </>
                                 )}
                               </div>
-                            </TableCell>
-                          </TableRow>
+                            </CardContent>
+                          </Card>
                         );
                       })}
-                    </TableBody>
-                  </Table>
-                </div>
+                    </div>
+                  ) : (
+                    /* Desktop View - Table */
+                    <div className="border rounded-lg overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="whitespace-nowrap">Task Details</TableHead>
+                            <TableHead className="whitespace-nowrap">Site & Client</TableHead>
+                            <TableHead className="whitespace-nowrap">Assigned By</TableHead>
+                            <TableHead className="whitespace-nowrap">Priority</TableHead>
+                            <TableHead className="whitespace-nowrap">My Status</TableHead>
+                            <TableHead className="whitespace-nowrap">Due Date & Time</TableHead>
+                            <TableHead className="whitespace-nowrap">Updates</TableHead>
+                            <TableHead className="whitespace-nowrap">Attachments</TableHead>
+                            <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredTasks.map((task) => {
+                            const taskStatus = getTaskSpecificStatus(task);
+                            const overdue = isOverdue(task);
+                            
+                            return (
+                              <TableRow key={task._id} className={overdue ? "bg-red-50/50" : ""}>
+                                <TableCell className="font-medium">
+                                  <div>
+                                    <div className="font-semibold flex items-center gap-2">
+                                      {task.title || "Untitled Task"}
+                                      {overdue && (
+                                        <Badge variant="destructive" className="text-xs">
+                                          Overdue
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-gray-500 line-clamp-2">
+                                      {task.description || "No description"}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1">
+                                      <Building className="h-3 w-3" />
+                                      <span className="font-medium">{getSiteName(task.siteId)}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {task.clientName}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4 text-blue-600" />
+                                    <span className="font-medium">{getAssignedByName(task)}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={getPriorityColor(task.priority) as any}>
+                                    {task.priority === "high" && <AlertCircle className="mr-1 h-3 w-3" />}
+                                    {task.priority}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={getStatusColor(taskStatus) as any}>
+                                    <span className="flex items-center gap-1">
+                                      {getStatusIcon(taskStatus)}
+                                      {taskStatus}
+                                    </span>
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {formatDate(task.dueDateTime)}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setShowUpdatesDialog(true);
+                                    }}
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                    {getHourlyUpdatesCount(task)}
+                                  </Button>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setShowAttachmentsDialog(true);
+                                    }}
+                                  >
+                                    <Paperclip className="h-4 w-4" />
+                                    {getAttachmentsCount(task)}
+                                  </Button>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleViewTask(task)}
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View
+                                    </Button>
+                                    
+                                    {taskStatus !== "completed" && taskStatus !== "cancelled" && (
+                                      <>
+                                        {taskStatus !== "in-progress" && (
+                                          <Button 
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleUpdateStatus(task._id, "in-progress")}
+                                            className="text-blue-600"
+                                          >
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            Start
+                                          </Button>
+                                        )}
+                                        
+                                        <Button 
+                                          size="sm"
+                                          onClick={() => handleUpdateStatus(task._id, "completed")}
+                                          className="text-green-600"
+                                        >
+                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          Complete
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Task Details Dialog */}
+      {/* Task Details Dialog - Mobile Optimized */}
       {selectedTask && (
         <Dialog open={showTaskDetails} onOpenChange={setShowTaskDetails}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-lg">
                 <Eye className="h-5 w-5" />
                 Task Details
               </DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
               {/* Task Info */}
               <div>
-                <h3 className="font-semibold mb-2">{selectedTask.title}</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                <h3 className="font-semibold text-base md:text-lg mb-2">{selectedTask.title}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
                   {selectedTask.description}
                 </p>
               </div>
 
-              {/* Metadata */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Metadata - Mobile Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div>
-                  <div className="text-sm text-muted-foreground">Site</div>
-                  <div className="font-medium flex items-center gap-2">
+                  <div className="text-xs md:text-sm text-gray-500">Site</div>
+                  <div className="font-medium text-sm md:text-base flex items-center gap-2">
                     <Building className="h-4 w-4" />
                     {getSiteName(selectedTask.siteId)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">Client</div>
-                  <div className="font-medium">{getClientName(selectedTask.siteId)}</div>
+                  <div className="text-xs md:text-sm text-gray-500">Client</div>
+                  <div className="font-medium text-sm md:text-base">{getClientName(selectedTask.siteId)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">Priority</div>
-                  <Badge variant={getPriorityColor(selectedTask.priority) as any}>
+                  <div className="text-xs md:text-sm text-gray-500">Priority</div>
+                  <Badge variant={getPriorityColor(selectedTask.priority) as any} className="mt-1">
                     {selectedTask.priority}
                   </Badge>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">My Status</div>
-                  <Badge variant={getStatusColor(getTaskSpecificStatus(selectedTask)) as any}>
+                  <div className="text-xs md:text-sm text-gray-500">My Status</div>
+                  <Badge variant={getStatusColor(getTaskSpecificStatus(selectedTask)) as any} className="mt-1">
                     <span className="flex items-center gap-1">
                       {getStatusIcon(getTaskSpecificStatus(selectedTask))}
                       {getTaskSpecificStatus(selectedTask)}
@@ -760,15 +1131,15 @@ const SupervisorTasksSection = () => {
                   </Badge>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">Deadline</div>
-                  <div className="font-medium flex items-center gap-2">
+                  <div className="text-xs md:text-sm text-gray-500">Deadline</div>
+                  <div className="font-medium text-sm md:text-base flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     {formatDate(selectedTask.deadline)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">Due Date & Time</div>
-                  <div className="font-medium">
+                  <div className="text-xs md:text-sm text-gray-500">Due Date & Time</div>
+                  <div className="font-medium text-sm md:text-base">
                     {formatDate(selectedTask.dueDateTime)}
                   </div>
                 </div>
@@ -777,15 +1148,15 @@ const SupervisorTasksSection = () => {
               {/* All Assignees */}
               {selectedTask.assignedUsers && selectedTask.assignedUsers.length > 0 && (
                 <div>
-                  <div className="text-sm text-muted-foreground mb-2">All Assignees</div>
+                  <div className="text-xs md:text-sm text-gray-500 mb-2">All Assignees</div>
                   <div className="space-y-2">
                     {selectedTask.assignedUsers.map((user, index) => {
                       const isMe = user.userId === (authUser?._id || authUser?.id);
                       return (
-                        <div key={index} className="flex items-center gap-2 p-2 border rounded">
-                          <User className="h-4 w-4" />
-                          <div>
-                            <div className="font-medium flex items-center gap-2">
+                        <div key={index} className="flex items-center gap-2 p-2 md:p-3 border rounded">
+                          <User className="h-4 w-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm flex items-center gap-2 flex-wrap">
                               {user.name}
                               {isMe && (
                                 <Badge variant="outline" className="text-xs bg-green-50">
@@ -793,11 +1164,11 @@ const SupervisorTasksSection = () => {
                                 </Badge>
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-gray-500">
                               {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                             </div>
                           </div>
-                          <Badge variant="outline" className="ml-auto">
+                          <Badge variant="outline" className="ml-auto text-xs">
                             {user.status}
                           </Badge>
                         </div>
@@ -808,14 +1179,15 @@ const SupervisorTasksSection = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
                 {getTaskSpecificStatus(selectedTask) !== 'completed' && 
                  getTaskSpecificStatus(selectedTask) !== 'cancelled' && (
                   <>
                     {getTaskSpecificStatus(selectedTask) !== 'in-progress' && (
                       <Button
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 w-full sm:w-auto"
+                        size={isMobileView ? "default" : "sm"}
                         onClick={() => {
                           handleUpdateStatus(selectedTask._id, 'in-progress');
                           setShowTaskDetails(false);
@@ -826,7 +1198,8 @@ const SupervisorTasksSection = () => {
                       </Button>
                     )}
                     <Button
-                      className="flex-1"
+                      className="flex-1 w-full sm:w-auto"
+                      size={isMobileView ? "default" : "sm"}
                       onClick={() => {
                         handleUpdateStatus(selectedTask._id, 'completed');
                         setShowTaskDetails(false);
@@ -839,7 +1212,8 @@ const SupervisorTasksSection = () => {
                 )}
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 w-full sm:w-auto"
+                  size={isMobileView ? "default" : "sm"}
                   onClick={() => setShowTaskDetails(false)}
                 >
                   Close
@@ -850,40 +1224,40 @@ const SupervisorTasksSection = () => {
         </Dialog>
       )}
 
-      {/* Hourly Updates Dialog */}
+      {/* Hourly Updates Dialog - Mobile Optimized */}
       {selectedTask && (
         <Dialog open={showUpdatesDialog} onOpenChange={setShowUpdatesDialog}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-4 md:p-6">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-lg">
                 <MessageSquare className="h-5 w-5" />
-                Hourly Updates: {selectedTask.title || "Untitled Task"}
+                <span className="truncate">Updates: {selectedTask.title || "Untitled Task"}</span>
               </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
               <div className="space-y-3">
                 {selectedTask.hourlyUpdates && selectedTask.hourlyUpdates.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-gray-500">
                     No hourly updates yet
                   </div>
                 ) : (
                   selectedTask.hourlyUpdates?.map((update, index) => (
-                    <div key={update.id || `update-${index}`} className="border rounded-lg p-4">
+                    <div key={update.id || `update-${index}`} className="border rounded-lg p-3 md:p-4">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="h-4 w-4 text-primary" />
+                          <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                           </div>
                           <div>
-                            <div className="font-medium">Update #{selectedTask.hourlyUpdates!.length - index}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="font-medium text-sm">Update #{selectedTask.hourlyUpdates!.length - index}</div>
+                            <div className="text-xs text-gray-500">
                               {formatDateTime(update.timestamp)}
                             </div>
                           </div>
                         </div>
                       </div>
-                      <p className="text-sm">{update.content}</p>
+                      <p className="text-sm mt-2">{update.content}</p>
                     </div>
                   ))
                 )}
@@ -895,7 +1269,7 @@ const SupervisorTasksSection = () => {
                   value={hourlyUpdateText}
                   onChange={(e) => setHourlyUpdateText(e.target.value)}
                   rows={3}
-                  className="mb-3"
+                  className="mb-3 text-sm"
                 />
                 <Button 
                   onClick={() => handleAddHourlyUpdate(selectedTask._id)}
@@ -909,24 +1283,24 @@ const SupervisorTasksSection = () => {
         </Dialog>
       )}
 
-      {/* Attachments Dialog */}
+      {/* Attachments Dialog - Mobile Optimized */}
       {selectedTask && (
         <Dialog open={showAttachmentsDialog} onOpenChange={setShowAttachmentsDialog}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto p-4 md:p-6">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-lg">
                 <Paperclip className="h-5 w-5" />
-                Attachments: {selectedTask.title || "Untitled Task"}
+                <span className="truncate">Attachments: {selectedTask.title || "Untitled Task"}</span>
               </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <span className="text-xs md:text-sm text-gray-500">
                   {(selectedTask.attachments || []).length} file(s) attached
                 </span>
-                <label className="cursor-pointer">
-                  <Button variant="outline" size="sm" asChild>
+                <label className="cursor-pointer w-full sm:w-auto">
+                  <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                     <div className="flex items-center gap-2">
                       <Upload className="h-4 w-4" />
                       Upload Files
@@ -943,27 +1317,28 @@ const SupervisorTasksSection = () => {
               
               <div className="space-y-3">
                 {!selectedTask.attachments || selectedTask.attachments.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-gray-500">
                     No attachments yet
                   </div>
                 ) : (
                   selectedTask.attachments.map((attachment) => (
-                    <div key={attachment.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Paperclip className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium">{attachment.filename || "Unnamed file"}</div>
-                            <div className="text-xs text-muted-foreground">
+                    <div key={attachment.id} className="border rounded-lg p-3 md:p-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Paperclip className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{attachment.filename || "Unnamed file"}</div>
+                            <div className="text-xs text-gray-500">
                               {attachment.size ? `${(attachment.size / 1024).toFixed(2)} KB` : "Unknown size"} • {formatDateTime(attachment.uploadedAt)}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => taskService.previewAttachment(attachment)}
+                            className="h-8 px-2"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -971,6 +1346,7 @@ const SupervisorTasksSection = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDownloadAttachment(attachment)}
+                            className="h-8 px-2"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -978,8 +1354,9 @@ const SupervisorTasksSection = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteAttachment(selectedTask._id, attachment.id)}
+                            className="h-8 px-2"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
                       </div>

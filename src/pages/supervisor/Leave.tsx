@@ -8,10 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, RefreshCw, Users, AlertCircle, Database, Search, Building, MapPin, User, Bug, Info, Briefcase } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Loader2, RefreshCw, Users, AlertCircle, Database, Search, Building, MapPin, User, Bug, Info, Briefcase, MoreVertical, Filter, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useRole } from "@/context/RoleContext";
+import { useOutletContext } from "react-router-dom";
 import { taskService } from "@/services/TaskService"; // Import taskService
 
 interface LeaveRequest {
@@ -64,6 +71,118 @@ interface Site {
   employeeCount?: number;
 }
 
+// Mobile responsive leave request card
+const MobileLeaveCard = ({
+  leave,
+  formatDate,
+  getStatusBadgeVariant
+}: {
+  leave: LeaveRequest;
+  formatDate: (date: string) => string;
+  getStatusBadgeVariant: (status: string) => "default" | "destructive" | "secondary" | "outline";
+}) => {
+  return (
+    <Card className={`mb-3 overflow-hidden ${leave.isSupervisorLeave ? 'border-blue-200 bg-blue-50/50' : ''}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold">{leave.employeeName}</h3>
+              <Badge variant={getStatusBadgeVariant(leave.status)}>
+                {leave.status.toUpperCase()}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">ID: {leave.employeeId}</p>
+          </div>
+          {leave.isSupervisorLeave && (
+            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+              <User className="mr-1 h-3 w-3" />
+              Supervisor
+            </Badge>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Department</p>
+            <p className="text-sm font-medium">{leave.department}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Site</p>
+            <p className="text-sm font-medium truncate">{leave.site}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Leave Type</p>
+            <p className="text-sm font-medium capitalize">{leave.leaveType}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Days</p>
+            <p className="text-sm font-bold">{leave.totalDays}</p>
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <p className="text-xs text-muted-foreground">Dates</p>
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-3 w-3" />
+            {formatDate(leave.fromDate)} - {formatDate(leave.toDate)}
+          </div>
+        </div>
+
+        <div className="mb-3 p-2 bg-gray-50 rounded">
+          <p className="text-xs text-muted-foreground">Reason</p>
+          <p className="text-sm">{leave.reason}</p>
+        </div>
+
+        <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t">
+          <span>Applied by: {leave.appliedBy}</span>
+          <span>{formatDate(leave.createdAt)}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Mobile responsive employee selection card
+const MobileEmployeeCard = ({
+  employee,
+  selected,
+  onSelect
+}: {
+  employee: Employee;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) => {
+  return (
+    <div
+      onClick={() => onSelect(employee._id)}
+      className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${
+        selected ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="font-medium">{employee.name}</h4>
+          <p className="text-xs text-muted-foreground">{employee.employeeId}</p>
+        </div>
+        <Badge variant="outline" className="text-xs">
+          {employee.position}
+        </Badge>
+      </div>
+      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+        <span className="flex items-center">
+          <Briefcase className="mr-1 h-3 w-3" />
+          {employee.department}
+        </span>
+        <span className="flex items-center">
+          <Building className="mr-1 h-3 w-3" />
+          {employee.site || 'N/A'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 // Helper to normalize site IDs
 const normalizeSiteId = (site: any): string | null => {
   if (!site) return null;
@@ -87,9 +206,10 @@ const compareSiteIds = (id1: string | null, id2: string | null): boolean => {
   return id1.toString().toLowerCase().trim() === id2.toString().toLowerCase().trim();
 };
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5001/api`;
 
 const Leave = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const { user, loading: authLoading } = useRole();
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -107,6 +227,10 @@ const Leave = () => {
   const [apiStatus, setApiStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>('idle');
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [applyMode, setApplyMode] = useState<'employee' | 'self'>('employee');
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -126,6 +250,18 @@ const Leave = () => {
     filteredEmployeesCount: 0,
     employeesBySite: {} as Record<string, number>
   });
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Check API connection on component mount
   useEffect(() => {
@@ -1038,7 +1174,7 @@ const Leave = () => {
     setShowDebugInfo(!showDebugInfo);
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string): "default" | "destructive" | "secondary" | "outline" => {
     switch (status) {
       case 'approved': return 'default';
       case 'rejected': return 'destructive';
@@ -1061,6 +1197,9 @@ const Leave = () => {
 
   // Employee Leave Form Component - UPDATED WITH SITE SELECTION
   const EmployeeLeaveForm = () => {
+    const [showEmployeeList, setShowEmployeeList] = useState(false);
+    const siteEmployees = selectedSite ? getEmployeesForSite(selectedSite) : [];
+    
     return (
       <form onSubmit={handleEmployeeSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -1105,14 +1244,16 @@ const Leave = () => {
                   const siteEmployees = getEmployeesForSite(site._id);
                   return (
                     <SelectItem key={site._id} value={site._id}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{site.name}</span>
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          {siteEmployees.length} employees
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {site.clientName}
+                      <div className="flex flex-col py-1">
+                        <div className="flex items-center justify-between">
+                          <span>{site.name}</span>
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {siteEmployees.length}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {site.clientName}
+                        </div>
                       </div>
                     </SelectItem>
                   );
@@ -1122,7 +1263,7 @@ const Leave = () => {
           )}
           {selectedSite && (
             <p className="text-xs text-muted-foreground mt-1">
-              {getEmployeesForSite(selectedSite).length} employees available at this site
+              {siteEmployees.length} employees available at this site
             </p>
           )}
         </div>
@@ -1134,7 +1275,7 @@ const Leave = () => {
             </Label>
             <div className="flex items-center text-xs text-muted-foreground">
               <Users className="mr-1 h-3 w-3" />
-              {selectedSite ? getEmployeesForSite(selectedSite).length : employees.length} employees
+              {selectedSite ? siteEmployees.length : employees.length} employees
             </div>
           </div>
           
@@ -1150,13 +1291,41 @@ const Leave = () => {
                 Please select a site first
               </p>
             </div>
-          ) : getEmployeesForSite(selectedSite).length === 0 ? (
+          ) : siteEmployees.length === 0 ? (
             <div className="p-3 border border-dashed rounded-lg text-center">
               <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
                 No employees found at this site
               </p>
             </div>
+          ) : isMobileView ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-between"
+                onClick={() => setShowEmployeeList(!showEmployeeList)}
+              >
+                <span>{selectedEmployee ? employees.find(e => e._id === selectedEmployee)?.name || "Select employee" : "Select employee"}</span>
+                {showEmployeeList ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+              
+              {showEmployeeList && (
+                <div className="mt-2 max-h-60 overflow-y-auto border rounded-lg p-2">
+                  {siteEmployees.map((employee) => (
+                    <MobileEmployeeCard
+                      key={employee._id}
+                      employee={employee}
+                      selected={selectedEmployee === employee._id}
+                      onSelect={(id) => {
+                        setSelectedEmployee(id);
+                        setShowEmployeeList(false);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
             <Select
               value={selectedEmployee}
@@ -1168,9 +1337,9 @@ const Leave = () => {
                 <SelectValue placeholder="Select employee" />
               </SelectTrigger>
               <SelectContent>
-                {getEmployeesForSite(selectedSite).map((employee) => (
+                {siteEmployees.map((employee) => (
                   <SelectItem key={employee._id} value={employee._id}>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col py-1">
                       <span className="font-medium">{employee.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {employee.employeeId} • {employee.position}
@@ -1472,7 +1641,7 @@ const Leave = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
           <h3 className="font-medium text-lg mb-2">Authentication Required</h3>
@@ -1489,7 +1658,7 @@ const Leave = () => {
 
   if (user.role !== 'supervisor') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
           <h3 className="font-medium text-lg mb-2">Access Denied</h3>
@@ -1512,154 +1681,141 @@ const Leave = () => {
       <DashboardHeader 
         title="Leave Management" 
         subtitle="Apply for leave for yourself or team members" 
+        onMenuClick={onMenuClick}
       />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
         {/* Supervisor Info Bar - UPDATED WITH SITES INFO */}
-        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-primary/10 rounded-full">
-              <User className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Supervisor Information</p>
-              <div className="flex items-center space-x-2 text-xs">
-                <Badge variant="outline">
-                  <span className="flex items-center">
-                    <User className="mr-1 h-3 w-3" />
-                    {user.name}
-                  </span>
-                </Badge>
-                <Badge variant="outline" className={sites.length > 0 ? "bg-green-50" : "bg-red-50"}>
-                  <span className="flex items-center">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-2 bg-primary/10 rounded-full">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold truncate">{user.name}</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className={sites.length > 0 ? "bg-green-50" : "bg-red-50"}>
                     <Building className="mr-1 h-3 w-3" />
                     Sites: {sites.length}
-                  </span>
-                </Badge>
-                <Badge variant="outline" className={user.department ? "bg-green-50" : "bg-yellow-50"}>
-                  <span className="flex items-center">
+                  </Badge>
+                  <Badge variant="outline" className={user.department ? "bg-green-50" : "bg-yellow-50"}>
                     <Briefcase className="mr-1 h-3 w-3" />
                     Dept: {user.department || "Not assigned"}
-                  </span>
-                </Badge>
-                {debugInfo.employeesLoaded && (
-                  <Badge variant="outline" className="bg-blue-50">
-                    <span className="flex items-center">
+                  </Badge>
+                  {debugInfo.employeesLoaded && (
+                    <Badge variant="outline" className="bg-blue-50">
                       <Users className="mr-1 h-3 w-3" />
                       Employees: {employees.length}
-                    </span>
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={debugLeaveSystem}
-              className="h-8"
-            >
-              <Bug className="mr-2 h-3 w-3" />
-              Debug System
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleDebugApi}
-              className="h-8"
-            >
-              <Search className="mr-2 h-3 w-3" />
-              Debug API
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleTestDatabase}
-              className="h-8"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-              ) : (
-                <Database className="mr-2 h-3 w-3" />
-              )}
-              Test DB
-            </Button>
-          </div>
-        </div>
-
-        {/* Debug Info Panel */}
-        {showDebugInfo && (
-          <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
-            <div className="flex items-center gap-2 mb-2">
-              <Info className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium">System Status</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-              <div className="flex items-center gap-1">
-                {debugInfo.sitesLoaded ? (
-                  <span className="text-green-600">✓</span>
-                ) : (
-                  <span className="text-red-600">✗</span>
-                )}
-                <span>Sites: {sites.length}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {debugInfo.employeesLoaded ? (
-                  <span className="text-green-600">✓</span>
-                ) : (
-                  <span className="text-red-600">✗</span>
-                )}
-                <span>Employees: {employees.length}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>API Status:</span>
-                <span className={`ml-1 ${apiStatus === 'connected' ? 'text-green-600' : 'text-red-600'}`}>
-                  {apiStatus}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>Selected Site:</span>
-                <span className="ml-1">
-                  {sites.find(s => s._id === selectedSite)?.name || "None"}
-                </span>
-              </div>
-            </div>
-            {Object.keys(debugInfo.employeesBySite).length > 0 && (
-              <div className="mt-2 text-xs">
-                <span className="text-gray-600">Employees by Site: </span>
-                <span>
-                  {Object.entries(debugInfo.employeesBySite).map(([site, count]) => (
-                    <Badge key={site} variant="outline" className="ml-1 text-xs">
-                      {site}: {count}
                     </Badge>
-                  ))}
-                </span>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        )}
+              
+              <div className="flex flex-col items-start md:items-end gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size={isMobileView ? "sm" : "default"}
+                    onClick={debugLeaveSystem}
+                    className="text-xs"
+                  >
+                    <Bug className="h-3 w-3 mr-1" />
+                    {!isMobileView && "Debug System"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size={isMobileView ? "sm" : "default"}
+                    onClick={handleDebugApi}
+                    className="text-xs"
+                  >
+                    <Search className="h-3 w-3 mr-1" />
+                    {!isMobileView && "Debug API"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size={isMobileView ? "sm" : "default"}
+                    onClick={handleTestDatabase}
+                    className="text-xs"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Database className="h-3 w-3 mr-1" />
+                    )}
+                    {!isMobileView && "Test DB"}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size={isMobileView ? "sm" : "default"}
+                    onClick={() => setShowMobileFilters(!showMobileFilters)}
+                    className="text-xs md:hidden"
+                  >
+                    <Filter className="h-3 w-3 mr-1" />
+                    Filters
+                    {showMobileFilters ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size={isMobileView ? "sm" : "default"}
+                    onClick={handleRefreshAll}
+                    className="text-xs"
+                    disabled={isLoading || isLoadingEmployees || isLoadingSites}
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                    {!isMobileView && "Refresh All"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Mobile Filters */}
+        {showMobileFilters && isMobileView && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="space-y-3">
                 <div>
-                  <Label className="text-sm">Your Assigned Sites</Label>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <div className="flex items-center px-3 py-2 border rounded-md text-sm bg-primary/5 border-primary/20">
-                      <Building className="mr-2 h-4 w-4" />
-                      {sites.length} site(s) available
-                    </div>
-                    <div className="flex items-center px-2 py-1 bg-blue-50 rounded text-xs">
-                      <Briefcase className="mr-1 h-3 w-3" />
-                      Manager: Site Manager
-                    </div>
+                  <Label className="text-sm">Department</Label>
+                  <Select
+                    value={supervisorDepartment}
+                    onValueChange={setSupervisorDepartment}
+                    disabled={apiStatus !== 'connected' || availableDepartments.length === 0}
+                  >
+                    <SelectTrigger className="h-9 mt-1">
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableDepartments.length > 0 ? (
+                        availableDepartments.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="loading" disabled>
+                          Loading...
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label className="text-sm">Sites</Label>
+                  <div className="flex items-center px-3 py-2 border rounded-md text-sm bg-primary/5 border-primary/20 mt-1">
+                    <Building className="mr-2 h-4 w-4" />
+                    {sites.length} site(s) available
                   </div>
                   {sites.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -1667,79 +1823,126 @@ const Leave = () => {
                     </p>
                   )}
                 </div>
-                <div>
-                  <Label className="text-sm">Department to Manage</Label>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Select
-                      value={supervisorDepartment}
-                      onValueChange={setSupervisorDepartment}
-                      disabled={apiStatus !== 'connected' || availableDepartments.length === 0}
-                    >
-                      <SelectTrigger className="w-full lg:w-64">
-                        <SelectValue placeholder={availableDepartments.length > 0 ? "Select Department" : "Loading departments..."} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableDepartments.length > 0 ? (
-                          availableDepartments.map((dept) => (
-                            <SelectItem key={dept} value={dept}>
-                              <div className="flex items-center">
-                                <Briefcase className="mr-2 h-4 w-4" />
-                                {dept}
-                                {user.department === dept && (
-                                  <Badge variant="secondary" className="ml-2 text-xs">
-                                    Your Dept
-                                  </Badge>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="loading" disabled>
-                            {apiStatus === 'connected' ? "Loading departments..." : "API not connected"}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={fetchDepartments}
-                      disabled={!user.site}
-                      className="h-9"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Debug Info Panel */}
+        {showDebugInfo && (
+          <Card className="bg-gray-50 border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Info className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">System Status</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  {debugInfo.sitesLoaded ? (
+                    <span className="text-green-600">✓</span>
+                  ) : (
+                    <span className="text-red-600">✗</span>
+                  )}
+                  <span>Sites: {sites.length}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {debugInfo.employeesLoaded ? (
+                    <span className="text-green-600">✓</span>
+                  ) : (
+                    <span className="text-red-600">✗</span>
+                  )}
+                  <span>Employees: {employees.length}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>API Status:</span>
+                  <span className={`ml-1 ${apiStatus === 'connected' ? 'text-green-600' : 'text-red-600'}`}>
+                    {apiStatus}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>Selected Site:</span>
+                  <span className="ml-1 truncate max-w-[100px]">
+                    {sites.find(s => s._id === selectedSite)?.name || "None"}
+                  </span>
                 </div>
               </div>
-              
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-2">
-                <span className="flex items-center">
-                  <Users className="mr-1 h-3 w-3" />
-                  {employees.length} employees at your sites
-                </span>
-                <span className="flex items-center">
-                  <Building className="mr-1 h-3 w-3" />
-                  {sites.length} site(s) assigned
-                </span>
-                <span className="flex items-center">
-                  <Briefcase className="mr-1 h-3 w-3" />
-                  {availableDepartments.length} departments available
-                </span>
+              {Object.keys(debugInfo.employeesBySite).length > 0 && (
+                <div className="mt-2 text-xs">
+                  <span className="text-gray-600">Employees by Site: </span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Object.entries(debugInfo.employeesBySite).map(([site, count]) => (
+                      <Badge key={site} variant="outline" className="text-xs">
+                        {site}: {count}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Content Area */}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm">Your Assigned Sites</Label>
+                <div className="flex items-center px-3 py-2 border rounded-md text-sm bg-primary/5 border-primary/20 mt-1">
+                  <Building className="mr-2 h-4 w-4" />
+                  {sites.length} site(s) available
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm">Department to Manage</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Select
+                    value={supervisorDepartment}
+                    onValueChange={setSupervisorDepartment}
+                    disabled={apiStatus !== 'connected' || availableDepartments.length === 0}
+                  >
+                    <SelectTrigger className="w-full lg:w-64 h-9">
+                      <SelectValue placeholder={availableDepartments.length > 0 ? "Select Department" : "Loading departments..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableDepartments.length > 0 ? (
+                        availableDepartments.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            <div className="flex items-center">
+                              <Briefcase className="mr-2 h-4 w-4" />
+                              {dept}
+                              {user.department === dept && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  Your Dept
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="loading" disabled>
+                          {apiStatus === 'connected' ? "Loading departments..." : "API not connected"}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleRefreshAll}
-                className="h-9"
-                disabled={isLoading || isLoadingEmployees || isLoadingSites}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh All
-              </Button>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground mt-2">
+              <span className="flex items-center">
+                <Users className="mr-1 h-3 w-3" />
+                {employees.length} employees at your sites
+              </span>
+              <span className="flex items-center">
+                <Building className="mr-1 h-3 w-3" />
+                {sites.length} site(s) assigned
+              </span>
+              <span className="flex items-center">
+                <Briefcase className="mr-1 h-3 w-3" />
+                {availableDepartments.length} departments available
+              </span>
             </div>
           </div>
           
@@ -1750,7 +1953,7 @@ const Leave = () => {
                 variant={applyMode === 'employee' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setApplyMode('employee')}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm"
               >
                 <Users className="mr-2 h-4 w-4" />
                 For Employee
@@ -1760,7 +1963,7 @@ const Leave = () => {
                 variant={applyMode === 'self' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setApplyMode('self')}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm"
               >
                 <User className="mr-2 h-4 w-4" />
                 For Myself
@@ -1809,7 +2012,7 @@ const Leave = () => {
               <div className="flex items-center space-x-2">
                 <Button 
                   variant="outline" 
-                  size="sm" 
+                  size={isMobileView ? "sm" : "default"}
                   onClick={fetchLeaveRequests}
                   disabled={isLoading || apiStatus !== 'connected' || !supervisorDepartment || !user.site}
                   className="h-9"
@@ -1819,7 +2022,7 @@ const Leave = () => {
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  <span className="ml-2">Refresh</span>
+                  <span className="ml-2 hidden sm:inline">Refresh</span>
                 </Button>
               </div>
             </div>
@@ -1877,57 +2080,68 @@ const Leave = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {leaveRequests.map((leave) => (
-                  <motion.div
-                    key={leave._id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 border rounded-lg space-y-3 hover:border-primary/50 transition-colors ${leave.isSupervisorLeave ? 'bg-blue-50/50 border-blue-200' : ''}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{leave.employeeName}</h3>
-                          {leave.isSupervisorLeave && (
-                            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                              <User className="mr-1 h-3 w-3" />
-                              Supervisor's Leave
+                {isMobileView ? (
+                  leaveRequests.map((leave) => (
+                    <MobileLeaveCard
+                      key={leave._id}
+                      leave={leave}
+                      formatDate={formatDate}
+                      getStatusBadgeVariant={getStatusBadgeVariant}
+                    />
+                  ))
+                ) : (
+                  leaveRequests.map((leave) => (
+                    <motion.div
+                      key={leave._id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`p-4 border rounded-lg space-y-3 hover:border-primary/50 transition-colors ${leave.isSupervisorLeave ? 'bg-blue-50/50 border-blue-200' : ''}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-medium">{leave.employeeName}</h3>
+                            {leave.isSupervisorLeave && (
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                                <User className="mr-1 h-3 w-3" />
+                                Supervisor's Leave
+                              </Badge>
+                            )}
+                            <Badge variant={getStatusBadgeVariant(leave.status)}>
+                              {leave.status.toUpperCase()}
                             </Badge>
-                          )}
-                          <Badge variant={getStatusBadgeVariant(leave.status)}>
-                            {leave.status.toUpperCase()}
-                          </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDate(leave.fromDate)} to {formatDate(leave.toDate)} ({leave.totalDays} days)
+                          </p>
+                          <div className="flex flex-wrap items-center gap-4 text-sm">
+                            <span className="text-muted-foreground">
+                              Type: <span className="font-medium capitalize">{leave.leaveType} Leave</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              ID: {leave.employeeId}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Dept: {leave.department}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Site: {leave.site}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(leave.fromDate)} to {formatDate(leave.toDate)} ({leave.totalDays} days)
+                      </div>
+                      <div className="pt-2 border-t">
+                        <p className="text-sm">
+                          <span className="font-medium">Reason:</span> {leave.reason}
                         </p>
-                        <div className="flex flex-wrap items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">
-                            Type: <span className="font-medium capitalize">{leave.leaveType} Leave</span>
-                          </span>
-                          <span className="text-muted-foreground">
-                            ID: {leave.employeeId}
-                          </span>
-                          <span className="text-muted-foreground">
-                            Dept: {leave.department}
-                          </span>
-                          <span className="text-muted-foreground">
-                            Site: {leave.site}
-                          </span>
+                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                          <span>Applied by: {leave.appliedBy} {leave.appliedBy === user.name && '(You)'}</span>
+                          <span>{formatDate(leave.createdAt)}</span>
                         </div>
                       </div>
-                    </div>
-                    <div className="pt-2 border-t">
-                      <p className="text-sm">
-                        <span className="font-medium">Reason:</span> {leave.reason}
-                      </p>
-                      <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                        <span>Applied by: {leave.appliedBy} {leave.appliedBy === user.name && '(You)'}</span>
-                        <span>{formatDate(leave.createdAt)}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))
+                )}
               </div>
             )}
           </CardContent>

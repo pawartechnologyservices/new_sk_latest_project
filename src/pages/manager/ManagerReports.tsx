@@ -53,7 +53,8 @@ import {
   Info,
   Database as DatabaseIcon,
   FileSpreadsheet,
-  FileDown
+  FileDown,
+  ScrollText
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -1643,33 +1644,33 @@ const ManagerReports = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="p-6 space-y-6"
+        className="p-4 sm:p-6 space-y-4 sm:space-y-6"
       >
       
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Summary Cards - Responsive Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {/* Task Summary */}
           <Card className="border-l-4 border-l-blue-500">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-blue-600" />
+            <CardHeader className="pb-2 p-3 sm:p-4">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+                <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
                 Task Summary
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-700">{taskStats.total}</div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-sm text-gray-600">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-blue-700">{taskStats.total}</div>
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between mt-2 gap-1">
+                <div className="text-xs sm:text-sm text-gray-600 truncate">
                   {taskStats.completed} completed • {taskStats.inProgress} in progress
                 </div>
-                <Badge className="bg-blue-100 text-blue-800">
+                <Badge className="bg-blue-100 text-blue-800 text-xs w-fit">
                   {taskStats.completionRate}% completion
                 </Badge>
               </div>
               {taskStats.overdue > 0 && (
                 <div className="mt-2 text-xs text-red-600 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {taskStats.overdue} overdue tasks
+                  <AlertCircle className="h-3 w-3 mr-1 flex-shrink-0" />
+                  <span className="truncate">{taskStats.overdue} overdue tasks</span>
                 </div>
               )}
             </CardContent>
@@ -1677,19 +1678,19 @@ const ManagerReports = () => {
 
           {/* Attendance Summary */}
           <Card className="border-l-4 border-l-green-500">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <CalendarCheck className="h-4 w-4 text-green-600" />
+            <CardHeader className="pb-2 p-3 sm:p-4">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+                <CalendarCheck className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                 Attendance Summary
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-700">{attendanceStatsMemo.presentDays}/{attendanceStatsMemo.totalDays}</div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-sm text-gray-600">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-green-700">{attendanceStatsMemo.presentDays}/{attendanceStatsMemo.totalDays}</div>
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between mt-2 gap-1">
+                <div className="text-xs sm:text-sm text-gray-600 truncate">
                   {attendanceStatsMemo.lateDays} late • {attendanceStatsMemo.absentDays} absent
                 </div>
-                <Badge className="bg-green-100 text-green-800">
+                <Badge className="bg-green-100 text-green-800 text-xs w-fit">
                   {attendanceStatsMemo.attendanceRate}% present
                 </Badge>
               </div>
@@ -1698,19 +1699,19 @@ const ManagerReports = () => {
 
           {/* Leave Summary */}
           <Card className="border-l-4 border-l-purple-500">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-purple-600" />
+            <CardHeader className="pb-2 p-3 sm:p-4">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+                <CalendarDays className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
                 Leave Summary
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-700">{leaveStats.total}</div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-sm text-gray-600">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-purple-700">{leaveStats.total}</div>
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between mt-2 gap-1">
+                <div className="text-xs sm:text-sm text-gray-600 truncate">
                   {leaveStats.approved} approved • {leaveStats.pending} pending
                 </div>
-                <Badge className="bg-purple-100 text-purple-800">
+                <Badge className="bg-purple-100 text-purple-800 text-xs w-fit">
                   {leaveStats.totalDays} total days
                 </Badge>
               </div>
@@ -1719,19 +1720,19 @@ const ManagerReports = () => {
 
           {/* Manager Stats */}
           <Card className="border-l-4 border-l-amber-500">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <User className="h-4 w-4 text-amber-600" />
+            <CardHeader className="pb-2 p-3 sm:p-4">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+                <User className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
                 Manager Stats
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-700">{leaveStats.myLeaves}</div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-sm text-gray-600">
+            <CardContent className="p-3 sm:p-4 pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-amber-700">{leaveStats.myLeaves}</div>
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between mt-2 gap-1">
+                <div className="text-xs sm:text-sm text-gray-600 truncate">
                   {leaveStats.teamLeaves} team leaves • {availableDepartments.length} depts
                 </div>
-                <Badge className="bg-amber-100 text-amber-800">
+                <Badge className="bg-amber-100 text-amber-800 text-xs w-fit">
                   Active
                 </Badge>
               </div>
@@ -1739,26 +1740,26 @@ const ManagerReports = () => {
           </Card>
         </div>
 
-        {/* Department Selector */}
+        {/* Department Selector - Responsive */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Building className="h-4 w-4 sm:h-5 sm:w-5" />
               Department Selection
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Select department to view team leaves and data
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="space-y-2 w-96">
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-2 w-full sm:w-96">
                 <Select
                   value={managerDepartment}
                   onValueChange={setManagerDepartment}
                   disabled={availableDepartments.length === 0}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1766,8 +1767,8 @@ const ManagerReports = () => {
                       availableDepartments.map((dept) => (
                         <SelectItem key={dept} value={dept}>
                           <div className="flex items-center">
-                            <Building className="mr-2 h-4 w-4" />
-                            {dept}
+                            <Building className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{dept}</span>
                           </div>
                         </SelectItem>
                       ))
@@ -1778,19 +1779,19 @@ const ManagerReports = () => {
                     )}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-1 xs:space-y-0 xs:space-x-4 text-xs text-muted-foreground">
                   <span className="flex items-center">
-                    <Users className="mr-1 h-3 w-3" />
-                    {leaveRequests.length} team leaves
+                    <Users className="mr-1 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{leaveRequests.length} team leaves</span>
                   </span>
                   <span className="flex items-center">
-                    <Building className="mr-1 h-3 w-3" />
-                    {availableDepartments.length} departments available
+                    <Building className="mr-1 h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{availableDepartments.length} departments available</span>
                   </span>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -1800,148 +1801,151 @@ const ManagerReports = () => {
                     fetchTeamLeaves();
                     fetchManagerLeaves();
                   }}
-                  className="h-9"
+                  className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   disabled={isLoading || isLoadingLeaves || isLoadingMyLeaves || isLoadingTasks || isLoadingAttendance}
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh All
+                  <RefreshCw className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Refresh All</span>
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => handleDownloadReport("tasks")}
                   disabled={tasks.length === 0}
+                  className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                 >
-                  <DownloadIcon className="mr-2 h-4 w-4" />
-                  Export All
+                  <DownloadIcon className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Export All</span>
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Main Tabs */}
-        <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4" />
-              Task Reports ({taskStats.total})
+        {/* Main Tabs - Responsive */}
+        <Tabs defaultValue="tasks" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+            <TabsTrigger value="tasks" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Tasks ({taskStats.total})</span>
             </TabsTrigger>
-            <TabsTrigger value="attendance" className="flex items-center gap-2">
-              <CalendarCheck className="h-4 w-4" />
-              Attendance Reports ({attendanceStatsMemo.totalDays} days)
+            <TabsTrigger value="attendance" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              <CalendarCheck className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Attendance ({attendanceStatsMemo.totalDays} days)</span>
             </TabsTrigger>
-            <TabsTrigger value="leaves" className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Leave Reports ({leaveStats.total})
+            <TabsTrigger value="leaves" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm">
+              <CalendarDays className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="truncate">Leaves ({leaveStats.total})</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Task Reports Tab */}
-          <TabsContent value="tasks" className="space-y-6">
+          <TabsContent value="tasks" className="space-y-4 sm:space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-4 p-4 sm:p-6">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <ClipboardCheck className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5" />
                     Task Performance Analytics
                   </CardTitle>
-                  <CardDescription>Real task data from your site and assigned tasks</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Real task data from your site and assigned tasks</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={refreshTasks}
                     disabled={isLoadingTasks}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingTasks ? 'animate-spin' : ''}`} />
-                    Refresh
+                    <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0 ${isLoadingTasks ? 'animate-spin' : ''}`} />
+                    <span className="truncate">Refresh</span>
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleDownloadReport("tasks")}
                     disabled={isExporting || tasks.length === 0}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    {isExporting ? "Exporting..." : "Export CSV"}
+                    <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">{isExporting ? "Exporting..." : "Export CSV"}</span>
                   </Button>
-                  <Button size="sm" onClick={() => handleDownloadReport("tasks")} disabled={tasks.length === 0}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Report
+                  <Button size="sm" onClick={() => handleDownloadReport("tasks")} disabled={tasks.length === 0} className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial">
+                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">Download</span>
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Task Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Search Tasks</label>
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+                {/* Task Filters - Responsive Grid with all fields visible */}
+                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Search Tasks</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-2 sm:left-3 top-2 sm:top-3 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                       <Input
                         placeholder="Search tasks..."
                         value={taskSearch}
                         onChange={(e) => setTaskSearch(e.target.value)}
-                        className="pl-9"
+                        className="pl-7 sm:pl-9 h-8 sm:h-10 text-xs sm:text-sm w-full"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Department</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Department</label>
                     <Select value={taskDeptFilter} onValueChange={setTaskDeptFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Departments" />
                       </SelectTrigger>
                       <SelectContent>
                         {["All Departments", ...Array.from(new Set(tasks.map(t => t.department).filter(Boolean) as string[]))].map(dept => (
-                          <SelectItem key={dept} value={dept === "All Departments" ? "all" : dept}>
+                          <SelectItem key={dept} value={dept === "All Departments" ? "all" : dept} className="text-xs sm:text-sm">
                             {dept}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Status</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Status</label>
                     <Select value={taskStatusFilter} onValueChange={setTaskStatusFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Status" />
                       </SelectTrigger>
                       <SelectContent>
                         {taskStatuses.map(status => (
-                          <SelectItem key={status} value={status === "All Status" ? "all" : status}>
+                          <SelectItem key={status} value={status === "All Status" ? "all" : status} className="text-xs sm:text-sm">
                             {status.charAt(0).toUpperCase() + status.slice(1)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Priority</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Priority</label>
                     <Select value={taskPriorityFilter} onValueChange={setTaskPriorityFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Priority" />
                       </SelectTrigger>
                       <SelectContent>
                         {taskPriorities.map(priority => (
-                          <SelectItem key={priority} value={priority === "All Priority" ? "all" : priority}>
+                          <SelectItem key={priority} value={priority === "All Priority" ? "all" : priority} className="text-xs sm:text-sm">
                             {priority.charAt(0).toUpperCase() + priority.slice(1)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Site</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Site</label>
                     <Select value={taskSiteFilter} onValueChange={setTaskSiteFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Sites" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Sites</SelectItem>
+                        <SelectItem value="all" className="text-xs sm:text-sm">All Sites</SelectItem>
                         {sites.map(site => (
-                          <SelectItem key={site._id} value={site.name}>
+                          <SelectItem key={site._id} value={site.name} className="text-xs sm:text-sm">
                             {site.name}
                           </SelectItem>
                         ))}
@@ -1950,22 +1954,22 @@ const ManagerReports = () => {
                   </div>
                 </div>
 
-                {/* Task Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Task Statistics - Responsive Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Task Status Distribution</CardTitle>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Task Status Distribution</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="h-64">
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="h-48 sm:h-56 lg:h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
                               data={taskChartData}
                               cx="50%"
                               cy="50%"
-                              innerRadius={60}
-                              outerRadius={80}
+                              innerRadius={40}
+                              outerRadius={60}
                               paddingAngle={5}
                               dataKey="value"
                             >
@@ -1977,38 +1981,36 @@ const ManagerReports = () => {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 mt-4">
+                      <div className="grid grid-cols-2 gap-1 sm:gap-2 mt-3 sm:mt-4">
                         {taskChartData.map((item) => (
                           <div key={item.name} className="flex items-center justify-between">
-                            <div className="flex items-center">
+                            <div className="flex items-center min-w-0">
                               <div 
-                                className="w-3 h-3 rounded-full mr-2" 
+                                className="w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2 flex-shrink-0" 
                                 style={{ backgroundColor: item.color }}
                               />
-                              <span className="text-sm">{item.name}</span>
+                              <span className="text-xs sm:text-sm truncate">{item.name}</span>
                             </div>
-                            <span className="text-sm font-medium">{item.value}</span>
+                            <span className="text-xs sm:text-sm font-medium ml-1">{item.value}</span>
                           </div>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
 
-               
-
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Department Performance</CardTitle>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Department Performance</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="space-y-3 sm:space-y-4">
                         {departmentTaskData.slice(0, 5).map((dept) => (
                           <div key={dept.department}>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>{dept.department}</span>
-                              <span>{dept.completed}/{dept.total} ({dept.completionRate}%)</span>
+                            <div className="flex justify-between text-xs sm:text-sm mb-1">
+                              <span className="truncate">{dept.department}</span>
+                              <span className="ml-2 flex-shrink-0">{dept.completed}/{dept.total} ({dept.completionRate}%)</span>
                             </div>
-                            <Progress value={parseFloat(dept.completionRate)} className="h-2" />
+                            <Progress value={parseFloat(dept.completionRate)} className="h-1.5 sm:h-2" />
                           </div>
                         ))}
                       </div>
@@ -2016,109 +2018,114 @@ const ManagerReports = () => {
                   </Card>
                 </div>
 
-                {/* Tasks Table */}
+                {/* Tasks Table - Responsive with horizontal scroll */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Task List ({filteredTasks.length})</h3>
+                  <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-3 sm:mb-4">Task List ({filteredTasks.length})</h3>
                   {isLoadingTasks ? (
-                    <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="ml-3 text-muted-foreground">Loading tasks...</p>
+                    <div className="flex items-center justify-center h-48 sm:h-64">
+                      <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+                      <p className="ml-2 sm:ml-3 text-xs sm:text-sm text-muted-foreground">Loading tasks...</p>
                     </div>
                   ) : filteredTasks.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Task</TableHead>
-                          <TableHead>Assignee</TableHead>
-                          <TableHead>Site</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Priority</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Progress</TableHead>
-                          <TableHead>Deadline</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredTasks.slice(0, 10).map((task) => (
-                          <TableRow key={task._id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{task.title}</p>
-                                <p className="text-sm text-gray-500 truncate max-w-xs">
-                                  {task.description}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-gray-400" />
-                                <span>{task.assignee || "Unassigned"}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-gray-400" />
-                                <span>{task.siteName || "Unknown"}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="bg-gray-100">
-                                {task.department || "Unknown"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getTaskPriorityBadge(task.priority)}>
-                                {task.priority}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getTaskStatusBadge(task.status)}>
-                                {task.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Progress value={task.progress} className="w-20" />
-                                <span className="text-sm">{task.progress}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {task.deadline ? formatDate(task.deadline) : "No deadline"}
-                                {task.deadline && new Date(task.deadline) < new Date() && task.status !== 'completed' && (
-                                  <Badge variant="destructive" className="ml-2 text-xs">Overdue</Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => updateTaskStatus(task._id, 'completed')}
-                                  disabled={task.status === 'completed'}
-                                >
-                                  <CheckCircle className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(`/tasks/${task._id}`, '_blank')}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                      <div className="min-w-[1200px] lg:min-w-full">
+                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Task</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Assignee</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Site</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Department</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Priority</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Status</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Progress</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Deadline</TableHead>
+                                <TableHead className="text-right text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredTasks.slice(0, 10).map((task) => (
+                                <TableRow key={task._id}>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div className="max-w-[200px]">
+                                      <p className="font-medium text-xs sm:text-sm truncate">{task.title}</p>
+                                      <p className="text-xs text-gray-500 truncate hidden sm:block">
+                                        {task.description}
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                      <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
+                                      <span className="text-xs sm:text-sm truncate">{task.assignee || "Unassigned"}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
+                                      <span className="text-xs sm:text-sm truncate">{task.siteName || "Unknown"}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge variant="outline" className="bg-gray-100 text-xs whitespace-nowrap">
+                                      {task.department || "Unknown"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge className={`${getTaskPriorityBadge(task.priority)} text-xs whitespace-nowrap`}>
+                                      {task.priority}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge className={`${getTaskStatusBadge(task.status)} text-xs whitespace-nowrap`}>
+                                      {task.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div className="flex items-center gap-1 sm:gap-2">
+                                      <Progress value={task.progress} className="w-12 sm:w-16 h-1.5" />
+                                      <span className="text-xs">{task.progress}%</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div className="text-xs">
+                                      {task.deadline ? formatDate(task.deadline) : "No deadline"}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => updateTaskStatus(task._id, 'completed')}
+                                        disabled={task.status === 'completed'}
+                                        className="h-6 w-6 sm:h-7 sm:w-7 p-0"
+                                      >
+                                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => window.open(`/tasks/${task._id}`, '_blank')}
+                                        className="h-6 w-6 sm:h-7 sm:w-7 p-0"
+                                      >
+                                        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <ClipboardList className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900">No tasks found</h3>
-                      <p className="text-gray-500 mt-2">
+                    <div className="text-center py-8 sm:py-12">
+                      <ClipboardList className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                      <h3 className="text-sm sm:text-base font-medium text-gray-900">No tasks found</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2 px-4">
                         No tasks match your current filters. Try changing your search criteria.
                       </p>
                     </div>
@@ -2128,429 +2135,403 @@ const ManagerReports = () => {
             </Card>
           </TabsContent>
 
-          {/* Attendance Reports Tab */}
-         <TabsContent value="attendance" className="space-y-6">
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-      <div>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarCheck className="h-5 w-5" />
-          Attendance Analytics
-        </CardTitle>
-        <CardDescription>
-          Showing attendance data for {getCurrentMonthName()}
-        </CardDescription>
-      </div>
-      <div className="flex gap-2">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-gray-500" />
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={handleMonthChange}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          />
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={refreshAttendance}
-          disabled={isLoadingAttendance}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingAttendance ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => handleDownloadReport("attendance")}
-          disabled={attendanceRecords.length === 0}
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
-      </div>
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {/* Attendance Statistics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Distribution Card - Full width on mobile, half on large screens */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-sm">Attendance Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={attendanceChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="count"
-                    label={(entry) => `${entry.status}: ${entry.count}`}
-                  >
-                    {attendanceChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value, name) => [`${value} days`, name]}
-                    contentStyle={{ borderRadius: '6px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-                  />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value, entry) => (
-                      <span className="text-xs">
-                        {value}: {attendanceChartData.find(d => d.status === value)?.count || 0}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              {attendanceChartData.map((item) => (
-                <div key={item.status} className="text-center p-2 rounded-lg bg-gray-50">
-                  <div className="flex items-center justify-center mb-2">
-                    <div 
-                      className="w-3 h-3 rounded-full mr-2" 
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm font-medium">{item.status}</span>
-                  </div>
-                  <div className="text-2xl font-bold">{item.count}</div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {attendanceStatsMemo.totalDays > 0 
-                      ? `${Math.round((item.count / attendanceStatsMemo.totalDays) * 100)}%` 
-                      : '0%'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Monthly Summary Card - Full width on mobile, half on large screens */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-sm">Monthly Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {/* Main Stats Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                  <div className="text-xs text-blue-600 font-medium mb-1">Working Days</div>
-                  <div className="text-2xl font-bold text-blue-700">
-                    {attendanceStatsMemo.totalDays - attendanceStatsMemo.absentDays}
-                    <span className="text-sm text-blue-600 ml-1">days</span>
-                  </div>
-                  <div className="text-xs text-blue-500 mt-1">
-                    out of {attendanceStatsMemo.totalDays} total days
-                  </div>
-                </div>
-                
-                <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                  <div className="text-xs text-green-600 font-medium mb-1">Attendance Rate</div>
-                  <div className="text-2xl font-bold text-green-700">
-                    {attendanceStatsMemo.attendanceRate}
-                    <span className="text-sm text-green-600 ml-1">%</span>
-                  </div>
-                  <div className="text-xs text-green-500 mt-1">
-                    {attendanceStatsMemo.presentDays} present days
-                  </div>
-                </div>
-              </div>
-
-              {/* Detailed Stats */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                      <TrendingUpIcon className="h-4 w-4 text-orange-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Total Hours Worked</div>
-                      <div className="text-xs text-gray-500">Monthly total</div>
-                    </div>
-                  </div>
-                  <div className="text-lg font-bold">
-                    {((parseFloat(attendanceStatsMemo.averageHours) * attendanceStatsMemo.presentDays) || 0).toFixed(1)}
-                    <span className="text-sm text-gray-600 ml-1">h</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                      <Clock className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Average Daily Hours</div>
-                      <div className="text-xs text-gray-500">Per working day</div>
-                    </div>
-                  </div>
-                  <div className="text-lg font-bold">
-                    {attendanceStatsMemo.averageHours}
-                    <span className="text-sm text-gray-600 ml-1">h</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Total Overtime</div>
-                      <div className="text-xs text-gray-500">Extra hours worked</div>
-                    </div>
-                  </div>
-                  <div className="text-lg font-bold text-orange-600">
-                    {attendanceStatsMemo.totalOvertime}
-                    <span className="text-sm text-orange-600 ml-1">h</span>
-                  </div>
-                </div>
-
-                {/* Status Breakdown */}
-                <div className="pt-4 border-t">
-                  <div className="text-sm font-medium mb-3">Status Breakdown</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span className="text-sm">Present</span>
-                      </div>
-                      <div className="font-medium">{attendanceStatsMemo.presentDays} days</div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <span className="text-sm">Late</span>
-                      </div>
-                      <div className="font-medium">{attendanceStatsMemo.lateDays} days</div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span className="text-sm">Half Day</span>
-                      </div>
-                      <div className="font-medium">{attendanceStatsMemo.halfDays} days</div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span className="text-sm">Absent</span>
-                      </div>
-                      <div className="font-medium">{attendanceStatsMemo.absentDays} days</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Attendance Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle>Attendance Records</CardTitle>
-              <CardDescription>
-                Showing records for {getCurrentMonthName()} 
-                {attendanceFilter !== "all" && (
-                  <span className="ml-2">
-                    | Filtered: {attendanceFilter.charAt(0).toUpperCase() + attendanceFilter.slice(1)}
-                  </span>
-                )}
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="present">Present Only</SelectItem>
-                  <SelectItem value="absent">Absent Only</SelectItem>
-                  <SelectItem value="late">Late Only</SelectItem>
-                  <SelectItem value="halfday">Half Day Only</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAttendanceFilter("all")}
-                disabled={attendanceFilter === "all"}
-              >
-                Clear Filter
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoadingAttendance ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-3 text-muted-foreground">Loading attendance data...</p>
-            </div>
-          ) : filteredAttendanceRecords.length > 0 ? (
-            <div className="rounded-md border">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px]">Date</TableHead>
-                      <TableHead className="w-[80px]">Day</TableHead>
-                      <TableHead className="w-[120px]">Check In</TableHead>
-                      <TableHead className="w-[120px]">Check Out</TableHead>
-                      <TableHead className="w-[100px]">Status</TableHead>
-                      <TableHead className="w-[100px]">Total Hours</TableHead>
-                      <TableHead className="w-[100px]">Breaks</TableHead>
-                      <TableHead className="w-[100px]">Overtime</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAttendanceRecords.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-gray-50">
-                        <TableCell className="font-medium">
-                          {new Date(record.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                            record.day === 'Sat' || record.day === 'Sun' 
-                              ? 'bg-blue-100 text-blue-600' 
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {record.day}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-mono">{record.checkIn}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-mono">{record.checkOut}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant="outline" 
-                            className={`${getStatusBadge(record.status)} px-3 py-1`}
-                          >
-                            <span className="flex items-center gap-1">
-                              {getStatusIcon(record.status)}
-                              {record.status}
-                            </span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <span>{record.totalHours}h</span>
-                            {parseFloat(record.totalHours) >= 8 && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-center">
-                            <span className="font-medium">{record.breaks}</span>
-                            <div className="text-xs text-muted-foreground">{record.breakDuration}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant="outline" 
-                            className={`px-3 py-1 ${
-                              parseFloat(record.overtime) > 0 
-                                ? "bg-orange-100 text-orange-800 border-orange-200" 
-                                : "bg-gray-100 text-gray-800 border-gray-200"
-                            }`}
-                          >
-                            {record.overtime}h
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="px-4 py-3 border-t bg-gray-50 flex justify-between items-center text-sm text-gray-600">
+          {/* Attendance Reports Tab - Responsive */}
+          <TabsContent value="attendance" className="space-y-4 sm:space-y-6">
+            <Card>
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-4 p-4 sm:p-6">
                 <div>
-                  Showing {Math.min(filteredAttendanceRecords.length, 15)} of {filteredAttendanceRecords.length} records
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Attendance Analytics
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Showing attendance data for {getCurrentMonthName()}
+                  </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownloadReport("attendance")}
-                    disabled={filteredAttendanceRecords.length === 0}
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
+                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={handleMonthChange}
+                      className="px-2 py-1 border border-gray-300 rounded-md text-xs sm:text-sm w-full sm:w-auto"
+                    />
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={refreshAttendance}
+                    disabled={isLoadingAttendance}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export All ({filteredAttendanceRecords.length})
+                    <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0 ${isLoadingAttendance ? 'animate-spin' : ''}`} />
+                    <span className="truncate">Refresh</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDownloadReport("attendance")}
+                    disabled={attendanceRecords.length === 0}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
+                  >
+                    <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">Export CSV</span>
                   </Button>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-                <Calendar className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No attendance records</h3>
-              <p className="text-gray-500 max-w-md mx-auto mb-4">
-                {attendanceFilter !== "all" 
-                  ? `No ${attendanceFilter} records found for ${getCurrentMonthName()}. Try changing the filter.`
-                  : `No attendance records found for ${getCurrentMonthName()}.`
-                }
-              </p>
-              {attendanceFilter !== "all" && (
-                <Button
-                  variant="outline"
-                  onClick={() => setAttendanceFilter("all")}
-                  className="mt-2"
-                >
-                  Show All Records
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </CardContent>
-  </Card>
-</TabsContent>
+              </CardHeader>
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+                {/* Attendance Statistics - Responsive Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  {/* Attendance Distribution Card */}
+                  <Card className="lg:col-span-1">
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Attendance Distribution</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="h-56 sm:h-64 lg:h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={attendanceChartData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={50}
+                              outerRadius={70}
+                              paddingAngle={5}
+                              dataKey="count"
+                              label={(entry) => `${entry.status}: ${entry.count}`}
+                            >
+                              {attendanceChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value, name) => [`${value} days`, name]}
+                              contentStyle={{ borderRadius: '6px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                            />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              height={36}
+                              wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-3 sm:mt-4">
+                        {attendanceChartData.map((item) => (
+                          <div key={item.status} className="text-center p-1 sm:p-2 rounded-lg bg-gray-50">
+                            <div className="flex items-center justify-center mb-1">
+                              <div 
+                                className="w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1" 
+                                style={{ backgroundColor: item.color }}
+                              />
+                              <span className="text-xs sm:text-sm font-medium truncate">{item.status}</span>
+                            </div>
+                            <div className="text-base sm:text-xl lg:text-2xl font-bold">{item.count}</div>
+                            <div className="text-xs text-gray-500 mt-0.5 sm:mt-1">
+                              {attendanceStatsMemo.totalDays > 0 
+                                ? `${Math.round((item.count / attendanceStatsMemo.totalDays) * 100)}%` 
+                                : '0%'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-          {/* Leave Reports Tab */}
-          <TabsContent value="leaves" className="space-y-6">
+                  {/* Monthly Summary Card */}
+                  <Card className="lg:col-span-1">
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Monthly Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="space-y-4 sm:space-y-6">
+                        {/* Main Stats Row */}
+                        <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                          <div className="bg-blue-50 p-2 sm:p-4 rounded-lg border border-blue-100">
+                            <div className="text-xs text-blue-600 font-medium mb-1">Working Days</div>
+                            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-700">
+                              {attendanceStatsMemo.totalDays - attendanceStatsMemo.absentDays}
+                              <span className="text-xs text-blue-600 ml-1">days</span>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-green-50 p-2 sm:p-4 rounded-lg border border-green-100">
+                            <div className="text-xs text-green-600 font-medium mb-1">Attendance Rate</div>
+                            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-700">
+                              {attendanceStatsMemo.attendanceRate}
+                              <span className="text-xs text-green-600 ml-1">%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detailed Stats */}
+                        <div className="space-y-3 sm:space-y-4">
+                          <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                <TrendingUpIcon className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs sm:text-sm font-medium">Total Hours Worked</div>
+                                <div className="text-xs text-gray-500 hidden sm:block">Monthly total</div>
+                              </div>
+                            </div>
+                            <div className="text-sm sm:text-lg font-bold ml-2">
+                              {((parseFloat(attendanceStatsMemo.averageHours) * attendanceStatsMemo.presentDays) || 0).toFixed(1)}
+                              <span className="text-xs text-gray-600 ml-1">h</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                                <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs sm:text-sm font-medium">Average Daily Hours</div>
+                                <div className="text-xs text-gray-500 hidden sm:block">Per working day</div>
+                              </div>
+                            </div>
+                            <div className="text-sm sm:text-lg font-bold ml-2">
+                              {attendanceStatsMemo.averageHours}
+                              <span className="text-xs text-gray-600 ml-1">h</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs sm:text-sm font-medium">Total Overtime</div>
+                                <div className="text-xs text-gray-500 hidden sm:block">Extra hours worked</div>
+                              </div>
+                            </div>
+                            <div className="text-sm sm:text-lg font-bold text-orange-600 ml-2">
+                              {attendanceStatsMemo.totalOvertime}
+                              <span className="text-xs text-orange-600 ml-1">h</span>
+                            </div>
+                          </div>
+
+                          {/* Status Breakdown */}
+                          <div className="pt-3 sm:pt-4 border-t">
+                            <div className="text-xs sm:text-sm font-medium mb-2 sm:mb-3">Status Breakdown</div>
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                  <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-green-500 flex-shrink-0"></div>
+                                  <span className="text-xs sm:text-sm">Present</span>
+                                </div>
+                                <span className="text-xs sm:text-sm font-medium ml-2">{attendanceStatsMemo.presentDays} days</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                  <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-yellow-500 flex-shrink-0"></div>
+                                  <span className="text-xs sm:text-sm">Late</span>
+                                </div>
+                                <span className="text-xs sm:text-sm font-medium ml-2">{attendanceStatsMemo.lateDays} days</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                  <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
+                                  <span className="text-xs sm:text-sm">Half Day</span>
+                                </div>
+                                <span className="text-xs sm:text-sm font-medium ml-2">{attendanceStatsMemo.halfDays} days</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                  <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-red-500 flex-shrink-0"></div>
+                                  <span className="text-xs sm:text-sm">Absent</span>
+                                </div>
+                                <span className="text-xs sm:text-sm font-medium ml-2">{attendanceStatsMemo.absentDays} days</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Attendance Table - Responsive with horizontal scroll */}
+                <Card>
+                  <CardHeader className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+                      <div>
+                        <CardTitle className="text-sm sm:text-base">Attendance Records</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">
+                          Showing records for {getCurrentMonthName()} 
+                          {attendanceFilter !== "all" && (
+                            <span className="ml-1 sm:ml-2">
+                              | Filtered: {attendanceFilter.charAt(0).toUpperCase() + attendanceFilter.slice(1)}
+                            </span>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Select value={attendanceFilter} onValueChange={setAttendanceFilter}>
+                          <SelectTrigger className="w-full sm:w-48 h-8 sm:h-9 text-xs sm:text-sm">
+                            <SelectValue placeholder="Filter by status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs sm:text-sm">All Status</SelectItem>
+                            <SelectItem value="present" className="text-xs sm:text-sm">Present Only</SelectItem>
+                            <SelectItem value="absent" className="text-xs sm:text-sm">Absent Only</SelectItem>
+                            <SelectItem value="late" className="text-xs sm:text-sm">Late Only</SelectItem>
+                            <SelectItem value="halfday" className="text-xs sm:text-sm">Half Day Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAttendanceFilter("all")}
+                          disabled={attendanceFilter === "all"}
+                          className="h-8 sm:h-9 text-xs sm:text-sm flex-shrink-0"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    {isLoadingAttendance ? (
+                      <div className="flex items-center justify-center h-48 sm:h-64">
+                        <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+                        <p className="ml-2 sm:ml-3 text-xs sm:text-sm text-muted-foreground">Loading attendance data...</p>
+                      </div>
+                    ) : filteredAttendanceRecords.length > 0 ? (
+                      <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                        <div className="min-w-[900px] lg:min-w-full">
+                          <div className="overflow-hidden border border-gray-200 rounded-lg">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Date</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Day</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Check In</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Check Out</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Status</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Total Hours</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Breaks</TableHead>
+                                  <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Overtime</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredAttendanceRecords.map((record) => (
+                                  <TableRow key={record.id} className="hover:bg-gray-50">
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <span className="text-xs sm:text-sm">
+                                        {new Date(record.date).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                        })}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-medium ${
+                                        record.day === 'Sat' || record.day === 'Sun' 
+                                          ? 'bg-blue-100 text-blue-600' 
+                                          : 'bg-gray-100 text-gray-600'
+                                      }`}>
+                                        {record.day}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <div className="flex items-center gap-1 sm:gap-2">
+                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                                        <span className="text-xs sm:text-sm font-mono">{record.checkIn}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <div className="flex items-center gap-1 sm:gap-2">
+                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                                        <span className="text-xs sm:text-sm font-mono">{record.checkOut}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`${getStatusBadge(record.status)} px-2 py-0.5 sm:px-3 sm:py-1 text-xs`}
+                                      >
+                                        <span className="flex items-center gap-1">
+                                          {getStatusIcon(record.status)}
+                                          {record.status}
+                                        </span>
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <span className="text-xs sm:text-sm font-medium">{record.totalHours}h</span>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <span className="text-xs sm:text-sm font-medium">{record.breaks}</span>
+                                      <span className="text-xs text-muted-foreground ml-1">({record.breakDuration})</span>
+                                    </TableCell>
+                                    <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`px-2 py-0.5 sm:px-3 sm:py-1 text-xs ${
+                                          parseFloat(record.overtime) > 0 
+                                            ? "bg-orange-100 text-orange-800 border-orange-200" 
+                                            : "bg-gray-100 text-gray-800 border-gray-200"
+                                        }`}
+                                      >
+                                        {record.overtime}h
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 sm:py-12">
+                        <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gray-100 mb-3 sm:mb-4">
+                          <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-1 sm:mb-2">No attendance records</h3>
+                        <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto mb-3 sm:mb-4 px-4">
+                          {attendanceFilter !== "all" 
+                            ? `No ${attendanceFilter} records found for ${getCurrentMonthName()}. Try changing the filter.`
+                            : `No attendance records found for ${getCurrentMonthName()}.`
+                          }
+                        </p>
+                        {attendanceFilter !== "all" && (
+                          <Button
+                            variant="outline"
+                            onClick={() => setAttendanceFilter("all")}
+                            className="mt-2 text-xs sm:text-sm h-8 sm:h-9"
+                          >
+                            Show All Records
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Leave Reports Tab - Responsive */}
+          <TabsContent value="leaves" className="space-y-4 sm:space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-4 p-4 sm:p-6">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarDays className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" />
                     Leave Management Analytics
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">
                     Manage and track leave requests for your department
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -2559,111 +2540,114 @@ const ManagerReports = () => {
                       fetchManagerLeaves();
                     }}
                     disabled={isLoadingLeaves || isLoadingMyLeaves}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${(isLoadingLeaves || isLoadingMyLeaves) ? 'animate-spin' : ''}`} />
-                    Refresh
+                    <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0 ${(isLoadingLeaves || isLoadingMyLeaves) ? 'animate-spin' : ''}`} />
+                    <span className="truncate">Refresh</span>
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleDownloadReport("leaves")}
                     disabled={leaveRequests.length === 0 && myLeaves.length === 0}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Export CSV
+                    <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">Export CSV</span>
                   </Button>
                   <Button 
                     size="sm" 
                     onClick={() => handleDownloadReport("leaves")}
                     disabled={leaveRequests.length === 0 && myLeaves.length === 0}
+                    className="h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
                   >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Report
+                    <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">Download</span>
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Leave Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Department</label>
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
+                {/* Leave Filters - Responsive with all fields visible */}
+                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Department</label>
                     <Select value={leaveDeptFilter} onValueChange={setLeaveDeptFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Departments" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Departments</SelectItem>
+                        <SelectItem value="all" className="text-xs sm:text-sm">All Departments</SelectItem>
                         {Array.from(new Set([...leaveRequests, ...myLeaves].map(l => l.department))).map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                          <SelectItem key={dept} value={dept} className="text-xs sm:text-sm">{dept}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Status</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Status</label>
                     <Select value={leaveStatusFilter} onValueChange={setLeaveStatusFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Status" />
                       </SelectTrigger>
                       <SelectContent>
                         {leaveStatuses.map(status => (
-                          <SelectItem key={status} value={status === "All Status" ? "all" : status}>
+                          <SelectItem key={status} value={status === "All Status" ? "all" : status} className="text-xs sm:text-sm">
                             {status.charAt(0).toUpperCase() + status.slice(1)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Leave Type</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">Leave Type</label>
                     <Select value={leaveTypeFilter} onValueChange={setLeaveTypeFilter}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Types" />
                       </SelectTrigger>
                       <SelectContent>
                         {leaveTypes.map(type => (
-                          <SelectItem key={type} value={type === "All Types" ? "all" : type}>
+                          <SelectItem key={type} value={type === "All Types" ? "all" : type} className="text-xs sm:text-sm">
                             {type}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">View</label>
+                  <div className="space-y-1 sm:space-y-2">
+                    <label className="text-xs sm:text-sm font-medium">View</label>
                     <Select defaultValue="all" onValueChange={(value) => {
                       if (value === 'team') {
                         setLeaveDeptFilter(managerDepartment);
                       }
                     }}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm w-full">
                         <SelectValue placeholder="All Leaves" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Leaves</SelectItem>
-                        <SelectItem value="team">Team Leaves Only</SelectItem>
-                        <SelectItem value="personal">My Leaves Only</SelectItem>
+                        <SelectItem value="all" className="text-xs sm:text-sm">All Leaves</SelectItem>
+                        <SelectItem value="team" className="text-xs sm:text-sm">Team Leaves Only</SelectItem>
+                        <SelectItem value="personal" className="text-xs sm:text-sm">My Leaves Only</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
-                {/* Leave Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Leave Statistics - Responsive */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Leave Status Distribution</CardTitle>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Leave Status Distribution</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="h-64">
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="h-48 sm:h-56 lg:h-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
                               data={leaveChartData}
                               cx="50%"
                               cy="50%"
-                              innerRadius={60}
-                              outerRadius={80}
+                              innerRadius={50}
+                              outerRadius={70}
                               paddingAngle={5}
                               dataKey="count"
                             >
@@ -2675,17 +2659,17 @@ const ManagerReports = () => {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 mt-4">
+                      <div className="grid grid-cols-2 gap-1 sm:gap-2 mt-3 sm:mt-4">
                         {leaveChartData.map((item) => (
                           <div key={item.status} className="flex items-center justify-between">
-                            <div className="flex items-center">
+                            <div className="flex items-center min-w-0">
                               <div 
-                                className="w-3 h-3 rounded-full mr-2" 
+                                className="w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2 flex-shrink-0" 
                                 style={{ backgroundColor: item.color }}
                               />
-                              <span className="text-sm">{item.status}</span>
+                              <span className="text-xs sm:text-sm truncate">{item.status}</span>
                             </div>
-                            <span className="text-sm font-medium">{item.count}</span>
+                            <span className="text-xs sm:text-sm font-medium ml-1">{item.count}</span>
                           </div>
                         ))}
                       </div>
@@ -2693,32 +2677,32 @@ const ManagerReports = () => {
                   </Card>
 
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Leave Summary</CardTitle>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Leave Summary</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="space-y-3 sm:space-y-4">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Total Leaves</span>
-                          <span className="font-medium">{leaveStats.total}</span>
+                          <span className="text-xs sm:text-sm text-gray-600">Total Leaves</span>
+                          <span className="text-xs sm:text-sm font-medium">{leaveStats.total}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Approval Rate</span>
-                          <Badge className="bg-green-100 text-green-800">
+                          <span className="text-xs sm:text-sm text-gray-600">Approval Rate</span>
+                          <Badge className="bg-green-100 text-green-800 text-xs">
                             {leaveStats.approvalRate}%
                           </Badge>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Total Leave Days</span>
-                          <span className="font-medium">{leaveStats.totalDays} days</span>
+                          <span className="text-xs sm:text-sm text-gray-600">Total Leave Days</span>
+                          <span className="text-xs sm:text-sm font-medium">{leaveStats.totalDays} days</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Pending Requests</span>
-                          <span className="font-medium text-yellow-600">{leaveStats.pending}</span>
+                          <span className="text-xs sm:text-sm text-gray-600">Pending Requests</span>
+                          <span className="text-xs sm:text-sm font-medium text-yellow-600">{leaveStats.pending}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Team vs Personal</span>
-                          <span className="font-medium">
+                          <span className="text-xs sm:text-sm text-gray-600">Team vs Personal</span>
+                          <span className="text-xs sm:text-sm font-medium">
                             {leaveStats.teamLeaves}/{leaveStats.myLeaves}
                           </span>
                         </div>
@@ -2727,11 +2711,11 @@ const ManagerReports = () => {
                   </Card>
 
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Leave Types</CardTitle>
+                    <CardHeader className="p-3 sm:p-4">
+                      <CardTitle className="text-xs sm:text-sm">Leave Types</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
+                    <CardContent className="p-3 sm:p-4 pt-0">
+                      <div className="space-y-3 sm:space-y-4">
                         {Array.from(
                           new Map(
                             [...leaveRequests, ...myLeaves]
@@ -2743,8 +2727,8 @@ const ManagerReports = () => {
                           )
                         ).slice(0, 5).map(([type, count]) => (
                           <div key={type} className="flex justify-between items-center">
-                            <span className="text-sm">{type}</span>
-                            <Badge variant="outline">{count}</Badge>
+                            <span className="text-xs sm:text-sm truncate">{type}</span>
+                            <Badge variant="outline" className="text-xs ml-2">{count}</Badge>
                           </div>
                         ))}
                       </div>
@@ -2752,81 +2736,87 @@ const ManagerReports = () => {
                   </Card>
                 </div>
 
-                {/* Leaves Table */}
+                {/* Leaves Table - Responsive with horizontal scroll */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Leave Requests ({filteredLeaves.length})</h3>
+                  <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-3 sm:mb-4">Leave Requests ({filteredLeaves.length})</h3>
                   
                   {(isLoadingLeaves || isLoadingMyLeaves) ? (
-                    <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="ml-3 text-muted-foreground">Loading leave requests...</p>
+                    <div className="flex items-center justify-center h-48 sm:h-64">
+                      <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-primary" />
+                      <p className="ml-2 sm:ml-3 text-xs sm:text-sm text-muted-foreground">Loading leave requests...</p>
                     </div>
                   ) : filteredLeaves.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Leave Type</TableHead>
-                          <TableHead>Period</TableHead>
-                          <TableHead>Days</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Applied On</TableHead>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Type</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredLeaves.slice(0, 10).map((leave) => (
-                          <TableRow key={leave._id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{leave.employeeName}</p>
-                                <p className="text-sm text-gray-500">{leave.employeeId}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{leave.department}</Badge>
-                            </TableCell>
-                            <TableCell>{leave.leaveType}</TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div>{formatDate(leave.fromDate)}</div>
-                                <div className="text-gray-500">to {formatDate(leave.toDate)}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{leave.totalDays} days</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={getLeaveStatusBadgeVariant(leave.status)}>
-                                {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {formatDate(leave.createdAt)}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {leave.contactNumber || "N/A"}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={leave.isManagerLeave ? "default" : "secondary"}>
-                                {leave.isManagerLeave ? "Personal" : "Team"}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                      <div className="min-w-[1100px] lg:min-w-full">
+                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Employee</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Department</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Leave Type</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Period</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Days</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Status</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Applied On</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Contact</TableHead>
+                                <TableHead className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-4">Type</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredLeaves.slice(0, 10).map((leave) => (
+                                <TableRow key={leave._id}>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div>
+                                      <p className="font-medium text-xs sm:text-sm truncate">{leave.employeeName}</p>
+                                      <p className="text-xs text-gray-500 truncate">{leave.employeeId}</p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                      {leave.department}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <span className="text-xs sm:text-sm">{leave.leaveType}</span>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <div className="text-xs">
+                                      <div>{formatDate(leave.fromDate)}</div>
+                                      <div className="text-gray-500">to {formatDate(leave.toDate)}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge variant="outline" className="text-xs whitespace-nowrap">{leave.totalDays} days</Badge>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge variant={getLeaveStatusBadgeVariant(leave.status)} className="text-xs whitespace-nowrap">
+                                      {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <span className="text-xs">{formatDate(leave.createdAt)}</span>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <span className="text-xs">{leave.contactNumber || "N/A"}</span>
+                                  </TableCell>
+                                  <TableCell className="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                    <Badge variant={leave.isManagerLeave ? "default" : "secondary"} className="text-xs whitespace-nowrap">
+                                      {leave.isManagerLeave ? "Personal" : "Team"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900">No leave requests</h3>
-                      <p className="text-gray-500 mt-2">
+                    <div className="text-center py-8 sm:py-12">
+                      <Calendar className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                      <h3 className="text-sm sm:text-base font-medium text-gray-900">No leave requests</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2 px-4">
                         No leave requests found for the selected filters.
                       </p>
                     </div>

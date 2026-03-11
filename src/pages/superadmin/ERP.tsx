@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
+import { DashboardSidebar } from "@/components/shared/DashboardSidebar";
 import {
   Card,
   CardHeader,
@@ -116,6 +118,9 @@ type InventoryItem = FrontendInventoryItem;
 type Machine = FrontendMachine;
 
 const InventoryPage = () => {
+  // State for mobile sidebar
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  
   // State
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -196,6 +201,16 @@ const InventoryPage = () => {
     cost: 0,
     performedBy: "",
   });
+
+  // Handler for menu button click
+  const handleMenuClick = () => {
+    setMobileSidebarOpen(!mobileSidebarOpen);
+  };
+
+  // Close sidebar when clicking outside or on navigation
+  const handleMobileClose = () => {
+    setMobileSidebarOpen(false);
+  };
 
   // Data
   const departments: Department[] = [
@@ -842,54 +857,45 @@ const InventoryPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Inventory Management</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage inventory, machinery, and equipment across sites</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search inventory, machines..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64 rounded-full border-gray-300 bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Bell className="h-5 w-5 text-gray-600" />
-              </button>
-              <button className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Sun className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Header with hamburger menu */}
+      <DashboardHeader 
+        title={
+          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Inventory Management
+          </span>
+        }
+        subtitle="Manage inventory, machinery, and equipment across sites"
+        onMenuClick={handleMenuClick}
+      />
 
-      <div className="p-6 space-y-6">
-        {/* Stats Cards - Animated like CRM */}
-        <div className="grid gap-6 md:grid-cols-4">
+      {/* Mobile Sidebar - Only shown when open */}
+      {mobileSidebarOpen && (
+        <DashboardSidebar 
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={handleMobileClose}
+        />
+      )}
+
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Stats Cards - Responsive Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            className="w-full"
           >
-            <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-white to-blue-50 hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
+            <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl bg-gradient-to-br from-white to-blue-50 hover:shadow-xl transition-shadow duration-300">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <Package className="h-6 w-6 text-blue-600" />
+                  <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Package className="h-4 w-4 md:h-6 md:w-6 text-blue-600" />
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Total Items</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {loading.stats ? <Loader2 className="h-7 w-7 animate-spin text-blue-500" /> : stats.totalItems}
+                    <p className="text-[10px] md:text-sm font-medium text-gray-500 mb-0.5 md:mb-1">Total Items</p>
+                    <p className="text-lg md:text-3xl font-bold text-gray-900">
+                      {loading.stats ? <Loader2 className="h-5 w-5 md:h-7 md:w-7 animate-spin text-blue-500" /> : stats.totalItems}
                     </p>
                   </div>
                 </div>
@@ -902,17 +908,18 @@ const InventoryPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            className="w-full"
           >
-            <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-white to-amber-50 hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
+            <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl bg-gradient-to-br from-white to-amber-50 hover:shadow-xl transition-shadow duration-300">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                    <AlertTriangle className="h-6 w-6 text-amber-600" />
+                  <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                    <AlertTriangle className="h-4 w-4 md:h-6 md:w-6 text-amber-600" />
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Low Stock</p>
-                    <p className="text-3xl font-bold text-amber-600">
-                      {loading.stats ? <Loader2 className="h-7 w-7 animate-spin text-amber-500" /> : stats.lowStockItems}
+                    <p className="text-[10px] md:text-sm font-medium text-gray-500 mb-0.5 md:mb-1">Low Stock</p>
+                    <p className="text-lg md:text-3xl font-bold text-amber-600">
+                      {loading.stats ? <Loader2 className="h-5 w-5 md:h-7 md:w-7 animate-spin text-amber-500" /> : stats.lowStockItems}
                     </p>
                   </div>
                 </div>
@@ -925,17 +932,18 @@ const InventoryPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            className="w-full"
           >
-            <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-white to-green-50 hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
+            <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl bg-gradient-to-br from-white to-green-50 hover:shadow-xl transition-shadow duration-300">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-green-600" />
+                  <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                    <DollarSign className="h-4 w-4 md:h-6 md:w-6 text-green-600" />
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Total Value</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {loading.stats ? <Loader2 className="h-7 w-7 animate-spin text-green-500" /> : formatCurrency(stats.totalValue)}
+                    <p className="text-[10px] md:text-sm font-medium text-gray-500 mb-0.5 md:mb-1">Total Value</p>
+                    <p className="text-xs md:text-3xl font-bold text-gray-900 truncate max-w-[80px] md:max-w-none">
+                      {loading.stats ? <Loader2 className="h-5 w-5 md:h-7 md:w-7 animate-spin text-green-500" /> : formatCurrency(stats.totalValue)}
                     </p>
                   </div>
                 </div>
@@ -948,17 +956,18 @@ const InventoryPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            className="w-full"
           >
-            <Card className="border-0 shadow-lg rounded-2xl bg-gradient-to-br from-white to-purple-50 hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
+            <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl bg-gradient-to-br from-white to-purple-50 hover:shadow-xl transition-shadow duration-300">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-                    <Cpu className="h-6 w-6 text-purple-600" />
+                  <div className="w-8 h-8 md:w-12 md:h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <Cpu className="h-4 w-4 md:h-6 md:w-6 text-purple-600" />
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-500 mb-1">Machines</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {loading.stats ? <Loader2 className="h-7 w-7 animate-spin text-purple-500" /> : machineStatsDisplay.totalMachines}
+                    <p className="text-[10px] md:text-sm font-medium text-gray-500 mb-0.5 md:mb-1">Machines</p>
+                    <p className="text-lg md:text-3xl font-bold text-gray-900">
+                      {loading.stats ? <Loader2 className="h-5 w-5 md:h-7 md:w-7 animate-spin text-purple-500" /> : machineStatsDisplay.totalMachines}
                     </p>
                   </div>
                 </div>
@@ -967,16 +976,16 @@ const InventoryPage = () => {
           </motion.div>
         </div>
 
-        {/* Tabs Section */}
+        {/* Tabs Section - Scrollable on Mobile */}
         <div className="space-y-6">
-          <div className="border-b border-gray-200">
+          <div className="border-b border-gray-200 overflow-x-auto pb-px">
             <Tabs defaultValue="inventory" className="w-full" onValueChange={setActiveTab}>
-              <TabsList className="inline-flex h-12 items-center justify-start rounded-lg bg-transparent p-0">
+              <TabsList className="inline-flex h-10 md:h-12 items-center justify-start rounded-lg bg-transparent p-0 min-w-max">
                 <TabsTrigger 
                   value="inventory" 
-                  className="relative px-6 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all"
+                  className="relative px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all whitespace-nowrap"
                 >
-                  <Package className="mr-2 h-4 w-4" />
+                  <Package className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   Inventory ({items.length})
                   {activeTab === "inventory" && (
                     <motion.div
@@ -989,9 +998,9 @@ const InventoryPage = () => {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="low-stock" 
-                  className="relative px-6 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all"
+                  className="relative px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all whitespace-nowrap"
                 >
-                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  <AlertTriangle className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   Low Stock ({stats.lowStockItems})
                   {activeTab === "low-stock" && (
                     <motion.div
@@ -1004,9 +1013,9 @@ const InventoryPage = () => {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="machines" 
-                  className="relative px-6 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all"
+                  className="relative px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all whitespace-nowrap"
                 >
-                  <Cpu className="mr-2 h-4 w-4" />
+                  <Cpu className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   Machines ({machines.length})
                   {activeTab === "machines" && (
                     <motion.div
@@ -1019,9 +1028,9 @@ const InventoryPage = () => {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="categories" 
-                  className="relative px-6 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all"
+                  className="relative px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm font-medium text-gray-600 hover:text-gray-900 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 transition-all whitespace-nowrap"
                 >
-                  <Tag className="mr-2 h-4 w-4" />
+                  <Tag className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   Categories
                   {activeTab === "categories" && (
                     <motion.div
@@ -1046,60 +1055,60 @@ const InventoryPage = () => {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-white border-b border-gray-200 px-6 py-4">
-                    <div className="flex items-center justify-between">
+                <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl overflow-hidden">
+                  <CardHeader className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <CardTitle className="text-xl font-bold text-gray-900">Inventory Items</CardTitle>
-                        <p className="text-sm text-gray-500 mt-1">Manage all inventory items across departments</p>
+                        <CardTitle className="text-base md:text-xl font-bold text-gray-900">Inventory Items</CardTitle>
+                        <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Manage all inventory items across departments</p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button 
                           variant="outline"
                           onClick={() => setImportDialogOpen(true)}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Import Items
+                          <Upload className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden xs:inline">Import</span>
                         </Button>
                         <Button 
                           variant="outline"
                           onClick={refreshData}
                           disabled={refreshing}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                          Refresh
+                          <RefreshCw className={`mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                          <span className="hidden xs:inline">Refresh</span>
                         </Button>
                         <Button 
                           onClick={() => {
                             setEditItem(null);
                             setItemDialogOpen(true);
                           }}
-                          className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm hover:shadow"
+                          className="bg-blue-600 hover:bg-blue-700 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Item
+                          <Plus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden xs:inline">Add</span>
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
-                    {/* Filters */}
-                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Filters - Stack on Mobile */}
+                    <div className="px-3 md:px-6 py-3 md:py-4 border-b border-gray-100 bg-gray-50/50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-gray-400" />
                           <Input
                             placeholder="Search items..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            className="pl-7 md:pl-10 h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                           />
                         </div>
                         
                         <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                          <SelectTrigger className="rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                          <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             <SelectValue placeholder="All Departments" />
                           </SelectTrigger>
                           <SelectContent className="rounded-lg">
@@ -1109,8 +1118,8 @@ const InventoryPage = () => {
                               return (
                                 <SelectItem key={dept.value} value={dept.value} className="rounded-md">
                                   <div className="flex items-center gap-2">
-                                    <Icon className="h-4 w-4 text-blue-500" />
-                                    {dept.label}
+                                    <Icon className="h-3 w-3 md:h-4 md:w-4 text-blue-500" />
+                                    <span className="text-xs md:text-sm">{dept.label}</span>
                                   </div>
                                 </SelectItem>
                               );
@@ -1123,63 +1132,63 @@ const InventoryPage = () => {
                           onValueChange={setSelectedCategory}
                           disabled={selectedDepartment === "all"}
                         >
-                          <SelectTrigger className="rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                          <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             <SelectValue placeholder="All Categories" />
                           </SelectTrigger>
                           <SelectContent className="rounded-lg">
                             <SelectItem value="all">All Categories</SelectItem>
                             {selectedDepartment !== "all" && 
                               getCategoriesForDepartment(selectedDepartment).map(cat => (
-                                <SelectItem key={cat} value={cat} className="rounded-md">{cat}</SelectItem>
+                                <SelectItem key={cat} value={cat} className="rounded-md text-xs md:text-sm">{cat}</SelectItem>
                               ))
                             }
                           </SelectContent>
                         </Select>
                         
                         <Select value={selectedSite} onValueChange={setSelectedSite}>
-                          <SelectTrigger className="rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                          <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             <SelectValue placeholder="All Sites" />
                           </SelectTrigger>
                           <SelectContent className="rounded-lg">
                             <SelectItem value="all">All Sites</SelectItem>
                             {sites.map(site => (
-                              <SelectItem key={site.id} value={site.id} className="rounded-md">{site.name}</SelectItem>
+                              <SelectItem key={site.id} value={site.id} className="rounded-md text-xs md:text-sm">{site.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
 
-                    {/* Table */}
+                    {/* Table - Horizontal Scroll on Mobile */}
                     {loading.items ? (
-                      <div className="flex justify-center items-center py-12">
+                      <div className="flex justify-center items-center py-8 md:py-12">
                         <div className="text-center">
-                          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
-                          <p className="text-gray-500 mt-3">Loading inventory items...</p>
+                          <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mx-auto text-blue-500" />
+                          <p className="text-xs md:text-sm text-gray-500 mt-2">Loading inventory items...</p>
                         </div>
                       </div>
                     ) : filteredItems.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                          <Package className="h-8 w-8 text-gray-400" />
+                      <div className="text-center py-8 md:py-12 px-4">
+                        <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3 md:mb-4">
+                          <Package className="h-6 w-6 md:h-8 md:w-8 text-gray-400" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">No items found</h3>
-                        <p className="text-gray-500 mt-2">
+                        <h3 className="text-sm md:text-lg font-semibold text-gray-900">No items found</h3>
+                        <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">
                           Add your first item or import from CSV to get started
                         </p>
                       </div>
                     ) : (
-                      <div className="overflow-hidden">
+                      <div className="overflow-x-auto">
                         <Table>
                           <TableHeader className="bg-gray-50">
                             <TableRow className="hover:bg-gray-50">
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Item</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">SKU</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Department</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Quantity</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Value</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Item</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">SKU</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell">Department</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Quantity</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Value</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1192,64 +1201,64 @@ const InventoryPage = () => {
                                   key={item.id} 
                                   className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                                 >
-                                  <TableCell className="py-4 px-6">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6">
                                     <div className="flex items-center">
-                                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                                        <span className="text-blue-600 font-semibold">{item.name.charAt(0)}</span>
+                                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex items-center justify-center mr-2 md:mr-3">
+                                        <span className="text-blue-600 font-semibold text-xs md:text-sm">{item.name.charAt(0)}</span>
                                       </div>
-                                      <div>
-                                        <div className="font-medium text-gray-900">{item.name}</div>
-                                        <div className="text-sm text-gray-500">{item.supplier}</div>
+                                      <div className="min-w-0">
+                                        <div className="font-medium text-gray-900 text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{item.name}</div>
+                                        <div className="text-xs text-gray-500 truncate max-w-[80px] md:max-w-none">{item.supplier}</div>
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <div className="font-mono text-sm text-blue-600">{item.sku}</div>
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6">
+                                    <div className="font-mono text-xs md:text-sm text-blue-600">{item.sku}</div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <Badge variant="outline" className="flex items-center gap-1 w-fit border-gray-300 bg-gray-50 text-gray-700">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden md:table-cell">
+                                    <Badge variant="outline" className="flex items-center gap-1 w-fit border-gray-300 bg-gray-50 text-gray-700 text-xs">
                                       <DeptIcon className="h-3 w-3" />
                                       {departments.find(d => d.value === item.department)?.label}
                                     </Badge>
                                     <div className="text-xs text-gray-500 mt-1">{item.category}</div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <div className="flex items-center gap-2">
-                                      <span className={`font-medium ${isLowStock ? 'text-amber-600' : 'text-blue-600'}`}>
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6">
+                                    <div className="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-2">
+                                      <span className={`font-medium text-xs md:text-sm ${isLowStock ? 'text-amber-600' : 'text-blue-600'}`}>
                                         {item.quantity}
                                       </span>
-                                      <div className="text-xs text-gray-500">
+                                      <div className="text-[10px] md:text-xs text-gray-500">
                                         Reorder: {item.reorderLevel}
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <div className="font-medium text-blue-600">{formatCurrency(item.price)}</div>
-                                    <div className="text-xs text-gray-500">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden sm:table-cell">
+                                    <div className="font-medium text-blue-600 text-xs md:text-sm">{formatCurrency(item.price)}</div>
+                                    <div className="text-[10px] md:text-xs text-gray-500">
                                       Cost: {formatCurrency(item.costPrice)}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6">
                                     {isLowStock ? (
-                                      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-                                        Low Stock
+                                      <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] md:text-xs px-1.5 md:px-2 py-0.5">
+                                        Low
                                       </Badge>
                                     ) : (
-                                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                                      <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px] md:text-xs px-1.5 md:px-2 py-0.5">
                                         In Stock
                                       </Badge>
                                     )}
                                   </TableCell>
-                                  <TableCell className="py-4 px-6 text-right">
-                                    <div className="flex items-center justify-end gap-2">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 text-right">
+                                    <div className="flex items-center justify-end gap-1 md:gap-2">
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => openEditDialog(item)}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                         title="Edit"
                                       >
-                                        <Edit className="h-4 w-4" />
+                                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                       
                                       <Dialog>
@@ -1257,58 +1266,58 @@ const InventoryPage = () => {
                                           <Button 
                                             variant="ghost" 
                                             size="sm"
-                                            className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                            className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                             title="View Details"
                                           >
-                                            <Eye className="h-4 w-4" />
+                                            <Eye className="h-3 w-3 md:h-4 md:w-4" />
                                           </Button>
                                         </DialogTrigger>
-                                        <DialogContent className="max-w-2xl border-gray-200 rounded-2xl">
+                                        <DialogContent className="max-w-sm md:max-w-2xl bg-white rounded-xl md:rounded-2xl">
                                           <DialogHeader>
-                                            <DialogTitle className="text-lg font-semibold text-gray-900">Item Details</DialogTitle>
+                                            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">Item Details</DialogTitle>
                                           </DialogHeader>
-                                          <div className="space-y-6">
-                                            <div className="flex items-center gap-4">
-                                              <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
-                                                <span className="text-blue-600 font-bold text-xl">{item.name.charAt(0)}</span>
+                                          <div className="space-y-4 md:space-y-6">
+                                            <div className="flex items-center gap-3 md:gap-4">
+                                              <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-blue-100 flex items-center justify-center">
+                                                <span className="text-blue-600 font-bold text-sm md:text-xl">{item.name.charAt(0)}</span>
                                               </div>
-                                              <div>
-                                                <h3 className="text-xl font-bold text-gray-900">{item.name}</h3>
-                                                <p className="text-gray-500">{item.sku}</p>
+                                              <div className="min-w-0">
+                                                <h3 className="text-base md:text-xl font-bold text-gray-900 truncate">{item.name}</h3>
+                                                <p className="text-xs md:text-sm text-gray-500">{item.sku}</p>
                                               </div>
                                             </div>
                                             
-                                            <div className="grid grid-cols-2 gap-6">
-                                              <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                              <div className="space-y-3 md:space-y-4">
                                                 <div>
-                                                  <Label className="text-xs text-gray-500 uppercase font-medium">Department</Label>
-                                                  <div className="flex items-center gap-2 text-gray-900">
-                                                    <DeptIcon className="h-4 w-4 text-gray-400" />
+                                                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Department</Label>
+                                                  <div className="flex items-center gap-2 text-xs md:text-sm text-gray-900">
+                                                    <DeptIcon className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
                                                     {departments.find(d => d.value === item.department)?.label}
                                                   </div>
                                                 </div>
                                                 <div>
-                                                  <Label className="text-xs text-gray-500 uppercase font-medium">Category</Label>
-                                                  <p className="text-gray-900">{item.category}</p>
+                                                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Category</Label>
+                                                  <p className="text-xs md:text-sm text-gray-900">{item.category}</p>
                                                 </div>
                                                 <div>
-                                                  <Label className="text-xs text-gray-500 uppercase font-medium">Manager</Label>
-                                                  <p className="text-gray-900">{item.assignedManager}</p>
+                                                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Manager</Label>
+                                                  <p className="text-xs md:text-sm text-gray-900">{item.assignedManager}</p>
                                                 </div>
                                               </div>
-                                              <div className="space-y-4">
+                                              <div className="space-y-3 md:space-y-4">
                                                 <div>
-                                                  <Label className="text-xs text-gray-500 uppercase font-medium">Quantity</Label>
-                                                  <p className="text-lg font-bold text-blue-600">{item.quantity}</p>
+                                                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Quantity</Label>
+                                                  <p className="text-base md:text-lg font-bold text-blue-600">{item.quantity}</p>
                                                 </div>
                                                 <div>
-                                                  <Label className="text-xs text-gray-500 uppercase font-medium">Price</Label>
-                                                  <p className="text-lg font-bold text-green-600">{formatCurrency(item.price)}</p>
+                                                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Price</Label>
+                                                  <p className="text-base md:text-lg font-bold text-green-600">{formatCurrency(item.price)}</p>
                                                 </div>
                                                 <div>
-                                                  <Label className="text-xs text-gray-500 uppercase font-medium">Status</Label>
+                                                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Status</Label>
                                                   <Badge 
-                                                    className={`px-3 py-1 rounded-full ${
+                                                    className={`px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs ${
                                                       isLowStock
                                                         ? 'bg-amber-100 text-amber-800 border-amber-200'
                                                         : 'bg-green-100 text-green-800 border-green-200'
@@ -1322,14 +1331,14 @@ const InventoryPage = () => {
                                             
                                             {item.description && (
                                               <div>
-                                                <Label className="text-xs text-gray-500 uppercase font-medium">Description</Label>
-                                                <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                                  <p className="text-gray-900">{item.description}</p>
+                                                <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Description</Label>
+                                                <div className="mt-1 md:mt-2 p-2 md:p-3 bg-gray-50 rounded-lg">
+                                                  <p className="text-xs md:text-sm text-gray-900">{item.description}</p>
                                                 </div>
                                               </div>
                                             )}
                                             
-                                            <div className="flex items-center justify-between text-sm text-gray-500 pt-4 border-t">
+                                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between text-[10px] md:text-sm text-gray-500 pt-3 md:pt-4 border-t gap-1 md:gap-0">
                                               <span>Supplier: {item.supplier}</span>
                                               <span>Reorder Level: {item.reorderLevel}</span>
                                             </div>
@@ -1341,20 +1350,20 @@ const InventoryPage = () => {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => setChangeHistoryDialogOpen(item.id)}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                         title="History"
                                       >
-                                        <History className="h-4 w-4" />
+                                        <History className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                       
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleDeleteItem(item.id)}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-red-100 hover:text-red-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-red-100 hover:text-red-600"
                                         title="Delete"
                                       >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                     </div>
                                   </TableCell>
@@ -1381,46 +1390,46 @@ const InventoryPage = () => {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-white border-b border-gray-200 px-6 py-4">
-                    <div className="flex items-center justify-between">
+                <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl overflow-hidden">
+                  <CardHeader className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <CardTitle className="text-xl font-bold text-gray-900">Low Stock Items</CardTitle>
-                        <p className="text-sm text-gray-500 mt-1">Items that need immediate reordering</p>
+                        <CardTitle className="text-base md:text-xl font-bold text-gray-900">Low Stock Items</CardTitle>
+                        <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Items that need immediate reordering</p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <Button 
                           variant="outline"
                           onClick={handleExport}
                           disabled={stats.lowStockItems === 0}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <Download className="mr-2 h-4 w-4" />
-                          Export Report
+                          <Download className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden xs:inline">Export</span>
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     {stats.lowStockItems === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                          <AlertTriangle className="h-8 w-8 text-green-600" />
+                      <div className="text-center py-8 md:py-12 px-4">
+                        <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-green-100 rounded-full flex items-center justify-center mb-3 md:mb-4">
+                          <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">All items are in stock!</h3>
-                        <p className="text-gray-500 mt-2">No items need reordering at this time.</p>
+                        <h3 className="text-sm md:text-lg font-semibold text-gray-900">All items are in stock!</h3>
+                        <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">No items need reordering at this time.</p>
                       </div>
                     ) : (
-                      <div className="overflow-hidden">
+                      <div className="overflow-x-auto">
                         <Table>
                           <TableHeader className="bg-amber-50">
                             <TableRow className="hover:bg-amber-50">
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Item</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Current Stock</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Reorder Level</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Deficit</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Urgency</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Item</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Current Stock</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell">Reorder Level</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Deficit</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Urgency</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1435,29 +1444,29 @@ const InventoryPage = () => {
                                     key={item.id} 
                                     className={`hover:bg-amber-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}`}
                                   >
-                                    <TableCell className="py-4 px-6">
+                                    <TableCell className="py-2 md:py-4 px-3 md:px-6">
                                       <div className="flex items-center">
-                                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mr-3">
-                                          <span className="text-amber-600 font-semibold">{item.name.charAt(0)}</span>
+                                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-amber-100 flex items-center justify-center mr-2 md:mr-3">
+                                          <span className="text-amber-600 font-semibold text-xs md:text-sm">{item.name.charAt(0)}</span>
                                         </div>
-                                        <div>
-                                          <div className="font-medium text-gray-900">{item.name}</div>
-                                          <div className="text-sm text-gray-500">{item.sku}</div>
+                                        <div className="min-w-0">
+                                          <div className="font-medium text-gray-900 text-xs md:text-sm truncate max-w-[80px] md:max-w-none">{item.name}</div>
+                                          <div className="text-xs text-gray-500 truncate max-w-[80px] md:max-w-none">{item.sku}</div>
                                         </div>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="py-4 px-6">
-                                      <div className="text-lg font-bold text-amber-600">{item.quantity}</div>
+                                    <TableCell className="py-2 md:py-4 px-3 md:px-6">
+                                      <div className="text-base md:text-lg font-bold text-amber-600">{item.quantity}</div>
                                     </TableCell>
-                                    <TableCell className="py-4 px-6">
-                                      <div className="text-gray-700">{item.reorderLevel}</div>
+                                    <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden md:table-cell">
+                                      <div className="text-xs md:text-sm text-gray-700">{item.reorderLevel}</div>
                                     </TableCell>
-                                    <TableCell className="py-4 px-6">
-                                      <div className="font-bold text-red-600">-{deficit}</div>
+                                    <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden sm:table-cell">
+                                      <div className="font-bold text-red-600 text-xs md:text-sm">-{deficit}</div>
                                     </TableCell>
-                                    <TableCell className="py-4 px-6">
+                                    <TableCell className="py-2 md:py-4 px-3 md:px-6">
                                       <Badge 
-                                        className={`${
+                                        className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 ${
                                           urgency === 'High' 
                                             ? 'bg-red-100 text-red-800 border-red-200'
                                             : urgency === 'Medium'
@@ -1465,28 +1474,28 @@ const InventoryPage = () => {
                                             : 'bg-blue-100 text-blue-800 border-blue-200'
                                         } border-0`}
                                       >
-                                        {urgency} Priority
+                                        {urgency}
                                       </Badge>
                                     </TableCell>
-                                    <TableCell className="py-4 px-6 text-right">
-                                      <div className="flex items-center justify-end gap-2">
+                                    <TableCell className="py-2 md:py-4 px-3 md:px-6 text-right">
+                                      <div className="flex items-center justify-end gap-1 md:gap-2">
                                         <Button
                                           variant="ghost"
                                           size="sm"
                                           onClick={() => openEditDialog(item)}
-                                          className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                          className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                           title="Edit"
                                         >
-                                          <Edit className="h-4 w-4" />
+                                          <Edit className="h-3 w-3 md:h-4 md:w-4" />
                                         </Button>
                                         <Button
                                           variant="ghost"
                                           size="sm"
                                           onClick={() => setChangeHistoryDialogOpen(item.id)}
-                                          className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                          className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                           title="History"
                                         >
-                                          <History className="h-4 w-4" />
+                                          <History className="h-3 w-3 md:h-4 md:w-4" />
                                         </Button>
                                       </div>
                                     </TableCell>
@@ -1513,39 +1522,39 @@ const InventoryPage = () => {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-white border-b border-gray-200 px-6 py-4">
-                    <div className="flex items-center justify-between">
+                <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl overflow-hidden">
+                  <CardHeader className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <CardTitle className="text-xl font-bold text-gray-900">Machinery & Equipment</CardTitle>
-                        <p className="text-sm text-gray-500 mt-1">Manage all machinery and equipment across sites</p>
+                        <CardTitle className="text-base md:text-xl font-bold text-gray-900">Machinery & Equipment</CardTitle>
+                        <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Manage all machinery and equipment across sites</p>
                         {usingLocalMachineStats && (
-                          <div className="mt-2">
-                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">
-                              <Database className="h-3 w-3 mr-1" />
+                          <div className="mt-1 md:mt-2">
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-[10px] md:text-xs">
+                              <Database className="h-2 w-2 md:h-3 md:w-3 mr-0.5 md:mr-1" />
                               Using locally calculated statistics
                             </Badge>
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button 
                           variant="outline"
                           onClick={handleExportMachines}
                           disabled={machines.length === 0}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <Download className="mr-2 h-4 w-4" />
-                          Export Machines
+                          <Download className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden xs:inline">Export</span>
                         </Button>
                         <Button 
                           variant="outline"
                           onClick={() => setMaintenanceDialogOpen(true)}
                           disabled={machines.length === 0}
-                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <Wrench className="mr-2 h-4 w-4" />
-                          Add Maintenance
+                          <Wrench className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden xs:inline">Maintenance</span>
                         </Button>
                         <Button 
                           onClick={() => {
@@ -1553,135 +1562,126 @@ const InventoryPage = () => {
                             resetNewMachineForm();
                             setMachineDialogOpen(true);
                           }}
-                          className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm hover:shadow"
+                          className="bg-blue-600 hover:bg-blue-700 rounded-lg md:rounded-xl text-xs md:text-sm px-2 md:px-4 py-1 md:py-2 h-8 md:h-10"
                         >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Machine
+                          <Plus className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden xs:inline">Add</span>
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     {/* Machine Search */}
-                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                    <div className="px-3 md:px-6 py-3 md:py-4 border-b border-gray-100 bg-gray-50/50">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-gray-400" />
                         <Input
-                          placeholder="Search machines by name, model, manufacturer, or location..."
+                          placeholder="Search machines..."
                           value={machineSearchQuery}
                           onChange={(e) => setMachineSearchQuery(e.target.value)}
-                          className="pl-10 rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                          className="pl-7 md:pl-10 h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
                     </div>
 
                     {/* Machines Table */}
                     {loading.machines ? (
-                      <div className="flex justify-center items-center py-12">
+                      <div className="flex justify-center items-center py-8 md:py-12">
                         <div className="text-center">
-                          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-500" />
-                          <p className="text-gray-500 mt-3">Loading machines...</p>
+                          <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin mx-auto text-blue-500" />
+                          <p className="text-xs md:text-sm text-gray-500 mt-2">Loading machines...</p>
                         </div>
                       </div>
                     ) : filteredMachines.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                          <Cpu className="h-8 w-8 text-gray-400" />
+                      <div className="text-center py-8 md:py-12 px-4">
+                        <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3 md:mb-4">
+                          <Cpu className="h-6 w-6 md:h-8 md:w-8 text-gray-400" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">No machines found</h3>
-                        <p className="text-gray-500 mt-2">
+                        <h3 className="text-sm md:text-lg font-semibold text-gray-900">No machines found</h3>
+                        <p className="text-xs md:text-sm text-gray-500 mt-1 md:mt-2">
                           {machines.length === 0 
                             ? "No machines in database. Add your first machine!" 
                             : "Try adjusting your search"}
                         </p>
                       </div>
                     ) : (
-                      <div className="overflow-hidden">
+                      <div className="overflow-x-auto">
                         <Table>
                           <TableHeader className="bg-gray-50">
                             <TableRow className="hover:bg-gray-50">
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Machine</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Model & Serial</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Cost</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Purchase Date</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</TableHead>
-                              <TableHead className="py-3 px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Machine</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell">Model & Serial</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Cost</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider hidden lg:table-cell">Purchase Date</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</TableHead>
+                              <TableHead className="py-2 md:py-3 px-3 md:px-6 text-xs font-semibold text-gray-700 uppercase tracking-wider text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {filteredMachines.map((machine, index) => {
                               const statusOption = machineStatusOptions.find(s => s.value === machine.status);
                               const StatusIcon = statusOption?.icon || CheckCircle;
-                              const machineAge = calculateMachineAge(machine.purchaseDate);
                               
                               return (
                                 <TableRow 
                                   key={machine.id} 
                                   className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                                 >
-                                  <TableCell className="py-4 px-6">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6">
                                     <div className="flex items-center">
-                                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                                        <span className="text-blue-600 font-semibold">{machine.name.charAt(0)}</span>
+                                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-blue-100 flex items-center justify-center mr-2 md:mr-3">
+                                        <span className="text-blue-600 font-semibold text-xs md:text-sm">{machine.name.charAt(0)}</span>
                                       </div>
-                                      <div>
-                                        <div className="font-medium text-gray-900">{machine.name}</div>
-                                        <div className="text-sm text-gray-500">{machine.manufacturer}</div>
+                                      <div className="min-w-0">
+                                        <div className="font-medium text-gray-900 text-xs md:text-sm truncate max-w-[100px] md:max-w-none">{machine.name}</div>
+                                        <div className="text-[10px] md:text-xs text-gray-500 truncate max-w-[100px] md:max-w-none">{machine.manufacturer}</div>
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <div className="text-gray-700">{machine.model || 'N/A'}</div>
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden md:table-cell">
+                                    <div className="text-xs md:text-sm text-gray-700">{machine.model || 'N/A'}</div>
                                     {machine.serialNumber && (
-                                      <div className="text-xs text-gray-500">SN: {machine.serialNumber}</div>
+                                      <div className="text-[10px] md:text-xs text-gray-500">SN: {machine.serialNumber}</div>
                                     )}
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <div className="font-medium text-blue-600">{formatCurrency(machine.cost)}</div>
-                                    <div className="text-xs text-gray-500">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden sm:table-cell">
+                                    <div className="font-medium text-blue-600 text-xs md:text-sm">{formatCurrency(machine.cost)}</div>
+                                    <div className="text-[10px] md:text-xs text-gray-500">
                                       Total: {formatCurrency(machine.cost * machine.quantity)}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 hidden lg:table-cell">
                                     <div className="flex items-center gap-1">
-                                      <Calendar className="h-4 w-4 text-gray-400" />
-                                      <span className="text-gray-700">{formatDate(machine.purchaseDate)}</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      Age: {machineAge} year{machineAge !== 1 ? 's' : ''}
+                                      <Calendar className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
+                                      <span className="text-xs md:text-sm text-gray-700">{formatDate(machine.purchaseDate)}</span>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-4 px-6">
-                                    <Badge className={`${statusOption?.color} border-0 flex items-center gap-1`}>
-                                      <StatusIcon className="h-3 w-3" />
-                                      {statusOption?.label}
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6">
+                                    <Badge className={`${statusOption?.color} border-0 flex items-center gap-1 text-[10px] md:text-xs px-1.5 md:px-2 py-0.5`}>
+                                      <StatusIcon className="h-2 w-2 md:h-3 md:w-3" />
+                                      <span className="hidden xs:inline">{statusOption?.label}</span>
                                     </Badge>
-                                    {machine.nextMaintenanceDate && (
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        Next: {formatDate(machine.nextMaintenanceDate)}
-                                      </div>
-                                    )}
                                   </TableCell>
-                                  <TableCell className="py-4 px-6 text-right">
-                                    <div className="flex items-center justify-end gap-2">
+                                  <TableCell className="py-2 md:py-4 px-3 md:px-6 text-right">
+                                    <div className="flex items-center justify-end gap-1 md:gap-2">
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleViewMachine(machine.id)}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                         title="View Details"
                                       >
-                                        <Eye className="h-4 w-4" />
+                                        <Eye className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                       
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleEditMachine(machine)}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                         title="Edit"
                                       >
-                                        <Edit className="h-4 w-4" />
+                                        <Edit className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                       
                                       <Button
@@ -1691,20 +1691,20 @@ const InventoryPage = () => {
                                           setSelectedMachineForMaintenance(machine.id);
                                           setMaintenanceDialogOpen(true);
                                         }}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-blue-100 hover:text-blue-600"
                                         title="Maintenance"
                                       >
-                                        <Wrench className="h-4 w-4" />
+                                        <Wrench className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                       
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleDeleteMachine(machine.id)}
-                                        className="w-8 h-8 p-0 rounded-full hover:bg-red-100 hover:text-red-600"
+                                        className="w-6 h-6 md:w-8 md:h-8 p-0 rounded-full hover:bg-red-100 hover:text-red-600"
                                         title="Delete"
                                       >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                                       </Button>
                                     </div>
                                   </TableCell>
@@ -1731,17 +1731,17 @@ const InventoryPage = () => {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-white border-b border-gray-200 px-6 py-4">
+                <Card className="border-0 shadow-lg rounded-xl md:rounded-2xl overflow-hidden">
+                  <CardHeader className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-xl font-bold text-gray-900">Categories & Departments</CardTitle>
-                        <p className="text-sm text-gray-500 mt-1">Browse inventory by categories and departments</p>
+                        <CardTitle className="text-base md:text-xl font-bold text-gray-900">Categories & Departments</CardTitle>
+                        <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">Browse inventory by categories and departments</p>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <CardContent className="p-4 md:p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                       {departments.map(dept => {
                         const Icon = dept.icon;
                         const deptItems = items.filter(item => item.department === dept.value);
@@ -1750,40 +1750,40 @@ const InventoryPage = () => {
                         
                         return (
                           <Card key={dept.value} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-300">
-                            <CardHeader className="pb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                  <Icon className="h-5 w-5 text-blue-600" />
+                            <CardHeader className="pb-2 md:pb-3">
+                              <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                  <Icon className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
                                 </div>
-                                <div>
-                                  <CardTitle className="text-lg text-gray-900">{dept.label}</CardTitle>
-                                  <CardDescription>
+                                <div className="min-w-0">
+                                  <CardTitle className="text-sm md:text-lg text-gray-900 truncate">{dept.label}</CardTitle>
+                                  <CardDescription className="text-[10px] md:text-xs truncate">
                                     {deptItems.length} items • {deptCategories.length} categories
                                   </CardDescription>
                                 </div>
                               </div>
                             </CardHeader>
-                            <CardContent>
-                              <div className="space-y-3">
-                                <div className="flex justify-between items-center text-sm">
+                            <CardContent className="p-3 md:p-4 pt-0">
+                              <div className="space-y-2 md:space-y-3">
+                                <div className="flex justify-between items-center text-[10px] md:text-xs">
                                   <span className="text-gray-600">Total Value:</span>
-                                  <span className="font-semibold text-blue-600">{formatCurrency(deptValue)}</span>
+                                  <span className="font-semibold text-blue-600 text-xs md:text-sm">{formatCurrency(deptValue)}</span>
                                 </div>
-                                <div className="space-y-2">
-                                  <div className="text-sm font-medium text-gray-700">Categories:</div>
+                                <div className="space-y-1 md:space-y-2">
+                                  <div className="text-[10px] md:text-xs font-medium text-gray-700">Categories:</div>
                                   {deptCategories.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-1 md:gap-2">
                                       {deptCategories.map(category => {
                                         const categoryItems = deptItems.filter(item => item.category === category);
                                         return (
-                                          <Badge key={category} variant="outline" className="bg-gray-50 text-gray-700">
+                                          <Badge key={category} variant="outline" className="bg-gray-50 text-gray-700 text-[8px] md:text-xs px-1.5 md:px-2 py-0.5">
                                             {category} ({categoryItems.length})
                                           </Badge>
                                         );
                                       })}
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-gray-500">No items in this department</p>
+                                    <p className="text-[10px] md:text-xs text-gray-500">No items in this department</p>
                                   )}
                                 </div>
                               </div>
@@ -1808,9 +1808,9 @@ const InventoryPage = () => {
           resetNewItemForm();
         }
       }}>
-        <DialogContent className="max-w-2xl bg-white rounded-2xl">
+        <DialogContent className="max-w-sm md:max-w-2xl bg-white rounded-xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">
+            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">
               {editItem ? 'Edit Item' : 'Add New Item'}
             </DialogTitle>
           </DialogHeader>
@@ -1818,10 +1818,10 @@ const InventoryPage = () => {
           <form onSubmit={(e) => {
             e.preventDefault();
             editItem ? handleEditItem() : handleAddItem();
-          }} className="space-y-5">
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium text-gray-700">Item Name *</Label>
+          }} className="space-y-4 md:space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="name" className="text-xs md:text-sm font-medium text-gray-700">Item Name *</Label>
                 <Input
                   id="name"
                   value={editItem ? editItem.name : newItem.name}
@@ -1832,12 +1832,12 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter item name"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="sku" className="text-sm font-medium text-gray-700">SKU *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="sku" className="text-xs md:text-sm font-medium text-gray-700">SKU *</Label>
                 <Input
                   id="sku"
                   value={editItem ? editItem.sku : newItem.sku}
@@ -1848,14 +1848,14 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter SKU (e.g., INV-001)"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="department" className="text-sm font-medium text-gray-700">Department *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="department" className="text-xs md:text-sm font-medium text-gray-700">Department *</Label>
                 <Select
                   value={editItem ? editItem.department : newItem.department}
                   onValueChange={(value) => 
@@ -1864,7 +1864,7 @@ const InventoryPage = () => {
                       : setNewItem({...newItem, department: value, category: ''})
                   }
                 >
-                  <SelectTrigger className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
@@ -1873,8 +1873,8 @@ const InventoryPage = () => {
                       return (
                         <SelectItem key={dept.value} value={dept.value} className="rounded-md">
                           <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-blue-500" />
-                            {dept.label}
+                            <Icon className="h-3 w-3 md:h-4 md:w-4 text-blue-500" />
+                            <span className="text-xs md:text-sm">{dept.label}</span>
                           </div>
                         </SelectItem>
                       );
@@ -1883,8 +1883,8 @@ const InventoryPage = () => {
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="category" className="text-sm font-medium text-gray-700">Category *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="category" className="text-xs md:text-sm font-medium text-gray-700">Category *</Label>
                 <Select
                   value={editItem ? editItem.category : newItem.category}
                   onValueChange={(value) => 
@@ -1894,22 +1894,22 @@ const InventoryPage = () => {
                   }
                   disabled={!editItem?.department && !newItem.department}
                 >
-                  <SelectTrigger className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
                     {(editItem ? getCategoriesForDepartment(editItem.department) : 
                       getCategoriesForDepartment(newItem.department || '')).map(cat => (
-                      <SelectItem key={cat} value={cat} className="rounded-md">{cat}</SelectItem>
+                      <SelectItem key={cat} value={cat} className="rounded-md text-xs md:text-sm">{cat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="quantity" className="text-sm font-medium text-gray-700">Quantity *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="quantity" className="text-xs md:text-sm font-medium text-gray-700">Quantity *</Label>
                 <Input
                   id="quantity"
                   type="number"
@@ -1922,12 +1922,12 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter quantity"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="reorderLevel" className="text-sm font-medium text-gray-700">Reorder Level *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="reorderLevel" className="text-xs md:text-sm font-medium text-gray-700">Reorder Level *</Label>
                 <Input
                   id="reorderLevel"
                   type="number"
@@ -1940,14 +1940,14 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter reorder level"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="price" className="text-sm font-medium text-gray-700">Price *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="price" className="text-xs md:text-sm font-medium text-gray-700">Price *</Label>
                 <Input
                   id="price"
                   type="number"
@@ -1961,12 +1961,12 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter price"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="costPrice" className="text-sm font-medium text-gray-700">Cost Price *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="costPrice" className="text-xs md:text-sm font-medium text-gray-700">Cost Price *</Label>
                 <Input
                   id="costPrice"
                   type="number"
@@ -1980,14 +1980,14 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter cost price"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="assignedManager" className="text-sm font-medium text-gray-700">Assigned Manager</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="assignedManager" className="text-xs md:text-sm font-medium text-gray-700">Assigned Manager</Label>
                 <Select
                   value={editItem ? editItem.assignedManager : newItem.assignedManager}
                   onValueChange={(value) => 
@@ -1996,19 +1996,19 @@ const InventoryPage = () => {
                       : setNewItem({...newItem, assignedManager: value})
                   }
                 >
-                  <SelectTrigger className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     <SelectValue placeholder="Select manager" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
                     {managers.map(manager => (
-                      <SelectItem key={manager} value={manager} className="rounded-md">{manager}</SelectItem>
+                      <SelectItem key={manager} value={manager} className="rounded-md text-xs md:text-sm">{manager}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="supplier" className="text-sm font-medium text-gray-700">Supplier *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="supplier" className="text-xs md:text-sm font-medium text-gray-700">Supplier *</Label>
                 <Input
                   id="supplier"
                   value={editItem ? editItem.supplier : newItem.supplier}
@@ -2019,13 +2019,13 @@ const InventoryPage = () => {
                   }
                   placeholder="Enter supplier name"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium text-gray-700">Description</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="description" className="text-xs md:text-sm font-medium text-gray-700">Description</Label>
               <Textarea
                 id="description"
                 value={editItem ? editItem.description : newItem.description}
@@ -2035,12 +2035,12 @@ const InventoryPage = () => {
                     : setNewItem({...newItem, description: e.target.value})
                 }
                 placeholder="Enter item description"
-                rows={3}
-                className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                rows={2}
+                className="text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
               <Button 
                 type="button"
                 variant="outline" 
@@ -2049,13 +2049,13 @@ const InventoryPage = () => {
                   setEditItem(null);
                   resetNewItemForm();
                 }}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 rounded-xl"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 {editItem ? 'Update Item' : 'Add Item'}
               </Button>
@@ -2072,9 +2072,9 @@ const InventoryPage = () => {
           resetNewMachineForm();
         }
       }}>
-        <DialogContent className="max-w-2xl bg-white rounded-2xl">
+        <DialogContent className="max-w-sm md:max-w-2xl bg-white rounded-xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">
+            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">
               {editMachine ? 'Edit Machine' : 'Add New Machine'}
             </DialogTitle>
           </DialogHeader>
@@ -2082,22 +2082,22 @@ const InventoryPage = () => {
           <form onSubmit={(e) => {
             e.preventDefault();
             handleAddMachine();
-          }} className="space-y-5">
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="machineName" className="text-sm font-medium text-gray-700">Machine Name *</Label>
+          }} className="space-y-4 md:space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="machineName" className="text-xs md:text-sm font-medium text-gray-700">Machine Name *</Label>
                 <Input
                   id="machineName"
                   value={newMachine.name}
                   onChange={(e) => setNewMachine({...newMachine, name: e.target.value})}
                   placeholder="Enter machine name"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="machineCost" className="text-sm font-medium text-gray-700">Cost/Price *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="machineCost" className="text-xs md:text-sm font-medium text-gray-700">Cost/Price *</Label>
                 <Input
                   id="machineCost"
                   type="number"
@@ -2107,26 +2107,26 @@ const InventoryPage = () => {
                   onChange={(e) => setNewMachine({...newMachine, cost: parseFloat(e.target.value) || 0})}
                   placeholder="Enter cost"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="purchaseDate" className="text-sm font-medium text-gray-700">Purchase Date *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="purchaseDate" className="text-xs md:text-sm font-medium text-gray-700">Purchase Date *</Label>
                 <Input
                   id="purchaseDate"
                   type="date"
                   value={newMachine.purchaseDate}
                   onChange={(e) => setNewMachine({...newMachine, purchaseDate: e.target.value})}
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="machineQuantity" className="text-sm font-medium text-gray-700">Quantity *</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="machineQuantity" className="text-xs md:text-sm font-medium text-gray-700">Quantity *</Label>
                 <Input
                   id="machineQuantity"
                   type="number"
@@ -2135,26 +2135,26 @@ const InventoryPage = () => {
                   onChange={(e) => setNewMachine({...newMachine, quantity: parseInt(e.target.value) || 1})}
                   placeholder="Enter quantity"
                   required
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="machineStatus" className="text-sm font-medium text-gray-700">Status *</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="machineStatus" className="text-xs md:text-sm font-medium text-gray-700">Status *</Label>
                 <Select
                   value={newMachine.status}
                   onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => 
                     setNewMachine({...newMachine, status: value})
                   }
                 >
-                  <SelectTrigger className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
                     {machineStatusOptions.map(status => (
-                      <SelectItem key={status.value} value={status.value} className="rounded-md">
+                      <SelectItem key={status.value} value={status.value} className="rounded-md text-xs md:text-sm">
                         {status.label}
                       </SelectItem>
                     ))}
@@ -2162,79 +2162,79 @@ const InventoryPage = () => {
                 </Select>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="machineLocation" className="text-sm font-medium text-gray-700">Location</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="machineLocation" className="text-xs md:text-sm font-medium text-gray-700">Location</Label>
                 <Input
                   id="machineLocation"
                   value={newMachine.location}
                   onChange={(e) => setNewMachine({...newMachine, location: e.target.value})}
                   placeholder="Enter location"
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="manufacturer" className="text-sm font-medium text-gray-700">Manufacturer</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="manufacturer" className="text-xs md:text-sm font-medium text-gray-700">Manufacturer</Label>
                 <Input
                   id="manufacturer"
                   value={newMachine.manufacturer}
                   onChange={(e) => setNewMachine({...newMachine, manufacturer: e.target.value})}
                   placeholder="Enter manufacturer"
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="model" className="text-sm font-medium text-gray-700">Model</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="model" className="text-xs md:text-sm font-medium text-gray-700">Model</Label>
                 <Input
                   id="model"
                   value={newMachine.model} 
                   onChange={(e) => setNewMachine({...newMachine, model: e.target.value})} 
                   placeholder="Enter model"
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <Label htmlFor="serialNumber" className="text-sm font-medium text-gray-700">Serial Number</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="serialNumber" className="text-xs md:text-sm font-medium text-gray-700">Serial Number</Label>
                 <Input
                   id="serialNumber"
                   value={newMachine.serialNumber}
                   onChange={(e) => setNewMachine({...newMachine, serialNumber: e.target.value})}
                   placeholder="Enter serial number"
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="department" className="text-sm font-medium text-gray-700">Department</Label>
+              <div className="space-y-1 md:space-y-2">
+                <Label htmlFor="department" className="text-xs md:text-sm font-medium text-gray-700">Department</Label>
                 <Input
                   id="department"
                   value={newMachine.department}
                   onChange={(e) => setNewMachine({...newMachine, department: e.target.value})}
                   placeholder="Enter department"
-                  className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="machineDescription" className="text-sm font-medium text-gray-700">Description</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="machineDescription" className="text-xs md:text-sm font-medium text-gray-700">Description</Label>
               <Textarea
                 id="machineDescription"
                 value={newMachine.description}
                 onChange={(e) => setNewMachine({...newMachine, description: e.target.value})}
                 placeholder="Enter machine description"
-                rows={3}
-                className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                rows={2}
+                className="text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
               <Button 
                 type="button"
                 variant="outline" 
@@ -2243,13 +2243,13 @@ const InventoryPage = () => {
                   setEditMachine(null);
                   resetNewMachineForm();
                 }}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit"
-                className="bg-blue-600 hover:bg-blue-700 rounded-xl"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 {editMachine ? 'Update Machine' : 'Add Machine'}
               </Button>
@@ -2260,70 +2260,70 @@ const InventoryPage = () => {
 
       {/* VIEW MACHINE DETAILS DIALOG */}
       <Dialog open={!!viewMachine} onOpenChange={() => setViewMachine(null)}>
-        <DialogContent className="max-w-2xl bg-white rounded-2xl">
+        <DialogContent className="max-w-sm md:max-w-2xl bg-white rounded-xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">Machine Details</DialogTitle>
+            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">Machine Details</DialogTitle>
           </DialogHeader>
           {viewMachine && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
-                  <span className="text-blue-600 font-bold text-xl">{viewMachine.name.charAt(0)}</span>
+            <div className="space-y-4 md:space-y-6">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-blue-100 flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm md:text-xl">{viewMachine.name.charAt(0)}</span>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">{viewMachine.name}</h3>
-                  <p className="text-gray-500">{viewMachine.manufacturer} • {viewMachine.model}</p>
+                <div className="min-w-0">
+                  <h3 className="text-base md:text-xl font-bold text-gray-900 truncate">{viewMachine.name}</h3>
+                  <p className="text-xs md:text-sm text-gray-500 truncate">{viewMachine.manufacturer} • {viewMachine.model}</p>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div className="space-y-3 md:space-y-4">
                   <div>
-                    <Label className="text-xs text-gray-500 uppercase font-medium">Cost</Label>
-                    <p className="text-lg font-bold text-blue-600">{formatCurrency(viewMachine.cost)}</p>
+                    <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Cost</Label>
+                    <p className="text-base md:text-lg font-bold text-blue-600">{formatCurrency(viewMachine.cost)}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-500 uppercase font-medium">Total Value</Label>
-                    <p className="text-lg font-bold text-green-600">{formatCurrency(viewMachine.cost * viewMachine.quantity)}</p>
+                    <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Total Value</Label>
+                    <p className="text-base md:text-lg font-bold text-green-600">{formatCurrency(viewMachine.cost * viewMachine.quantity)}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-500 uppercase font-medium">Quantity</Label>
-                    <p className="text-gray-900">{viewMachine.quantity}</p>
+                    <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Quantity</Label>
+                    <p className="text-xs md:text-sm text-gray-900">{viewMachine.quantity}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-500 uppercase font-medium">Purchase Date</Label>
+                    <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Purchase Date</Label>
                     <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-900">{formatDate(viewMachine.purchaseDate)}</span>
+                      <Calendar className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
+                      <span className="text-xs md:text-sm text-gray-900">{formatDate(viewMachine.purchaseDate)}</span>
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   <div>
-                    <Label className="text-xs text-gray-500 uppercase font-medium">Status</Label>
-                    <Badge className={`${machineStatusOptions.find(s => s.value === viewMachine.status)?.color} border-0`}>
+                    <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Status</Label>
+                    <Badge className={`${machineStatusOptions.find(s => s.value === viewMachine.status)?.color} border-0 text-[10px] md:text-xs`}>
                       {machineStatusOptions.find(s => s.value === viewMachine.status)?.label}
                     </Badge>
                   </div>
                   {viewMachine.location && (
                     <div>
-                      <Label className="text-xs text-gray-500 uppercase font-medium">Location</Label>
+                      <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Location</Label>
                       <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <span className="text-gray-900">{viewMachine.location}</span>
+                        <MapPin className="h-3 w-3 md:h-4 md:w-4 text-gray-400" />
+                        <span className="text-xs md:text-sm text-gray-900">{viewMachine.location}</span>
                       </div>
                     </div>
                   )}
                   {viewMachine.department && (
                     <div>
-                      <Label className="text-xs text-gray-500 uppercase font-medium">Department</Label>
-                      <p className="text-gray-900">{viewMachine.department}</p>
+                      <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Department</Label>
+                      <p className="text-xs md:text-sm text-gray-900">{viewMachine.department}</p>
                     </div>
                   )}
                   {viewMachine.assignedTo && (
                     <div>
-                      <Label className="text-xs text-gray-500 uppercase font-medium">Assigned To</Label>
-                      <p className="text-gray-900">{viewMachine.assignedTo}</p>
+                      <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Assigned To</Label>
+                      <p className="text-xs md:text-sm text-gray-900">{viewMachine.assignedTo}</p>
                     </div>
                   )}
                 </div>
@@ -2331,9 +2331,9 @@ const InventoryPage = () => {
               
               {viewMachine.description && (
                 <div>
-                  <Label className="text-xs text-gray-500 uppercase font-medium">Description</Label>
-                  <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-gray-900">{viewMachine.description}</p>
+                  <Label className="text-[10px] md:text-xs text-gray-500 uppercase font-medium">Description</Label>
+                  <div className="mt-1 md:mt-2 p-2 md:p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs md:text-sm text-gray-900">{viewMachine.description}</p>
                   </div>
                 </div>
               )}
@@ -2341,16 +2341,16 @@ const InventoryPage = () => {
               {/* Maintenance History */}
               {viewMachine.maintenanceHistory && viewMachine.maintenanceHistory.length > 0 && (
                 <div>
-                  <h4 className="font-semibold mb-2 text-gray-900">Maintenance History</h4>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <h4 className="text-xs md:text-sm font-semibold mb-2 text-gray-900">Maintenance History</h4>
+                  <div className="space-y-1 md:space-y-2 max-h-32 md:max-h-40 overflow-y-auto">
                     {viewMachine.maintenanceHistory.map((record, index) => (
-                      <div key={index} className="flex flex-col p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                      <div key={index} className="flex flex-col p-2 md:p-3 bg-gray-50 rounded-lg border border-gray-100 text-[10px] md:text-xs">
                         <div className="flex justify-between">
                           <span className="font-medium text-blue-700">{record.type}</span>
                           <span className="text-blue-600">{formatDate(record.date)}</span>
                         </div>
-                        <div className="text-gray-600 mt-1">{record.description}</div>
-                        <div className="flex justify-between text-xs mt-2">
+                        <div className="text-gray-600 mt-0.5 md:mt-1">{record.description}</div>
+                        <div className="flex justify-between text-[8px] md:text-xs mt-1 md:mt-2">
                           <span className="text-gray-500">Performed by: {record.performedBy}</span>
                           <span className="text-blue-600">Cost: {formatCurrency(record.cost)}</span>
                         </div>
@@ -2377,27 +2377,27 @@ const InventoryPage = () => {
           });
         }
       }}>
-        <DialogContent className="bg-white rounded-2xl">
+        <DialogContent className="max-w-sm md:max-w-md bg-white rounded-xl md:rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">Add Maintenance Record</DialogTitle>
+            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">Add Maintenance Record</DialogTitle>
           </DialogHeader>
           
           <form onSubmit={(e) => {
             e.preventDefault();
             handleAddMaintenance();
-          }} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="maintenanceMachine" className="text-sm font-medium text-gray-700">Select Machine</Label>
+          }} className="space-y-3 md:space-y-4">
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="maintenanceMachine" className="text-xs md:text-sm font-medium text-gray-700">Select Machine</Label>
               <Select
                 value={selectedMachineForMaintenance || ""}
                 onValueChange={setSelectedMachineForMaintenance}
               >
-                <SelectTrigger className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                   <SelectValue placeholder="Select machine" />
                 </SelectTrigger>
                 <SelectContent className="rounded-lg">
                   {machines.map(machine => (
-                    <SelectItem key={machine.id} value={machine.id} className="rounded-md">
+                    <SelectItem key={machine.id} value={machine.id} className="rounded-md text-xs md:text-sm">
                       {machine.name} {machine.model ? `(${machine.model})` : ''}
                     </SelectItem>
                   ))}
@@ -2407,38 +2407,38 @@ const InventoryPage = () => {
             
             {selectedMachineForMaintenance && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="maintenanceType" className="text-sm font-medium text-gray-700">Maintenance Type *</Label>
+                <div className="space-y-1 md:space-y-2">
+                  <Label htmlFor="maintenanceType" className="text-xs md:text-sm font-medium text-gray-700">Maintenance Type *</Label>
                   <Select
                     value={maintenanceRecord.type}
                     onValueChange={(value) => setMaintenanceRecord({...maintenanceRecord, type: value})}
                   >
-                    <SelectTrigger className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent className="rounded-lg">
                       {maintenanceTypes.map(type => (
-                        <SelectItem key={type} value={type} className="rounded-md">{type}</SelectItem>
+                        <SelectItem key={type} value={type} className="rounded-md text-xs md:text-sm">{type}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="maintenanceDescription" className="text-sm font-medium text-gray-700">Description *</Label>
+                <div className="space-y-1 md:space-y-2">
+                  <Label htmlFor="maintenanceDescription" className="text-xs md:text-sm font-medium text-gray-700">Description *</Label>
                   <Textarea
                     id="maintenanceDescription"
                     value={maintenanceRecord.description}
                     onChange={(e) => setMaintenanceRecord({...maintenanceRecord, description: e.target.value})}
                     placeholder="Describe the maintenance performed"
-                    rows={3}
-                    className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    rows={2}
+                    className="text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="maintenanceCost" className="text-sm font-medium text-gray-700">Cost</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                  <div className="space-y-1 md:space-y-2">
+                    <Label htmlFor="maintenanceCost" className="text-xs md:text-sm font-medium text-gray-700">Cost</Label>
                     <Input
                       id="maintenanceCost"
                       type="number"
@@ -2446,38 +2446,38 @@ const InventoryPage = () => {
                       min="0"
                       value={maintenanceRecord.cost}
                       onChange={(e) => setMaintenanceRecord({...maintenanceRecord, cost: parseFloat(e.target.value) || 0})}
-                      placeholder="Enter maintenance cost"
-                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      placeholder="Enter cost"
+                      className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="performedBy" className="text-sm font-medium text-gray-700">Performed By *</Label>
+                  <div className="space-y-1 md:space-y-2">
+                    <Label htmlFor="performedBy" className="text-xs md:text-sm font-medium text-gray-700">Performed By *</Label>
                     <Input
                       id="performedBy"
                       value={maintenanceRecord.performedBy}
                       onChange={(e) => setMaintenanceRecord({...maintenanceRecord, performedBy: e.target.value})}
                       placeholder="Enter technician name"
-                      className="rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className="h-8 md:h-10 text-xs md:text-sm rounded-lg border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                 </div>
               </>
             )}
             
-            <DialogFooter>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
               <Button 
                 type="button"
                 variant="outline" 
                 onClick={() => setMaintenanceDialogOpen(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 Cancel
               </Button>
               <Button 
                 type="submit"
                 disabled={!selectedMachineForMaintenance || maintenanceLoading}
-                className="bg-blue-600 hover:bg-blue-700 rounded-xl"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 {maintenanceLoading ? "Adding..." : "Add Maintenance"}
               </Button>
@@ -2488,14 +2488,14 @@ const InventoryPage = () => {
 
       {/* IMPORT DIALOG */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-md bg-white rounded-2xl">
+        <DialogContent className="max-w-sm md:max-w-md bg-white rounded-xl md:rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">Import Data from CSV</DialogTitle>
+            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">Import Data from CSV</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="csv-file" className="text-sm font-medium text-gray-700">Upload CSV File</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors bg-gray-50">
+          <div className="space-y-3 md:space-y-4">
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="csv-file" className="text-xs md:text-sm font-medium text-gray-700">Upload CSV File</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 md:p-6 text-center hover:border-blue-400 transition-colors bg-gray-50">
                 <Input 
                   id="csv-file"
                   type="file" 
@@ -2503,23 +2503,23 @@ const InventoryPage = () => {
                   className="hidden"
                 />
                 <Label htmlFor="csv-file" className="cursor-pointer">
-                  <UploadCloud className="h-10 w-10 mx-auto mb-3 text-gray-400" />
-                  <p className="text-sm font-medium text-gray-700">Drag & drop or click to upload</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <UploadCloud className="h-8 w-8 md:h-10 md:w-10 mx-auto mb-2 text-gray-400" />
+                  <p className="text-xs md:text-sm font-medium text-gray-700">Click to upload</p>
+                  <p className="text-[10px] md:text-xs text-gray-500 mt-1">
                     Supports .csv files
                   </p>
                 </Label>
               </div>
             </div>
             
-            <div className="p-4 border border-gray-200 rounded-xl bg-gray-50">
-              <h4 className="font-medium text-gray-900 mb-2">CSV Format (Inventory)</h4>
-              <div className="text-sm space-y-2 text-gray-600">
+            <div className="p-3 md:p-4 border border-gray-200 rounded-xl bg-gray-50">
+              <h4 className="font-medium text-gray-900 text-xs md:text-sm mb-2">CSV Format (Inventory)</h4>
+              <div className="text-[10px] md:text-xs space-y-1 md:space-y-2 text-gray-600">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <CheckCircle className="h-2 w-2 md:h-3 md:w-3 text-green-500" />
                   <span>Required fields: SKU, Name, Department, Category</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-3">
+                <div className="grid grid-cols-2 gap-1 md:gap-2 mt-2">
                   <div><span className="font-medium">SKU</span> <span className="text-red-500">*</span></div>
                   <div><span className="font-medium">Name</span> <span className="text-red-500">*</span></div>
                   <div><span className="font-medium">Department</span> <span className="text-red-500">*</span></div>
@@ -2528,26 +2528,26 @@ const InventoryPage = () => {
               </div>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button 
                 onClick={handleExport}
                 disabled={items.length === 0}
                 variant="outline"
-                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl"
+                className="w-full sm:flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                 Export Template
               </Button>
               
               <Button 
                 disabled={true}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-xl"
+                className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 rounded-lg md:rounded-xl text-xs md:text-sm h-8 md:h-10"
               >
                 Import Data
               </Button>
             </div>
             
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-[10px] md:text-xs text-gray-500 text-center">
               Note: Import functionality is under development
             </p>
           </div>
@@ -2556,17 +2556,17 @@ const InventoryPage = () => {
 
       {/* CHANGE HISTORY DIALOG */}
       <Dialog open={!!changeHistoryDialogOpen} onOpenChange={() => setChangeHistoryDialogOpen(null)}>
-        <DialogContent className="bg-white rounded-2xl">
+        <DialogContent className="max-w-sm md:max-w-md bg-white rounded-xl md:rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">Change History</DialogTitle>
+            <DialogTitle className="text-base md:text-lg font-semibold text-gray-900">Change History</DialogTitle>
           </DialogHeader>
           {changeHistoryDialogOpen && (
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="space-y-1 md:space-y-2 max-h-40 md:max-h-60 overflow-y-auto">
               {(() => {
                 const item = items.find(item => item.id === changeHistoryDialogOpen);
                 return item?.changeHistory && item.changeHistory.length > 0 ? (
                   item.changeHistory.map((change, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm p-3 bg-gray-50/50 rounded-lg border border-gray-100">
+                    <div key={index} className="flex flex-col md:flex-row md:items-center justify-between text-[10px] md:text-xs p-2 md:p-3 bg-gray-50/50 rounded-lg border border-gray-100 gap-1 md:gap-0">
                       <span className="text-blue-600">{change.date}</span>
                       <span className="text-gray-700">{change.change}</span>
                       <span className="text-gray-600">by {change.user}</span>
@@ -2576,7 +2576,7 @@ const InventoryPage = () => {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-gray-500 text-center py-4">
+                  <p className="text-xs md:text-sm text-gray-500 text-center py-4">
                     No change history available for this item
                   </p>
                 );

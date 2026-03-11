@@ -9,9 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { Save, User, Lock, Shield, Loader2, LogIn, Key, AlertCircle, Eye, EyeOff, Bug, Database } from "lucide-react";
+import { Save, User, Lock, Shield, Loader2, LogIn, Key, AlertCircle, Eye, EyeOff, Bug, Database, Menu, ChevronDown, ChevronUp, MoreVertical, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useOutletContext } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 const getApiUrl = () => {
   if (typeof window === 'undefined') {
@@ -73,7 +81,449 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
   return response;
 };
 
+// Mobile responsive settings card for tabs
+const MobileSettingsCard = ({
+  title,
+  icon: Icon,
+  children,
+  className = ""
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  className?: string;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className={`mb-4 overflow-hidden ${className}`}>
+      <CardHeader 
+        className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Icon className="h-5 w-5 text-primary" />
+            </div>
+            <CardTitle className="text-base">{title}</CardTitle>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="p-4 pt-0 border-t">
+          {children}
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+// Mobile responsive connection status card
+const ConnectionStatusCard = ({ 
+  backendStatus, 
+  isAuthenticated,
+  apiUrl,
+  onCheckBackend,
+  onSetToken,
+  onLogout
+}: { 
+  backendStatus: string;
+  isAuthenticated: boolean;
+  apiUrl: string;
+  onCheckBackend: () => void;
+  onSetToken: () => void;
+  onLogout: () => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const isConnected = backendStatus.includes('Connected') || backendStatus.includes('connected');
+  const isError = backendStatus.includes('error') || backendStatus.includes('Not Connected');
+  
+  return (
+    <Card className={`mb-4 ${isConnected ? 'border-green-200' : isError ? 'border-red-200' : 'border-yellow-200'}`}>
+      <CardHeader 
+        className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${
+              isConnected ? 'bg-green-100' : isError ? 'bg-red-100' : 'bg-yellow-100'
+            }`}>
+              {isConnected ? (
+                <Wifi className="h-5 w-5 text-green-600" />
+              ) : isError ? (
+                <WifiOff className="h-5 w-5 text-red-600" />
+              ) : (
+                <Loader2 className="h-5 w-5 text-yellow-600 animate-spin" />
+              )}
+            </div>
+            <div>
+              <h3 className="font-medium">Connection Status</h3>
+              <p className={`text-sm ${
+                isConnected ? 'text-green-600' : isError ? 'text-red-600' : 'text-yellow-600'
+              }`}>
+                {backendStatus}
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="p-4 pt-0 border-t space-y-3">
+          <div className="text-xs space-y-2">
+            <p><span className="font-medium">API URL:</span> {apiUrl}</p>
+            <p><span className="font-medium">Auth Status:</span> {isAuthenticated ? '✅' : '❌'}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button size="sm" variant="outline" onClick={onCheckBackend} className="w-full">
+              <Database className="mr-2 h-3 w-3" />
+              Check Connection
+            </Button>
+            <Button size="sm" variant="outline" onClick={onSetToken} className="w-full">
+              <Key className="mr-2 h-3 w-3" />
+              Set Token
+            </Button>
+            <Button size="sm" variant="destructive" onClick={onLogout} className="w-full">
+              <LogIn className="mr-2 h-3 w-3" />
+              Logout
+            </Button>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+// Mobile responsive debug card
+const DebugCard = ({
+  requestLogs,
+  onDebugPassword,
+  onGetPasswordInfo,
+  onResetPassword,
+  loading
+}: {
+  requestLogs: string[];
+  onDebugPassword: () => void;
+  onGetPasswordInfo: () => void;
+  onResetPassword: () => void;
+  loading: any;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Card className="mb-4 border-purple-200">
+      <CardHeader 
+        className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Bug className="h-5 w-5 text-purple-600" />
+            </div>
+            <CardTitle className="text-base">Debug Tools</CardTitle>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="p-4 pt-0 border-t space-y-4">
+          <div className="flex flex-col gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={onDebugPassword}
+              disabled={loading.debug}
+              className="w-full"
+            >
+              {loading.debug ? (
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+              ) : (
+                <Bug className="mr-2 h-3 w-3" />
+              )}
+              Debug Password
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={onGetPasswordInfo}
+              disabled={loading.passwordInfo}
+              className="w-full"
+            >
+              {loading.passwordInfo ? (
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+              ) : (
+                <Key className="mr-2 h-3 w-3" />
+              )}
+              Get Password Info
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              onClick={onResetPassword}
+              disabled={loading.reset}
+              className="w-full"
+            >
+              {loading.reset ? (
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+              ) : (
+                <AlertCircle className="mr-2 h-3 w-3" />
+              )}
+              Reset Password (Testing)
+            </Button>
+          </div>
+
+          {requestLogs.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium mb-2">Request Logs</h4>
+              <div className="bg-black/5 rounded-lg p-2 max-h-40 overflow-y-auto">
+                {requestLogs.map((log, index) => (
+                  <p key={index} className="text-xs font-mono py-1 border-b last:border-0">
+                    {log}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+// Mobile responsive profile form
+const MobileProfileForm = ({
+  profileData,
+  loading,
+  onUpdate
+}: {
+  profileData: any;
+  loading: any;
+  onUpdate: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+}) => {
+  return (
+    <form onSubmit={onUpdate} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">Full Name</Label>
+        <Input 
+          id="name"
+          value={profileData.name}
+          onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+          disabled={loading.profile}
+          placeholder="Enter your full name"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input 
+          id="email"
+          value={profileData.email}
+          disabled
+          className="bg-muted"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone</Label>
+        <Input 
+          id="phone"
+          value={profileData.phone}
+          onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+          disabled={loading.profile}
+          placeholder="Enter phone number"
+        />
+      </div>
+      <Button type="submit" disabled={loading.profile} className="w-full">
+        {loading.profile ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+          </>
+        ) : (
+          <>
+            <Save className="mr-2 h-4 w-4" /> Save Changes
+          </>
+        )}
+      </Button>
+    </form>
+  );
+};
+
+// Mobile responsive password form
+const MobilePasswordForm = ({
+  passwordData,
+  showPassword,
+  loading,
+  onUpdate,
+  onTogglePassword,
+  onClear,
+  debugInfo,
+  passwordInfo
+}: {
+  passwordData: any;
+  showPassword: any;
+  loading: any;
+  onUpdate: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  onTogglePassword: (field: 'current' | 'new' | 'confirm') => void;
+  onClear: () => void;
+  debugInfo: any;
+  passwordInfo: any;
+}) => {
+  return (
+    <form onSubmit={onUpdate} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="currentPassword">Current Password</Label>
+        <div className="relative">
+          <Input 
+            id="currentPassword"
+            type={showPassword.current ? "text" : "password"} 
+            value={passwordData.currentPassword}
+            onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+            disabled={loading.password}
+            placeholder="Enter current password"
+            required
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+            onClick={() => onTogglePassword('current')}
+          >
+            {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="newPassword">New Password</Label>
+        <div className="relative">
+          <Input 
+            id="newPassword"
+            type={showPassword.new ? "text" : "password"} 
+            value={passwordData.newPassword}
+            onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+            disabled={loading.password}
+            placeholder="Enter new password"
+            required
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+            onClick={() => onTogglePassword('new')}
+          >
+            {showPassword.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirm Password</Label>
+        <div className="relative">
+          <Input 
+            id="confirmPassword"
+            type={showPassword.confirm ? "text" : "password"} 
+            value={passwordData.confirmPassword}
+            onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+            disabled={loading.password}
+            placeholder="Confirm new password"
+            required
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+            onClick={() => onTogglePassword('confirm')}
+          >
+            {showPassword.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+      
+      <div className="flex flex-col gap-2">
+        <Button type="submit" disabled={loading.password} className="w-full">
+          {loading.password ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</>
+          ) : 'Update Password'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onClear} className="w-full">
+          Clear Fields
+        </Button>
+      </div>
+      
+      {/* Debug Info */}
+      {(debugInfo || passwordInfo) && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+          <div className="text-xs">
+            <p className="font-semibold mb-1">💡 Debug Information:</p>
+            {debugInfo && debugInfo.testResults?.some((r: any) => r.matches) ? (
+              <p className="text-green-600">
+                Matching password found! Current Password field has been auto-filled.
+              </p>
+            ) : (
+              <p className="text-yellow-600">
+                No matching password found. Try "Reset Password" or check backend logs.
+              </p>
+            )}
+            {passwordInfo && (
+              <p className="text-xs mt-1">
+                Hash length: {passwordInfo.passwordHashLength} chars
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </form>
+  );
+};
+
+// Mobile responsive permissions form
+const MobilePermissionsForm = ({
+  permissions,
+  loading,
+  onToggle,
+  onSave
+}: {
+  permissions: any;
+  loading: any;
+  onToggle: (key: string, checked: boolean) => void;
+  onSave: () => Promise<void>;
+}) => {
+  return (
+    <div className="space-y-4">
+      {Object.entries(permissions).map(([key, value]) => (
+        <div key={key} className="flex justify-between items-center py-2">
+          <Label className="capitalize text-sm">
+            {key.replace(/([A-Z])/g, ' $1').trim()}
+          </Label>
+          <Switch 
+            checked={value as boolean}
+            onCheckedChange={(checked) => onToggle(key, checked)}
+            disabled={loading.permissions}
+          />
+        </div>
+      ))}
+      <Button onClick={onSave} disabled={loading.permissions} className="w-full">
+        {loading.permissions ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+        ) : 'Save Permissions'}
+      </Button>
+    </div>
+  );
+};
+
 const Settings = () => {
+  const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [loading, setLoading] = useState({
     profile: false,
     password: false,
@@ -110,10 +560,26 @@ const Settings = () => {
   const [requestLogs, setRequestLogs] = useState<string[]>([]);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [passwordInfo, setPasswordInfo] = useState<any>(null);
+  
+  // Mobile responsive state
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState('profile');
 
   const addLog = (message: string) => {
     setRequestLogs(prev => [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev.slice(0, 9)]);
   };
+
+  // Check for mobile view on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const currentApiUrl = getApiUrl();
@@ -565,246 +1031,313 @@ const Settings = () => {
     }
   };
 
+  const togglePasswordVisibility = (field: 'current' | 'new' | 'confirm') => {
+    setShowPassword({...showPassword, [field]: !showPassword[field]});
+  };
+
+  const clearPasswordFields = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setShowPassword({
+      current: false,
+      new: false,
+      confirm: false
+    });
+    toast.info('Password fields cleared');
+  };
+
+  const togglePermission = (key: string, checked: boolean) => {
+    setPermissions({...permissions, [key]: checked});
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader title="Settings" />
+      <DashboardHeader 
+        title="Settings" 
+        onMenuClick={onMenuClick}
+      />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 space-y-6"
+        className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Settings Tabs */}
-        {isAuthenticated && (
-          <Tabs defaultValue="profile">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="profile">Profile</TabsTrigger>
-              <TabsTrigger value="security">Security</TabsTrigger>
-              <TabsTrigger value="permissions">Permissions</TabsTrigger>
-            </TabsList>
+        {/* Connection Status Card - Always visible on mobile */}
+        <ConnectionStatusCard
+          backendStatus={backendStatus}
+          isAuthenticated={isAuthenticated}
+          apiUrl={apiUrl}
+          onCheckBackend={checkBackend}
+          onSetToken={handleSetToken}
+          onLogout={handleLogout}
+        />
 
-            {/* Profile Tab */}
-            <TabsContent value="profile">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" /> Profile Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleProfileUpdate} className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>Full Name</Label>
-                      <Input 
-                        value={profileData.name}
-                        onChange={(e) => setProfileData({...profileData, name: e.target.value})}
-                        disabled={loading.profile}
-                        placeholder="Enter your full name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input 
-                        value={profileData.email}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Phone</Label>
-                      <Input 
-                        value={profileData.phone}
-                        onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                        disabled={loading.profile}
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    <Button type="submit" disabled={loading.profile} className="w-full">
-                      {loading.profile ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" /> Save Changes
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
+        {/* Debug Card - Always visible on mobile */}
+        <DebugCard
+          requestLogs={requestLogs}
+          onDebugPassword={handleDebugPassword}
+          onGetPasswordInfo={handleGetPasswordInfo}
+          onResetPassword={handleResetPasswordForTesting}
+          loading={loading}
+        />
 
-            {/* Security Tab */}
-            <TabsContent value="security">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Lock className="h-5 w-5" /> Change Password
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handlePasswordUpdate} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Current Password</Label>
-                      <div className="relative">
+        {/* Settings Tabs - Desktop View */}
+        {isMobileView ? (
+          // Mobile View - Cards for each section
+          <div className="space-y-4">
+            <MobileSettingsCard title="Profile Settings" icon={User}>
+              <MobileProfileForm
+                profileData={profileData}
+                loading={loading}
+                onUpdate={handleProfileUpdate}
+              />
+            </MobileSettingsCard>
+
+            <MobileSettingsCard title="Change Password" icon={Lock}>
+              <MobilePasswordForm
+                passwordData={passwordData}
+                showPassword={showPassword}
+                loading={loading}
+                onUpdate={handlePasswordUpdate}
+                onTogglePassword={togglePasswordVisibility}
+                onClear={clearPasswordFields}
+                debugInfo={debugInfo}
+                passwordInfo={passwordInfo}
+              />
+            </MobileSettingsCard>
+
+            <MobileSettingsCard title="Permissions" icon={Shield}>
+              <MobilePermissionsForm
+                permissions={permissions}
+                loading={loading}
+                onToggle={togglePermission}
+                onSave={handlePermissionsUpdate}
+              />
+            </MobileSettingsCard>
+          </div>
+        ) : (
+          // Desktop View - Tabs
+          isAuthenticated && (
+            <Tabs defaultValue="profile" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+                <TabsTrigger value="security">Security</TabsTrigger>
+                <TabsTrigger value="permissions">Permissions</TabsTrigger>
+              </TabsList>
+
+              {/* Profile Tab */}
+              <TabsContent value="profile">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" /> Profile Settings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleProfileUpdate} className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="name-desktop">Full Name</Label>
                         <Input 
-                          name="currentPassword" 
-                          type={showPassword.current ? "text" : "password"} 
-                          value={passwordData.currentPassword}
-                          onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
-                          disabled={loading.password}
-                          placeholder="Enter current password"
-                          required
+                          id="name-desktop"
+                          value={profileData.name}
+                          onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                          disabled={loading.profile}
+                          placeholder="Enter your full name"
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                          onClick={() => setShowPassword({...showPassword, current: !showPassword.current})}
-                        >
-                          {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>New Password</Label>
-                      <div className="relative">
+                      <div className="space-y-2">
+                        <Label htmlFor="email-desktop">Email</Label>
                         <Input 
-                          name="newPassword" 
-                          type={showPassword.new ? "text" : "password"} 
-                          value={passwordData.newPassword}
-                          onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
-                          disabled={loading.password}
-                          placeholder="Enter new password"
-                          required
+                          id="email-desktop"
+                          value={profileData.email}
+                          disabled
+                          className="bg-muted"
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                          onClick={() => setShowPassword({...showPassword, new: !showPassword.new})}
-                        >
-                          {showPassword.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Confirm Password</Label>
-                      <div className="relative">
+                      <div className="space-y-2">
+                        <Label htmlFor="phone-desktop">Phone</Label>
                         <Input 
-                          name="confirmPassword" 
-                          type={showPassword.confirm ? "text" : "password"} 
-                          value={passwordData.confirmPassword}
-                          onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
-                          disabled={loading.password}
-                          placeholder="Confirm new password"
-                          required
+                          id="phone-desktop"
+                          value={profileData.phone}
+                          onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                          disabled={loading.profile}
+                          placeholder="Enter phone number"
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                          onClick={() => setShowPassword({...showPassword, confirm: !showPassword.confirm})}
-                        >
-                          {showPassword.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
                       </div>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button type="submit" disabled={loading.password} className="flex-1">
-                        {loading.password ? (
-                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</>
-                        ) : 'Update Password'}
+                      <Button type="submit" disabled={loading.profile} className="w-full">
+                        {loading.profile ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" /> Save Changes
+                          </>
+                        )}
                       </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => {
-                          setPasswordData({
-                            currentPassword: '',
-                            newPassword: '',
-                            confirmPassword: ''
-                          });
-                          setShowPassword({
-                            current: false,
-                            new: false,
-                            confirm: false
-                          });
-                          toast.info('Password fields cleared');
-                        }}
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                    
-                    {/* Debug Info */}
-                    {(debugInfo || passwordInfo) && (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                        <div className="text-xs">
-                          <p className="font-semibold mb-1">💡 Debug Information:</p>
-                          {debugInfo && debugInfo.testResults.some((r: any) => r.matches) ? (
-                            <p className="text-green-600">
-                              Matching password found! Current Password field has been auto-filled.
-                            </p>
-                          ) : (
-                            <p className="text-yellow-600">
-                              No matching password found. Try "Reset Password" or check backend logs.
-                            </p>
-                          )}
-                          {passwordInfo && (
-                            <p className="text-xs mt-1">
-                              Hash length: {passwordInfo.passwordHashLength} chars
-                            </p>
-                          )}
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Security Tab */}
+              <TabsContent value="security">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Lock className="h-5 w-5" /> Change Password
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="currentPassword-desktop">Current Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="currentPassword-desktop"
+                            type={showPassword.current ? "text" : "password"} 
+                            value={passwordData.currentPassword}
+                            onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                            disabled={loading.password}
+                            placeholder="Enter current password"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                            onClick={() => togglePasswordVisibility('current')}
+                          >
+                            {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="newPassword-desktop">New Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="newPassword-desktop"
+                            type={showPassword.new ? "text" : "password"} 
+                            value={passwordData.newPassword}
+                            onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                            disabled={loading.password}
+                            placeholder="Enter new password"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                            onClick={() => togglePasswordVisibility('new')}
+                          >
+                            {showPassword.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword-desktop">Confirm Password</Label>
+                        <div className="relative">
+                          <Input 
+                            id="confirmPassword-desktop"
+                            type={showPassword.confirm ? "text" : "password"} 
+                            value={passwordData.confirmPassword}
+                            onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                            disabled={loading.password}
+                            placeholder="Confirm new password"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                            onClick={() => togglePasswordVisibility('confirm')}
+                          >
+                            {showPassword.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button type="submit" disabled={loading.password} className="flex-1">
+                          {loading.password ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</>
+                          ) : 'Update Password'}
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={clearPasswordFields}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                      
+                      {/* Debug Info */}
+                      {(debugInfo || passwordInfo) && (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                          <div className="text-xs">
+                            <p className="font-semibold mb-1">💡 Debug Information:</p>
+                            {debugInfo && debugInfo.testResults?.some((r: any) => r.matches) ? (
+                              <p className="text-green-600">
+                                Matching password found! Current Password field has been auto-filled.
+                              </p>
+                            ) : (
+                              <p className="text-yellow-600">
+                                No matching password found. Try "Reset Password" or check backend logs.
+                              </p>
+                            )}
+                            {passwordInfo && (
+                              <p className="text-xs mt-1">
+                                Hash length: {passwordInfo.passwordHashLength} chars
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* Permissions Tab */}
-            <TabsContent value="permissions">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" /> Permissions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {Object.entries(permissions).map(([key, value]) => (
-                    <div key={key} className="flex justify-between items-center">
-                      <div>
+              {/* Permissions Tab */}
+              <TabsContent value="permissions">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" /> Permissions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {Object.entries(permissions).map(([key, value]) => (
+                      <div key={key} className="flex justify-between items-center">
                         <Label className="capitalize">
                           {key.replace(/([A-Z])/g, ' $1').trim()}
                         </Label>
+                        <Switch 
+                          checked={value}
+                          onCheckedChange={(checked) => togglePermission(key, checked)}
+                          disabled={loading.permissions}
+                        />
                       </div>
-                      <Switch 
-                        checked={value}
-                        onCheckedChange={(checked) => 
-                          setPermissions({...permissions, [key]: checked})
-                        }
-                        disabled={loading.permissions}
-                      />
-                    </div>
-                  ))}
-                  <Button onClick={handlePermissionsUpdate} disabled={loading.permissions} className="w-full">
-                    {loading.permissions ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
-                    ) : 'Save Permissions'}
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                    ))}
+                    <Button onClick={handlePermissionsUpdate} disabled={loading.permissions} className="w-full">
+                      {loading.permissions ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                      ) : 'Save Permissions'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          )
         )}
       </motion.div>
     </div>

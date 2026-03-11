@@ -226,6 +226,7 @@ export const createEmployee = async (req: Request, res: Response) => {
 
     console.log('Employee created successfully:', savedEmployee._id);
 
+    // Return the full employee object with all fields
     res.status(201).json({
       success: true,
       message: 'Employee created successfully',

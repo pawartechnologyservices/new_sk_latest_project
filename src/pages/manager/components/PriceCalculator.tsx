@@ -276,18 +276,18 @@ const initialStaffBriefings: StaffBriefing[] = [
 
 const departments = ['All Departments', 'Housekeeping', 'Security', 'Maintenance', 'Operations', 'Front Desk', 'Administration', 'IT Support'];
 const trainingTypes = [
-  { value: 'safety', label: 'Safety Training', color: 'bg-red-100 text-red-800' },
-  { value: 'technical', label: 'Technical Training', color: 'bg-blue-100 text-blue-800' },
-  { value: 'soft_skills', label: 'Soft Skills', color: 'bg-green-100 text-green-800' },
-  { value: 'compliance', label: 'Compliance', color: 'bg-purple-100 text-purple-800' },
-  { value: 'other', label: 'Other', color: 'bg-gray-100 text-gray-800' }
+  { value: 'safety', label: 'Safety Training', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+  { value: 'technical', label: 'Technical Training', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
+  { value: 'soft_skills', label: 'Soft Skills', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+  { value: 'compliance', label: 'Compliance', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' },
+  { value: 'other', label: 'Other', color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' }
 ];
 const shifts = ['morning', 'evening', 'night'];
 const priorities = ['low', 'medium', 'high'];
 const sites = ['Main Building', 'Parking Area', 'IT Building', 'Warehouse', 'Admin Block', 'All Sites'];
 const supervisors = ['John Safety Officer', 'Robert Engineer', 'Sarah Customer Manager', 'Manager Smith', 'Supervisor Lee', 'Manager Garcia', 'Team Lead Brown'];
 
-const PriceCalculator: React.FC = () => {
+const TrainingBriefingSection: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'training' | 'briefing'>('training');
   const [trainingSessions, setTrainingSessions] = useState<TrainingSession[]>(initialTrainingSessions);
   const [staffBriefings, setStaffBriefings] = useState<StaffBriefing[]>(initialStaffBriefings);
@@ -619,31 +619,31 @@ const PriceCalculator: React.FC = () => {
   // Get status badge color
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'ongoing': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'scheduled': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'ongoing': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
   // Get priority badge color
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
   // Get shift badge color
   const getShiftBadge = (shift: string) => {
     switch (shift) {
-      case 'morning': return 'bg-blue-100 text-blue-800';
-      case 'evening': return 'bg-purple-100 text-purple-800';
-      case 'night': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'morning': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'evening': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'night': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
@@ -708,52 +708,393 @@ const PriceCalculator: React.FC = () => {
 
   const calendarEvents = getCalendarEvents();
 
+  // Mobile card component for training sessions
+  const MobileTrainingCard = ({ session }: { session: TrainingSession }) => (
+    <div className="border rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{session.title}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{session.description}</p>
+        </div>
+        <div className="flex flex-col gap-2 ml-2 flex-shrink-0">
+          <Badge className={trainingTypes.find(t => t.value === session.type)?.color}>
+            {trainingTypes.find(t => t.value === session.type)?.label}
+          </Badge>
+          <Badge className={getStatusBadge(session.status)}>
+            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+          </Badge>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center gap-2 min-w-0">
+          <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{formatDate(session.date)}</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{session.time}</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{session.trainer}</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{session.attendees.length}/{session.maxAttendees}</span>
+        </div>
+      </div>
+      
+      <div className="flex flex-wrap gap-2 pt-2 border-t dark:border-gray-700">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" className="flex-1 min-w-[80px]">
+              <Eye className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">View</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="w-[95vw] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Training Session Details</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold">{session.title}</h3>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">{session.description}</p>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Date & Time</p>
+                  <p className="text-sm">{formatDate(session.date)} at {session.time}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Duration</p>
+                  <p className="text-sm">{session.duration}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Trainer</p>
+                  <p className="text-sm">{session.trainer}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Supervisor</p>
+                  <p className="text-sm">{session.supervisor}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Site</p>
+                  <p className="text-sm">{session.site}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Department</p>
+                  <p className="text-sm">{session.department}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Location</p>
+                  <p className="text-sm">{session.location}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Status</p>
+                  <Badge className={getStatusBadge(session.status)}>
+                    {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                  </Badge>
+                </div>
+              </div>
+              
+              {session.objectives.length > 0 && (
+                <div>
+                  <h4 className="text-sm sm:text-base font-medium mb-2">Objectives</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {session.objectives.map((obj, idx) => (
+                      <li key={idx} className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{obj}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {session.feedback.length > 0 && (
+                <div>
+                  <h4 className="text-sm sm:text-base font-medium mb-2">Feedback</h4>
+                  <div className="space-y-2">
+                    {session.feedback.map(fb => (
+                      <div key={fb.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                          <p className="font-medium text-sm">{fb.employeeName}</p>
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className={`h-3 w-3 sm:h-4 sm:w-4 ${i < fb.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">{fb.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        
+        <Select
+          value={session.status}
+          onValueChange={(value: any) => updateTrainingStatus(session.id, value)}
+        >
+          <SelectTrigger className="flex-1 min-w-[100px] h-8 text-xs sm:text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="scheduled">Scheduled</SelectItem>
+            <SelectItem value="ongoing">Ongoing</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => deleteTraining(session.id)}
+          className="flex-shrink-0 px-2"
+        >
+          <Trash2 className="h-4 w-4 text-red-500" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Mobile card component for staff briefings
+  const MobileBriefingCard = ({ briefing }: { briefing: StaffBriefing }) => (
+    <div className="border rounded-lg p-4 space-y-3 bg-white dark:bg-gray-800">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+            Briefing - {briefing.site}
+          </h3>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge className={getShiftBadge(briefing.shift)}>
+              {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
+            </Badge>
+            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">by {briefing.conductedBy}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center gap-2 min-w-0">
+          <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{formatDate(briefing.date)}</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{briefing.time}</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Building className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{briefing.department}</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-400 truncate">{briefing.attendeesCount} attendees</span>
+        </div>
+      </div>
+      
+      {briefing.topics.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {briefing.topics.slice(0, 3).map((topic, idx) => (
+            <Badge key={idx} variant="outline" className="text-xs">
+              {topic}
+            </Badge>
+          ))}
+          {briefing.topics.length > 3 && (
+            <Badge variant="outline" className="text-xs">+{briefing.topics.length - 3}</Badge>
+          )}
+        </div>
+      )}
+      
+      <div className="flex gap-2 pt-2 border-t dark:border-gray-700">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" className="flex-1 min-w-[80px]">
+              <Eye className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">View</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="w-[95vw] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">Staff Briefing Details</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold">
+                  {briefing.site} - {briefing.department}
+                </h3>
+                <div className="flex flex-wrap items-center gap-3 mt-1">
+                  <Badge className={getShiftBadge(briefing.shift)}>
+                    {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
+                  </Badge>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Conducted by {briefing.conductedBy}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Date & Time</p>
+                  <p className="text-sm">{formatDate(briefing.date)} at {briefing.time}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Attendees</p>
+                  <p className="text-sm">{briefing.attendeesCount} staff members</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Site</p>
+                  <p className="text-sm">{briefing.site}</p>
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Department</p>
+                  <p className="text-sm">{briefing.department}</p>
+                </div>
+              </div>
+              
+              {briefing.topics.length > 0 && (
+                <div>
+                  <h4 className="text-sm sm:text-base font-medium mb-2">Topics Discussed</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {briefing.topics.map((topic, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">{topic}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {briefing.keyPoints.length > 0 && (
+                <div>
+                  <h4 className="text-sm sm:text-base font-medium mb-2">Key Points</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {briefing.keyPoints.map((point, idx) => (
+                      <li key={idx} className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {briefing.actionItems.length > 0 && (
+                <div>
+                  <h4 className="text-sm sm:text-base font-medium mb-2">Action Items</h4>
+                  <div className="space-y-2">
+                    {briefing.actionItems.map(item => (
+                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded gap-2">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => updateActionItemStatus(
+                              briefing.id,
+                              item.id,
+                              item.status === 'completed' ? 'pending' : 'completed'
+                            )}
+                            className="flex-shrink-0 p-1 h-auto"
+                          >
+                            {item.status === 'completed' ? (
+                              <CheckSquare className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Square className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{item.description}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                              <span className="truncate">Assigned: {item.assignedTo}</span>
+                              <span className="whitespace-nowrap">Due: {formatDate(item.dueDate)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge className={getPriorityBadge(item.priority) + " sm:ml-2 self-start sm:self-center"}>
+                          {item.priority.toUpperCase()}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {briefing.notes && (
+                <div>
+                  <h4 className="text-sm sm:text-base font-medium mb-2">Notes</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded">
+                    {briefing.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => deleteBriefing(briefing.id)}
+          className="flex-shrink-0 px-2"
+        >
+          <Trash2 className="h-4 w-4 text-red-500" />
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <div className="min-h-screen bg-background p-3 sm:p-4 md:p-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-6 sm:mb-8"
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Training & Staff Briefing</h1>
-            <p className="text-gray-600 mt-2">Manage training sessions and daily staff briefings</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Training & Staff Briefing</h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
+              Manage training sessions and daily staff briefings
+            </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button 
               variant="outline" 
               onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
+              className="flex-1 sm:flex-none min-w-[100px]"
             >
               {viewMode === 'list' ? (
                 <>
-                  <CalendarDays className="h-4 w-4 mr-2" />
-                  Calendar View
+                  <CalendarDays className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Calendar View</span>
+                  <span className="sm:hidden">Calendar</span>
                 </>
               ) : (
                 <>
-                  <List className="h-4 w-4 mr-2" />
-                  List View
+                  <List className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">List View</span>
+                  <span className="sm:hidden">List</span>
                 </>
               )}
             </Button>
             <Dialog open={showAddTraining} onOpenChange={setShowAddTraining}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Training
+                <Button className="flex-1 sm:flex-none min-w-[100px]">
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Add Training</span>
+                  <span className="sm:hidden">Training</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="w-[95vw] sm:w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle>Add New Training Session</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg sm:text-xl">Add New Training Session</DialogTitle>
+                  <DialogDescription className="text-sm">
                     Schedule a new training session for your team.
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 py-4">
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Training Title *</label>
@@ -761,6 +1102,7 @@ const PriceCalculator: React.FC = () => {
                         placeholder="Enter training title"
                         value={trainingForm.title}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -770,7 +1112,7 @@ const PriceCalculator: React.FC = () => {
                         value={trainingForm.type}
                         onValueChange={(value: any) => setTrainingForm(prev => ({ ...prev, type: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -789,6 +1131,7 @@ const PriceCalculator: React.FC = () => {
                         type="date"
                         value={trainingForm.date}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -798,6 +1141,7 @@ const PriceCalculator: React.FC = () => {
                         type="time"
                         value={trainingForm.time}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, time: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -807,6 +1151,7 @@ const PriceCalculator: React.FC = () => {
                         placeholder="e.g., 2 hours"
                         value={trainingForm.duration}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, duration: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -816,6 +1161,7 @@ const PriceCalculator: React.FC = () => {
                         placeholder="Enter trainer name"
                         value={trainingForm.trainer}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, trainer: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -825,7 +1171,7 @@ const PriceCalculator: React.FC = () => {
                         value={trainingForm.supervisor}
                         onValueChange={(value) => setTrainingForm(prev => ({ ...prev, supervisor: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select supervisor" />
                         </SelectTrigger>
                         <SelectContent>
@@ -846,7 +1192,7 @@ const PriceCalculator: React.FC = () => {
                         value={trainingForm.site}
                         onValueChange={(value) => setTrainingForm(prev => ({ ...prev, site: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select site" />
                         </SelectTrigger>
                         <SelectContent>
@@ -865,7 +1211,7 @@ const PriceCalculator: React.FC = () => {
                         value={trainingForm.department}
                         onValueChange={(value) => setTrainingForm(prev => ({ ...prev, department: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -885,6 +1231,7 @@ const PriceCalculator: React.FC = () => {
                         min="1"
                         value={trainingForm.maxAttendees}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, maxAttendees: parseInt(e.target.value) || 1 }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -894,6 +1241,7 @@ const PriceCalculator: React.FC = () => {
                         placeholder="Enter location"
                         value={trainingForm.location}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, location: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -906,6 +1254,7 @@ const PriceCalculator: React.FC = () => {
                               placeholder={`Objective ${index + 1}`}
                               value={objective}
                               onChange={(e) => updateObjective(index, e.target.value)}
+                              className="flex-1"
                             />
                             {trainingForm.objectives.length > 1 && (
                               <Button
@@ -913,6 +1262,7 @@ const PriceCalculator: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeObjective(index)}
+                                className="flex-shrink-0"
                               >
                                 <XCircle className="h-4 w-4 text-red-500" />
                               </Button>
@@ -924,6 +1274,7 @@ const PriceCalculator: React.FC = () => {
                           variant="outline"
                           size="sm"
                           onClick={addObjective}
+                          className="w-full"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Objective
@@ -938,17 +1289,20 @@ const PriceCalculator: React.FC = () => {
                         value={trainingForm.description}
                         onChange={(e) => setTrainingForm(prev => ({ ...prev, description: e.target.value }))}
                         rows={3}
+                        className="w-full"
                       />
                     </div>
                   </div>
                 </div>
                 
                 {/* Attachments Section */}
-                <div className="py-4">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="py-4 border-t dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold">Attachments</h3>
-                      <p className="text-sm text-gray-500">Upload training materials, photos, or videos</p>
+                      <h3 className="text-base sm:text-lg font-semibold">Attachments</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        Upload training materials, photos, or videos
+                      </p>
                     </div>
                     <div>
                       <input
@@ -963,6 +1317,7 @@ const PriceCalculator: React.FC = () => {
                         type="button"
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
+                        className="w-full sm:w-auto"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         Upload Files
@@ -971,19 +1326,19 @@ const PriceCalculator: React.FC = () => {
                   </div>
                   
                   {attachments.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
                       {attachments.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             {file.type.startsWith('image/') ? (
-                              <ImageIcon className="h-5 w-5 text-blue-500" />
+                              <ImageIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
                             ) : file.type.startsWith('video/') ? (
-                              <Video className="h-5 w-5 text-red-500" />
+                              <Video className="h-5 w-5 text-red-500 flex-shrink-0" />
                             ) : (
-                              <File className="h-5 w-5 text-gray-500" />
+                              <File className="h-5 w-5 text-gray-500 flex-shrink-0" />
                             )}
-                            <div>
-                              <p className="text-sm font-medium">{file.name}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{file.name}</p>
                               <p className="text-xs text-gray-500">
                                 {(file.size / (1024 * 1024)).toFixed(1)} MB
                               </p>
@@ -993,6 +1348,7 @@ const PriceCalculator: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => removeAttachment(index)}
+                            className="flex-shrink-0"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -1002,31 +1358,32 @@ const PriceCalculator: React.FC = () => {
                   )}
                 </div>
                 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
+                    <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
                   </DialogClose>
-                  <Button onClick={handleAddTraining}>Add Training Session</Button>
+                  <Button onClick={handleAddTraining} className="w-full sm:w-auto">Add Training Session</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
             
             <Dialog open={showAddBriefing} onOpenChange={setShowAddBriefing}>
               <DialogTrigger asChild>
-                <Button variant="secondary">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Briefing
+                <Button variant="secondary" className="flex-1 sm:flex-none min-w-[100px]">
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Add Briefing</span>
+                  <span className="sm:hidden">Briefing</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="w-[95vw] sm:w-full max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
                 <DialogHeader>
-                  <DialogTitle>Add New Staff Briefing</DialogTitle>
-                  <DialogDescription>
+                  <DialogTitle className="text-lg sm:text-xl">Add New Staff Briefing</DialogTitle>
+                  <DialogDescription className="text-sm">
                     Record daily staff briefing details and action items.
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 py-4">
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Date *</label>
@@ -1034,6 +1391,7 @@ const PriceCalculator: React.FC = () => {
                         type="date"
                         value={briefingForm.date}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -1043,6 +1401,7 @@ const PriceCalculator: React.FC = () => {
                         type="time"
                         value={briefingForm.time}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, time: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -1052,7 +1411,7 @@ const PriceCalculator: React.FC = () => {
                         value={briefingForm.shift}
                         onValueChange={(value: any) => setBriefingForm(prev => ({ ...prev, shift: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select shift" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1071,6 +1430,7 @@ const PriceCalculator: React.FC = () => {
                         placeholder="Enter conductor name"
                         value={briefingForm.conductedBy}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, conductedBy: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -1080,6 +1440,7 @@ const PriceCalculator: React.FC = () => {
                         placeholder="Enter site/location"
                         value={briefingForm.site}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, site: e.target.value }))}
+                        className="w-full"
                       />
                     </div>
                     
@@ -1089,7 +1450,7 @@ const PriceCalculator: React.FC = () => {
                         value={briefingForm.department}
                         onValueChange={(value) => setBriefingForm(prev => ({ ...prev, department: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1109,6 +1470,7 @@ const PriceCalculator: React.FC = () => {
                         min="0"
                         value={briefingForm.attendeesCount}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, attendeesCount: parseInt(e.target.value) || 0 }))}
+                        className="w-full"
                       />
                     </div>
                   </div>
@@ -1123,6 +1485,7 @@ const PriceCalculator: React.FC = () => {
                               placeholder={`Topic ${index + 1}`}
                               value={topic}
                               onChange={(e) => updateTopic(index, e.target.value)}
+                              className="flex-1"
                             />
                             {briefingForm.topics.length > 1 && (
                               <Button
@@ -1130,6 +1493,7 @@ const PriceCalculator: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeTopic(index)}
+                                className="flex-shrink-0"
                               >
                                 <XCircle className="h-4 w-4 text-red-500" />
                               </Button>
@@ -1141,6 +1505,7 @@ const PriceCalculator: React.FC = () => {
                           variant="outline"
                           size="sm"
                           onClick={addTopic}
+                          className="w-full"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Topic
@@ -1157,6 +1522,7 @@ const PriceCalculator: React.FC = () => {
                               placeholder={`Key point ${index + 1}`}
                               value={point}
                               onChange={(e) => updateKeyPoint(index, e.target.value)}
+                              className="flex-1"
                             />
                             {briefingForm.keyPoints.length > 1 && (
                               <Button
@@ -1164,6 +1530,7 @@ const PriceCalculator: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeKeyPoint(index)}
+                                className="flex-shrink-0"
                               >
                                 <XCircle className="h-4 w-4 text-red-500" />
                               </Button>
@@ -1175,6 +1542,7 @@ const PriceCalculator: React.FC = () => {
                           variant="outline"
                           size="sm"
                           onClick={addKeyPoint}
+                          className="w-full"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Key Point
@@ -1189,22 +1557,26 @@ const PriceCalculator: React.FC = () => {
                         value={briefingForm.notes}
                         onChange={(e) => setBriefingForm(prev => ({ ...prev, notes: e.target.value }))}
                         rows={3}
+                        className="w-full"
                       />
                     </div>
                   </div>
                 </div>
                 
                 {/* Action Items Section */}
-                <div className="py-4">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="py-4 border-t dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold">Action Items</h3>
-                      <p className="text-sm text-gray-500">Add tasks assigned during the briefing</p>
+                      <h3 className="text-base sm:text-lg font-semibold">Action Items</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        Add tasks assigned during the briefing
+                      </p>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
                       onClick={addActionItem}
+                      className="w-full sm:w-auto"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Action Item
@@ -1212,13 +1584,14 @@ const PriceCalculator: React.FC = () => {
                   </div>
                   
                   {briefingForm.actionItems.map((item, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg mb-3">
-                      <div>
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-3">
+                      <div className="sm:col-span-2">
                         <label className="text-xs font-medium mb-1 block">Description</label>
                         <Input
                           placeholder="Task description"
                           value={item.description}
                           onChange={(e) => updateActionItem(index, 'description', e.target.value)}
+                          className="w-full"
                         />
                       </div>
                       <div>
@@ -1227,6 +1600,7 @@ const PriceCalculator: React.FC = () => {
                           placeholder="Person/Team"
                           value={item.assignedTo}
                           onChange={(e) => updateActionItem(index, 'assignedTo', e.target.value)}
+                          className="w-full"
                         />
                       </div>
                       <div>
@@ -1235,16 +1609,17 @@ const PriceCalculator: React.FC = () => {
                           type="date"
                           value={item.dueDate}
                           onChange={(e) => updateActionItem(index, 'dueDate', e.target.value)}
+                          className="w-full"
                         />
                       </div>
-                      <div className="flex items-end gap-2">
+                      <div className="flex items-end gap-2 sm:col-span-4">
                         <div className="flex-1">
                           <label className="text-xs font-medium mb-1 block">Priority</label>
                           <Select
                             value={item.priority}
                             onValueChange={(value: any) => updateActionItem(index, 'priority', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1261,6 +1636,7 @@ const PriceCalculator: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeActionItem(index)}
+                          className="mb-0.5"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
@@ -1270,11 +1646,13 @@ const PriceCalculator: React.FC = () => {
                 </div>
                 
                 {/* Attachments Section */}
-                <div className="py-4">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="py-4 border-t dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold">Attachments</h3>
-                      <p className="text-sm text-gray-500">Upload photos, documents, or other files</p>
+                      <h3 className="text-base sm:text-lg font-semibold">Attachments</h3>
+                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        Upload photos, documents, or other files
+                      </p>
                     </div>
                     <div>
                       <input
@@ -1289,6 +1667,7 @@ const PriceCalculator: React.FC = () => {
                         type="button"
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
+                        className="w-full sm:w-auto"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         Upload Files
@@ -1297,19 +1676,19 @@ const PriceCalculator: React.FC = () => {
                   </div>
                   
                   {attachments.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
                       {attachments.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             {file.type.startsWith('image/') ? (
-                              <ImageIcon className="h-5 w-5 text-blue-500" />
+                              <ImageIcon className="h-5 w-5 text-blue-500 flex-shrink-0" />
                             ) : file.type.startsWith('video/') ? (
-                              <Video className="h-5 w-5 text-red-500" />
+                              <Video className="h-5 w-5 text-red-500 flex-shrink-0" />
                             ) : (
-                              <File className="h-5 w-5 text-gray-500" />
+                              <File className="h-5 w-5 text-gray-500 flex-shrink-0" />
                             )}
-                            <div>
-                              <p className="text-sm font-medium">{file.name}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{file.name}</p>
                               <p className="text-xs text-gray-500">
                                 {(file.size / (1024 * 1024)).toFixed(1)} MB
                               </p>
@@ -1319,6 +1698,7 @@ const PriceCalculator: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => removeAttachment(index)}
+                            className="flex-shrink-0"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -1328,11 +1708,11 @@ const PriceCalculator: React.FC = () => {
                   )}
                 </div>
                 
-                <DialogFooter>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
                   <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
+                    <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
                   </DialogClose>
-                  <Button onClick={handleAddBriefing}>Add Staff Briefing</Button>
+                  <Button onClick={handleAddBriefing} className="w-full sm:w-auto">Add Staff Briefing</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -1340,76 +1720,70 @@ const PriceCalculator: React.FC = () => {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Training Sessions</p>
-                  <p className="text-2xl font-bold text-gray-900">{trainingSessions.length}</p>
-                  <p className="text-xs text-green-600 mt-1">
-                    +2 this week
-                  </p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Total Training</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{trainingSessions.length}</p>
+                  <p className="text-xs text-green-600 mt-1 hidden sm:block">+2 this week</p>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Calendar className="h-6 w-6 text-blue-600" />
+                <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900 rounded-full flex-shrink-0">
+                  <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-300" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Staff Briefings</p>
-                  <p className="text-2xl font-bold text-gray-900">{staffBriefings.length}</p>
-                  <p className="text-xs text-green-600 mt-1">
-                    Daily average: 3
-                  </p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Briefings</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{staffBriefings.length}</p>
+                  <p className="text-xs text-green-600 mt-1 hidden sm:block">Daily avg: 3</p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <Users className="h-6 w-6 text-green-600" />
+                <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900 rounded-full flex-shrink-0">
+                  <Users className="h-4 w-4 sm:h-6 sm:w-6 text-green-600 dark:text-green-300" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Completed Training</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Completed</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {trainingSessions.filter(t => t.status === 'completed').length}
                   </p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {Math.round((trainingSessions.filter(t => t.status === 'completed').length / trainingSessions.length) * 100)}% completion rate
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 hidden sm:block">
+                    {Math.round((trainingSessions.filter(t => t.status === 'completed').length / trainingSessions.length) * 100)}% rate
                   </p>
                 </div>
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <CheckCircle className="h-6 w-6 text-purple-600" />
+                <div className="p-2 sm:p-3 bg-purple-100 dark:bg-purple-900 rounded-full flex-shrink-0">
+                  <CheckCircle className="h-4 w-4 sm:h-6 sm:w-6 text-purple-600 dark:text-purple-300" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Pending Actions</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Pending Actions</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {staffBriefings.reduce((acc, briefing) => 
                       acc + briefing.actionItems.filter(a => a.status === 'pending').length, 0
                     )}
                   </p>
-                  <p className="text-xs text-red-600 mt-1">
-                    Requires attention
-                  </p>
+                  <p className="text-xs text-red-600 mt-1 hidden sm:block">Needs attention</p>
                 </div>
-                <div className="p-3 bg-red-100 rounded-full">
-                  <AlertCircle className="h-6 w-6 text-red-600" />
+                <div className="p-2 sm:p-3 bg-red-100 dark:bg-red-900 rounded-full flex-shrink-0">
+                  <AlertCircle className="h-4 w-4 sm:h-6 sm:w-6 text-red-600 dark:text-red-300" />
                 </div>
               </div>
             </CardContent>
@@ -1421,15 +1795,17 @@ const PriceCalculator: React.FC = () => {
       {viewMode === 'list' ? (
         <>
           {/* Tabs */}
-          <Tabs defaultValue="training" className="mb-6" onValueChange={(value: any) => setActiveTab(value)}>
-            <TabsList className="grid w-full md:w-auto grid-cols-2">
-              <TabsTrigger value="training" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Training Sessions
+          <Tabs defaultValue="training" className="mb-4 sm:mb-6" onValueChange={(value: any) => setActiveTab(value)}>
+            <TabsList className="grid w-full sm:w-auto grid-cols-2">
+              <TabsTrigger value="training" className="flex items-center gap-2 text-xs sm:text-sm">
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Training</span>
+                <span className="xs:hidden">TRN</span>
               </TabsTrigger>
-              <TabsTrigger value="briefing" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Staff Briefings
+              <TabsTrigger value="briefing" className="flex items-center gap-2 text-xs sm:text-sm">
+                <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Briefings</span>
+                <span className="xs:hidden">BRF</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1439,27 +1815,27 @@ const PriceCalculator: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="mb-6"
+            className="mb-4 sm:mb-6"
           >
             <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                  <div className="flex items-center gap-2 w-full md:w-auto">
-                    <Search className="h-4 w-4 text-gray-400" />
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
                     <Input
-                      placeholder={activeTab === 'training' ? "Search training sessions..." : "Search staff briefings..."}
+                      placeholder={activeTab === 'training' ? "Search training..." : "Search briefings..."}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full md:w-64"
+                      className="w-full sm:w-64 text-sm"
                     />
                   </div>
                   
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4 text-gray-400" />
+                      <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
                       <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="All Departments" />
+                        <SelectTrigger className="w-32 sm:w-40 text-sm">
+                          <SelectValue placeholder="All Depts" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Departments</SelectItem>
@@ -1472,8 +1848,8 @@ const PriceCalculator: React.FC = () => {
                     
                     {activeTab === 'training' && (
                       <Select value={filterStatus} onValueChange={setFilterStatus}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="All Status" />
+                        <SelectTrigger className="w-28 sm:w-32 text-sm">
+                          <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Status</SelectItem>
@@ -1485,9 +1861,9 @@ const PriceCalculator: React.FC = () => {
                       </Select>
                     )}
                     
-                    <Button variant="outline" size="sm">
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
+                    <Button variant="outline" size="sm" className="text-sm">
+                      <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden xs:inline">Export</span>
                     </Button>
                   </div>
                 </div>
@@ -1506,222 +1882,226 @@ const PriceCalculator: React.FC = () => {
                 transition={{ duration: 0.2 }}
               >
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Training Sessions</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg">Training Sessions</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
                       Manage weekly training sessions and track attendance
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 sm:p-6">
                     {filteredTrainingSessions.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No training sessions found</h3>
-                        <p className="text-gray-500 mb-4">Try adjusting your filters or add a new training session.</p>
-                        <Button onClick={() => setShowAddTraining(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Training Session
+                      <div className="text-center py-8 sm:py-12">
+                        <Calendar className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-1 sm:mb-2">
+                          No training sessions found
+                        </h3>
+                        <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
+                          Try adjusting your filters or add a new training session.
+                        </p>
+                        <Button onClick={() => setShowAddTraining(true)} size="sm" className="text-xs sm:text-sm">
+                          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                          Add Training
                         </Button>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {filteredTrainingSessions.map(session => (
-                          <Card key={session.id} className="overflow-hidden">
-                            <div className="p-6">
-                              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
-                                <div className="flex-1">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div>
-                                      <h3 className="text-lg font-semibold text-gray-900">{session.title}</h3>
-                                      <p className="text-sm text-gray-600 mt-1">{session.description}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Badge className={trainingTypes.find(t => t.value === session.type)?.color}>
-                                        {trainingTypes.find(t => t.value === session.type)?.label}
-                                      </Badge>
-                                      <Badge className={getStatusBadge(session.status)}>
-                                        {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">{formatDate(session.date)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">{session.time} ({session.duration})</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <User className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">{session.trainer}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <User className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">Supervisor: {session.supervisor}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Building className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">Site: {session.site}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Building className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">{session.department}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Users className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">
-                                        {session.attendees.length}/{session.maxAttendees} attendees
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Target className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm text-gray-600">{session.location}</span>
-                                    </div>
-                                  </div>
-                                  
-                                  {session.objectives.length > 0 && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Objectives:</h4>
-                                      <ul className="list-disc pl-5 space-y-1">
-                                        {session.objectives.map((objective, index) => (
-                                          <li key={index} className="text-sm text-gray-600">{objective}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  
-                                  {session.attachments.length > 0 && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments:</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {session.attachments.map(attachment => (
-                                          <Badge key={attachment.id} variant="outline" className="flex items-center gap-1">
-                                            {attachment.type === 'image' ? (
-                                              <ImageIcon className="h-3 w-3" />
-                                            ) : attachment.type === 'video' ? (
-                                              <Video className="h-3 w-3" />
-                                            ) : (
-                                              <File className="h-3 w-3" />
-                                            )}
-                                            {attachment.name}
-                                          </Badge>
-                                        ))}
+                      <div className="space-y-3 sm:space-y-4">
+                        {/* Desktop View */}
+                        <div className="hidden md:block">
+                          {filteredTrainingSessions.map(session => (
+                            <Card key={session.id} className="overflow-hidden mb-4">
+                              <div className="p-4 sm:p-6">
+                                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="min-w-0 flex-1">
+                                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                          {session.title}
+                                        </h3>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                          {session.description}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                                        <Badge className={trainingTypes.find(t => t.value === session.type)?.color}>
+                                          {trainingTypes.find(t => t.value === session.type)?.label}
+                                        </Badge>
+                                        <Badge className={getStatusBadge(session.status)}>
+                                          {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                                        </Badge>
                                       </div>
                                     </div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex flex-col gap-2">
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        View Details
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-3xl">
-                                      <DialogHeader>
-                                        <DialogTitle>Training Session Details</DialogTitle>
-                                      </DialogHeader>
-                                      <div className="space-y-4">
-                                        <div>
-                                          <h3 className="text-lg font-semibold">{session.title}</h3>
-                                          <p className="text-gray-600">{session.description}</p>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Date & Time</p>
-                                            <p>{formatDate(session.date)} at {session.time}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Duration</p>
-                                            <p>{session.duration}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Trainer</p>
-                                            <p>{session.trainer}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Supervisor</p>
-                                            <p>{session.supervisor}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Site</p>
-                                            <p>{session.site}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Department</p>
-                                            <p>{session.department}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Location</p>
-                                            <p>{session.location}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Status</p>
-                                            <Badge className={getStatusBadge(session.status)}>
-                                              {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                                    
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+                                      <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                          {formatDate(session.date)}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                          {session.time} ({session.duration})
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                          {session.trainer}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                                          {session.attendees.length}/{session.maxAttendees} attendees
+                                        </span>
+                                      </div>
+                                    </div>
+                                    
+                                    {session.objectives.length > 0 && (
+                                      <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                          Objectives:
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                          {session.objectives.map((obj, idx) => (
+                                            <Badge key={idx} variant="outline" className="text-xs">
+                                              {obj}
                                             </Badge>
-                                          </div>
+                                          ))}
                                         </div>
-                                        
-                                        {session.feedback.length > 0 && (
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex flex-row lg:flex-col gap-2 lg:min-w-[200px]">
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm" className="flex-1 lg:w-full">
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          View Details
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent className="w-[95vw] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                                        <DialogHeader>
+                                          <DialogTitle className="text-lg sm:text-xl">Training Session Details</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
                                           <div>
-                                            <h4 className="font-medium mb-2">Feedback</h4>
-                                            <div className="space-y-2">
-                                              {session.feedback.map(fb => (
-                                                <div key={fb.id} className="p-3 bg-gray-50 rounded">
-                                                  <div className="flex justify-between">
-                                                    <p className="font-medium">{fb.employeeName}</p>
-                                                    <div className="flex">
-                                                      {[...Array(5)].map((_, i) => (
-                                                        <Star key={i} className={`h-4 w-4 ${i < fb.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                  <p className="text-sm text-gray-600 mt-1">{fb.comment}</p>
-                                                </div>
-                                              ))}
+                                            <h3 className="text-base sm:text-lg font-semibold">{session.title}</h3>
+                                            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">{session.description}</p>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Date & Time</p>
+                                              <p className="text-sm">{formatDate(session.date)} at {session.time}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Duration</p>
+                                              <p className="text-sm">{session.duration}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Trainer</p>
+                                              <p className="text-sm">{session.trainer}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Supervisor</p>
+                                              <p className="text-sm">{session.supervisor}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Site</p>
+                                              <p className="text-sm">{session.site}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Department</p>
+                                              <p className="text-sm">{session.department}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Location</p>
+                                              <p className="text-sm">{session.location}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Status</p>
+                                              <Badge className={getStatusBadge(session.status)}>
+                                                {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                                              </Badge>
                                             </div>
                                           </div>
-                                        )}
-                                      </div>
-                                    </DialogContent>
-                                  </Dialog>
-                                  
-                                  <div className="flex gap-2">
-                                    <Select
-                                      value={session.status}
-                                      onValueChange={(value: any) => updateTrainingStatus(session.id, value)}
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="scheduled">Scheduled</SelectItem>
-                                        <SelectItem value="ongoing">Ongoing</SelectItem>
-                                        <SelectItem value="completed">Completed</SelectItem>
-                                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                          
+                                          {session.objectives.length > 0 && (
+                                            <div>
+                                              <h4 className="text-sm sm:text-base font-medium mb-2">Objectives</h4>
+                                              <ul className="list-disc pl-5 space-y-1">
+                                                {session.objectives.map((obj, idx) => (
+                                                  <li key={idx} className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{obj}</li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          )}
+                                          
+                                          {session.feedback.length > 0 && (
+                                            <div>
+                                              <h4 className="text-sm sm:text-base font-medium mb-2">Feedback</h4>
+                                              <div className="space-y-2">
+                                                {session.feedback.map(fb => (
+                                                  <div key={fb.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                                      <p className="font-medium text-sm">{fb.employeeName}</p>
+                                                      <div className="flex">
+                                                        {[...Array(5)].map((_, i) => (
+                                                          <Star key={i} className={`h-3 w-3 sm:h-4 sm:w-4 ${i < fb.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">{fb.comment}</p>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </DialogContent>
+                                    </Dialog>
                                     
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => deleteTraining(session.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={session.status}
+                                        onValueChange={(value: any) => updateTrainingStatus(session.id, value)}
+                                      >
+                                        <SelectTrigger className="flex-1 h-8 text-xs sm:text-sm">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                                          <SelectItem value="ongoing">Ongoing</SelectItem>
+                                          <SelectItem value="completed">Completed</SelectItem>
+                                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => deleteTraining(session.id)}
+                                        className="flex-shrink-0 px-2"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          </Card>
-                        ))}
+                            </Card>
+                          ))}
+                        </div>
+
+                        {/* Mobile View */}
+                        <div className="md:hidden space-y-3">
+                          {filteredTrainingSessions.map(session => (
+                            <MobileTrainingCard key={session.id} session={session} />
+                          ))}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -1736,216 +2116,230 @@ const PriceCalculator: React.FC = () => {
                 transition={{ duration: 0.2 }}
               >
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Staff Briefings</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg">Staff Briefings</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
                       Daily staff briefings and action items
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 sm:p-6">
                     {filteredStaffBriefings.length === 0 ? (
-                      <div className="text-center py-12">
-                        <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No staff briefings found</h3>
-                        <p className="text-gray-500 mb-4">Try adjusting your filters or add a new staff briefing.</p>
-                        <Button onClick={() => setShowAddBriefing(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Staff Briefing
+                      <div className="text-center py-8 sm:py-12">
+                        <MessageSquare className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-1 sm:mb-2">
+                          No staff briefings found
+                        </h3>
+                        <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
+                          Try adjusting your filters or add a new staff briefing.
+                        </p>
+                        <Button onClick={() => setShowAddBriefing(true)} size="sm" className="text-xs sm:text-sm">
+                          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                          Add Briefing
                         </Button>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {filteredStaffBriefings.map(briefing => (
-                          <Card key={briefing.id} className="overflow-hidden">
-                            <div className="p-6">
-                              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
-                                <div className="flex-1">
-                                  <div className="flex items-start justify-between mb-2">
-                                    <div>
-                                      <h3 className="text-lg font-semibold text-gray-900">
-                                        Staff Briefing - {briefing.site}
-                                      </h3>
-                                      <div className="flex items-center gap-3 mt-1">
-                                        <Badge className={getShiftBadge(briefing.shift)}>
-                                          {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
-                                        </Badge>
-                                        <span className="text-sm text-gray-600">by {briefing.conductedBy}</span>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-sm font-medium text-gray-900">{formatDate(briefing.date)}</p>
-                                      <p className="text-sm text-gray-600">{briefing.time}</p>
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-700 mb-1">Department:</p>
-                                      <p className="text-gray-600">{briefing.department}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-700 mb-1">Attendees:</p>
-                                      <p className="text-gray-600">{briefing.attendeesCount} staff members</p>
-                                    </div>
-                                  </div>
-                                  
-                                  {briefing.topics.length > 0 && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Topics Discussed:</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {briefing.topics.map((topic, index) => (
-                                          <Badge key={index} variant="outline">
-                                            {topic}
+                      <div className="space-y-3 sm:space-y-4">
+                        {/* Desktop View */}
+                        <div className="hidden md:block">
+                          {filteredStaffBriefings.map(briefing => (
+                            <Card key={briefing.id} className="overflow-hidden mb-4">
+                              <div className="p-4 sm:p-6">
+                                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div>
+                                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                          Staff Briefing - {briefing.site}
+                                        </h3>
+                                        <div className="flex flex-wrap items-center gap-3 mt-1">
+                                          <Badge className={getShiftBadge(briefing.shift)}>
+                                            {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
                                           </Badge>
-                                        ))}
+                                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                                            by {briefing.conductedBy}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="text-right ml-4 flex-shrink-0">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                          {formatDate(briefing.date)}
+                                        </p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{briefing.time}</p>
                                       </div>
                                     </div>
-                                  )}
-                                  
-                                  {briefing.keyPoints.length > 0 && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Key Points:</h4>
-                                      <ul className="list-disc pl-5 space-y-1">
-                                        {briefing.keyPoints.map((point, index) => (
-                                          <li key={index} className="text-sm text-gray-600">{point}</li>
-                                        ))}
-                                      </ul>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 mt-4">
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Department:</p>
+                                        <p className="text-gray-600 dark:text-gray-400">{briefing.department}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Attendees:</p>
+                                        <p className="text-gray-600 dark:text-gray-400">{briefing.attendeesCount} staff</p>
+                                      </div>
                                     </div>
-                                  )}
-                                  
-                                  {briefing.actionItems.length > 0 && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Action Items:</h4>
-                                      <div className="space-y-2">
-                                        {briefing.actionItems.map(item => (
-                                          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                                            <div className="flex items-center gap-3">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => updateActionItemStatus(
-                                                  briefing.id,
-                                                  item.id,
-                                                  item.status === 'completed' ? 'pending' : 'completed'
-                                                )}
-                                              >
-                                                {item.status === 'completed' ? (
-                                                  <CheckSquare className="h-4 w-4 text-green-500" />
-                                                ) : (
-                                                  <Square className="h-4 w-4 text-gray-400" />
-                                                )}
-                                              </Button>
-                                              <div>
-                                                <p className="font-medium">{item.description}</p>
-                                                <div className="flex items-center gap-3 text-xs text-gray-500">
-                                                  <span>Assigned to: {item.assignedTo}</span>
-                                                  <span>Due: {formatDate(item.dueDate)}</span>
+                                    
+                                    {briefing.topics.length > 0 && (
+                                      <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                          Topics:
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                          {briefing.topics.map((topic, index) => (
+                                            <Badge key={index} variant="outline" className="text-xs">
+                                              {topic}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {briefing.keyPoints.length > 0 && (
+                                      <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                          Key Points:
+                                        </h4>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                          {briefing.keyPoints.map((point, index) => (
+                                            <li key={index} className="text-sm text-gray-600 dark:text-gray-400">
+                                              {point}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    
+                                    {briefing.actionItems.length > 0 && (
+                                      <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                          Action Items:
+                                        </h4>
+                                        <div className="space-y-2">
+                                          {briefing.actionItems.map(item => (
+                                            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded gap-2">
+                                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={() => updateActionItemStatus(
+                                                    briefing.id,
+                                                    item.id,
+                                                    item.status === 'completed' ? 'pending' : 'completed'
+                                                  )}
+                                                  className="flex-shrink-0 p-1 h-auto"
+                                                >
+                                                  {item.status === 'completed' ? (
+                                                    <CheckSquare className="h-4 w-4 text-green-500" />
+                                                  ) : (
+                                                    <Square className="h-4 w-4 text-gray-400" />
+                                                  )}
+                                                </Button>
+                                                <div className="min-w-0 flex-1">
+                                                  <p className="font-medium text-sm truncate">{item.description}</p>
+                                                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                                    <span className="truncate">Assigned: {item.assignedTo}</span>
+                                                    <span className="whitespace-nowrap">Due: {formatDate(item.dueDate)}</span>
+                                                  </div>
                                                 </div>
                                               </div>
+                                              <Badge className={getPriorityBadge(item.priority) + " sm:ml-2 self-start sm:self-center"}>
+                                                {item.priority.toUpperCase()}
+                                              </Badge>
                                             </div>
-                                            <Badge className={getPriorityBadge(item.priority)}>
-                                              {item.priority.toUpperCase()}
-                                            </Badge>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {briefing.attachments.length > 0 && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments:</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {briefing.attachments.map(attachment => (
-                                          <Badge key={attachment.id} variant="outline" className="flex items-center gap-1">
-                                            {attachment.type === 'image' ? (
-                                              <ImageIcon className="h-3 w-3" />
-                                            ) : attachment.type === 'video' ? (
-                                              <Video className="h-3 w-3" />
-                                            ) : (
-                                              <File className="h-3 w-3" />
-                                            )}
-                                            {attachment.name}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {briefing.notes && (
-                                    <div className="mt-4">
-                                      <h4 className="text-sm font-medium text-gray-700 mb-2">Notes:</h4>
-                                      <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{briefing.notes}</p>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex flex-col gap-2">
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        View Details
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-3xl">
-                                      <DialogHeader>
-                                        <DialogTitle>Staff Briefing Details</DialogTitle>
-                                      </DialogHeader>
-                                      <div className="space-y-4">
-                                        <div>
-                                          <h3 className="text-lg font-semibold">
-                                            {briefing.site} - {briefing.department}
-                                          </h3>
-                                          <div className="flex items-center gap-3 mt-1">
-                                            <Badge className={getShiftBadge(briefing.shift)}>
-                                              {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
-                                            </Badge>
-                                            <span className="text-gray-600">Conducted by {briefing.conductedBy}</span>
-                                          </div>
+                                          ))}
                                         </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Date & Time</p>
-                                            <p>{formatDate(briefing.date)} at {briefing.time}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Attendees</p>
-                                            <p>{briefing.attendeesCount} staff members</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Site</p>
-                                            <p>{briefing.site}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-500">Department</p>
-                                            <p>{briefing.department}</p>
-                                          </div>
-                                        </div>
-                                        
-                                        {briefing.notes && (
-                                          <div>
-                                            <h4 className="font-medium mb-2">Notes</h4>
-                                            <p className="text-gray-600 bg-gray-50 p-3 rounded">{briefing.notes}</p>
-                                          </div>
-                                        )}
                                       </div>
-                                    </DialogContent>
-                                  </Dialog>
+                                    )}
+                                    
+                                    {briefing.notes && (
+                                      <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes:</h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded">
+                                          {briefing.notes}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
                                   
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => deleteBriefing(briefing.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
+                                  <div className="flex flex-row lg:flex-col gap-2 lg:min-w-[120px]">
+                                    <Dialog>
+                                      <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm" className="flex-1 lg:w-full">
+                                          <Eye className="h-4 w-4 mr-2" />
+                                          View
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent className="w-[95vw] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                                        <DialogHeader>
+                                          <DialogTitle className="text-lg sm:text-xl">Staff Briefing Details</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                          <div>
+                                            <h3 className="text-base sm:text-lg font-semibold">
+                                              {briefing.site} - {briefing.department}
+                                            </h3>
+                                            <div className="flex flex-wrap items-center gap-3 mt-1">
+                                              <Badge className={getShiftBadge(briefing.shift)}>
+                                                {briefing.shift.charAt(0).toUpperCase() + briefing.shift.slice(1)} Shift
+                                              </Badge>
+                                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                Conducted by {briefing.conductedBy}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Date & Time</p>
+                                              <p className="text-sm">{formatDate(briefing.date)} at {briefing.time}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Attendees</p>
+                                              <p className="text-sm">{briefing.attendeesCount} staff members</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Site</p>
+                                              <p className="text-sm">{briefing.site}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs sm:text-sm font-medium text-gray-500">Department</p>
+                                              <p className="text-sm">{briefing.department}</p>
+                                            </div>
+                                          </div>
+                                          
+                                          {briefing.notes && (
+                                            <div>
+                                              <h4 className="text-sm sm:text-base font-medium mb-2">Notes</h4>
+                                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded">
+                                                {briefing.notes}
+                                              </p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </DialogContent>
+                                    </Dialog>
+                                    
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteBriefing(briefing.id)}
+                                      className="flex-shrink-0 px-2"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </Card>
-                        ))}
+                            </Card>
+                          ))}
+                        </div>
+
+                        {/* Mobile View */}
+                        <div className="md:hidden space-y-3">
+                          {filteredStaffBriefings.map(briefing => (
+                            <MobileBriefingCard key={briefing.id} briefing={briefing} />
+                          ))}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -1962,59 +2356,67 @@ const PriceCalculator: React.FC = () => {
           transition={{ delay: 0.1 }}
         >
           <Card>
-            <CardHeader>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle>Training & Briefing Calendar</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-base sm:text-lg">Training & Briefing Calendar</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     View all scheduled training sessions and staff briefings
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Button variant="outline" size="sm" onClick={prevMonth}>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={prevMonth} className="h-8 w-8 p-0">
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <h3 className="text-lg font-semibold">
+                  <h3 className="text-sm sm:text-base font-semibold min-w-[140px] text-center">
                     {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </h3>
-                  <Button variant="outline" size="sm" onClick={nextMonth}>
+                  <Button variant="outline" size="sm" onClick={nextMonth} className="h-8 w-8 p-0">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center font-medium text-gray-500 py-2">
-                    {day}
+            <CardContent className="p-3 sm:p-6">
+              {/* Calendar Grid - Simplified for now */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                  <div key={idx} className="text-center font-medium text-gray-500 dark:text-gray-400 py-2 text-xs sm:text-sm">
+                    <span className="hidden sm:inline">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][idx]}</span>
+                    <span className="sm:hidden">{day}</span>
                   </div>
                 ))}
                 
-                {/* Calendar days would be rendered here */}
-                {/* This is a simplified version - you would implement full calendar logic */}
-                
-                <div className="text-center text-gray-400 py-8">
-                  Calendar view would show training sessions and briefings on their respective dates
-                </div>
+                {/* Placeholder calendar days */}
+                {[...Array(35)].map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="aspect-square border rounded p-1 sm:p-2 text-xs sm:text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  >
+                    <div className="text-right text-gray-600 dark:text-gray-400">{idx + 1}</div>
+                  </div>
+                ))}
               </div>
               
-              <div className="space-y-4 mt-8">
-                <h4 className="font-semibold">Upcoming Events</h4>
+              {/* Upcoming Events */}
+              <div className="space-y-3 mt-6 sm:mt-8">
+                <h4 className="text-sm sm:text-base font-semibold">Upcoming Events</h4>
                 {calendarEvents
                   .filter(event => new Date(event.date) >= new Date())
                   .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                   .slice(0, 5)
                   .map(event => (
-                    <div key={event.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className={`h-3 w-3 rounded-full ${event.color}`}></div>
-                      <div className="flex-1">
-                        <p className="font-medium">{event.title}</p>
-                        <p className="text-sm text-gray-600">
-                          {formatDate(event.date)} • {event.type === 'training' ? 'Training' : 'Briefing'}
-                        </p>
+                    <div key={event.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full ${event.color}`}></div>
+                        <div className="flex-1">
+                          <p className="text-xs sm:text-sm font-medium truncate max-w-[200px]">{event.title}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {formatDate(event.date)} • {event.type === 'training' ? 'Training' : 'Briefing'}
+                          </p>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="text-xs sm:text-sm ml-auto sm:ml-0">
                         View
                       </Button>
                     </div>
@@ -2041,4 +2443,4 @@ const List: React.FC<{ className?: string }> = ({ className = "h-4 w-4" }) => (
   </svg>
 );
 
-export default PriceCalculator;
+export default TrainingBriefingSection;

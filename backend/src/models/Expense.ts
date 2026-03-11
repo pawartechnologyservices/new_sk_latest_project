@@ -1,119 +1,98 @@
-
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IExpense extends Document {
-  expenseId: string;
+  siteId: mongoose.Types.ObjectId;
+  expenseType: string;
   category: string;
   description: string;
   amount: number;
-  baseAmount: number;
-  gst: number;
   date: Date;
-  status: 'pending' | 'approved' | 'rejected';
   vendor: string;
   paymentMethod: string;
-  site: string;
-  expenseType: 'operational' | 'office' | 'other';
+  customFields?: Array<{
+    fieldName: string;
+    fieldValue: string;
+  }>;
   receiptUrl?: string;
-  notes?: string;
-  createdBy: string;
+  createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const ExpenseSchema = new Schema<IExpense>({
-  expenseId: {
-    type: String,
-    required: true,
-    unique: true,
-    default: () => `EXP-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`
-  },
-  category: {
-    type: String,
-    required: true
-  },
-  description: {
-    type: String,
-    required: true
-  },
-  baseAmount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  gst: {
-    type: Number,
-    required: true,
-    default: 0
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  date: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
-  },
-  vendor: {
-    type: String,
-    required: true
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['Bank Transfer', 'Credit Card', 'UPI', 'Cash', 'Cheque', 'Online Payment'],
-    required: true
-  },
-  site: {
-    type: String,
-    required: true
+  siteId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Site',
+    required: [true, 'Site ID is required'],
+    index: true
   },
   expenseType: {
     type: String,
-    enum: ['operational', 'office', 'other'],
-    required: true
+    required: [true, 'Expense type is required'],
+    enum: ['operational', 'maintenance', 'salary', 'utility', 'supplies', 'other']
   },
+  category: {
+    type: String,
+    required: [true, 'Category is required'],
+    enum: [
+      'housekeeping', 'security', 'parking', 'waste_management',
+      'maintenance', 'electricity', 'water', 'internet',
+      'salary', 'supplies', 'equipment', 'transportation',
+      'office_expense', 'other'
+    ]
+  },
+  description: {
+    type: String,
+    required: [true, 'Description is required'],
+    trim: true
+  },
+  amount: {
+    type: Number,
+    required: [true, 'Amount is required'],
+    min: [0, 'Amount cannot be negative']
+  },
+  date: {
+    type: Date,
+    required: [true, 'Date is required'],
+    default: Date.now,
+    index: true
+  },
+  vendor: {
+    type: String,
+    required: [true, 'Vendor name is required'],
+    trim: true
+  },
+  paymentMethod: {
+    type: String,
+    required: [true, 'Payment method is required'],
+    enum: ['cash', 'bank transfer', 'credit card', 'cheque', 'upi']
+  },
+  customFields: [{
+    fieldName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    fieldValue: {
+      type: String,
+      required: true,
+      trim: true
+    }
+  }],
   receiptUrl: {
-    type: String
-  },
-  notes: {
-    type: String
+    type: String,
+    trim: true
   },
   createdBy: {
     type: String,
-    required: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+    trim: true
   }
 }, {
   timestamps: true
 });
 
-// Pre-save middleware to calculate amount
-ExpenseSchema.pre('save', function(next) {
-  this.amount = this.baseAmount + this.gst;
-  next();
-});
-
-// Indexes for better query performance
-ExpenseSchema.index({ expenseId: 1 });
-ExpenseSchema.index({ status: 1 });
-ExpenseSchema.index({ expenseType: 1 });
-ExpenseSchema.index({ site: 1 });
-ExpenseSchema.index({ date: 1 });
-ExpenseSchema.index({ vendor: 1 });
+// Compound indexes for better query performance
+ExpenseSchema.index({ siteId: 1, date: -1 });
+ExpenseSchema.index({ siteId: 1, category: 1 });
 
 export default mongoose.model<IExpense>('Expense', ExpenseSchema);
-
