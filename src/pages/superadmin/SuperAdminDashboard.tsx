@@ -209,7 +209,19 @@ interface DailyAttendanceSummary {
     }
   };
 }
+// REMOVE THESE LINES - they are outside the component
+// Add these navigation handler functions
+// Add these navigation handler functions
+// Add these navigation handler functions
+const handleManagerAttendance = () => {
+  console.log('Navigating to managers tab');
+  navigate('/superadmin/users?tab=managers');
+};
 
+const handleSupervisorAttendance = () => {
+  console.log('Navigating to supervisors tab');
+  navigate('/superadmin/users?tab=supervisors');
+};
 // Fetch all employees and count ONLY THOSE ASSIGNED TO SITES
 const fetchEmployeesAssignedToSites = async (): Promise<{employees: Employee[], siteCounts: SiteEmployeeCount[]}> => {
   try {
@@ -951,6 +963,20 @@ const SuperAdminDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const navigate = useNavigate();
 
+  // ✅ CORRECT: Navigation handlers defined inside the component
+  const handleManagerAttendance = () => {
+    console.log('Navigating to managers tab');
+    navigate('/superadmin/users?tab=managers');
+  };
+
+  const handleSupervisorAttendance = () => {
+    console.log('Navigating to supervisors tab');
+    navigate('/superadmin/users?tab=supervisors');
+  };
+
+  // State for attendance data
+ 
+  // ... rest of your state declarations
   // State for attendance data
   const [attendanceData, setAttendanceData] = useState<DailyAttendanceSummary[]>([]);
   const [loadingAttendance, setLoadingAttendance] = useState(true);
@@ -1313,7 +1339,51 @@ const SuperAdminDashboard = () => {
             </CardContent>
           </Card>
         </motion.div>
+{/* Quick Navigation Buttons */}
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.12 }}
+  className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
+>
+  {/* Manager Attendance Button */}
+  <Button
+    onClick={handleManagerAttendance}
+    className="h-auto py-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group"
+  >
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-4">
+        <div className="p-2 bg-white/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+          <Briefcase className="h-6 w-6" />
+        </div>
+        <div className="text-left">
+          <div className="text-lg font-semibold">Manager Attendance</div>
+          <div className="text-sm text-white/80">View and manage manager attendance</div>
+        </div>
+      </div>
+      <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+    </div>
+  </Button>
 
+  {/* Supervisor Attendance Button */}
+  <Button
+    onClick={handleSupervisorAttendance}
+    className="h-auto py-6 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group"
+  >
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-4">
+        <div className="p-2 bg-white/20 rounded-lg group-hover:scale-110 transition-transform duration-300">
+          <Shield className="h-6 w-6" />
+        </div>
+        <div className="text-left">
+          <div className="text-lg font-semibold">Supervisor Attendance</div>
+          <div className="text-sm text-white/80">View and manage supervisor attendance</div>
+        </div>
+      </div>
+      <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+    </div>
+  </Button>
+</motion.div>
         {/* Site Employee Counts Summary - ONLY EMPLOYEES ASSIGNED TO SITES */}
         {siteEmployeeCounts.length > 0 && (
           <motion.div
