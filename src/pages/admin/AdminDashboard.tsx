@@ -209,7 +209,19 @@ interface DailyAttendanceSummary {
     }
   };
 }
+// REMOVE THESE LINES - they are outside the component
+// Add these navigation handler functions
+// Add these navigation handler functions
+// Add these navigation handler functions
+const handleManagerAttendance = () => {
+  console.log('Navigating to managers tab');
+  navigate('/superadmin/users?tab=managers');
+};
 
+const handleSupervisorAttendance = () => {
+  console.log('Navigating to supervisors tab');
+  navigate('/superadmin/users?tab=supervisors');
+};
 // Fetch all employees and count ONLY THOSE ASSIGNED TO SITES
 const fetchEmployeesAssignedToSites = async (): Promise<{employees: Employee[], siteCounts: SiteEmployeeCount[]}> => {
   try {
@@ -297,9 +309,11 @@ const fetchEmployeesAssignedToSites = async (): Promise<{employees: Employee[], 
 };
 
 // Fetch attendance data from API and calculate totals across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES)
+// Fetch attendance data from API and calculate totals across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES)
+// EXCLUDING managers and supervisors from the counts
 const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSummary[]> => {
   try {
-    console.log(`🔄 Fetching attendance data for last ${days} days across ALL sites (only site-assigned employees)...`);
+    console.log(`🔄 Fetching attendance data for last ${days} days across ALL sites (only site-assigned employees, excluding managers/supervisors)...`);
     
     const endDate = new Date();
     const startDate = new Date();
@@ -315,10 +329,19 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
     const siteAssignedEmployees = employeesWithCounts.employees;
     const siteCounts = employeesWithCounts.siteCounts;
     
-    // Calculate total employees assigned to sites
-    const totalEmployeesAssignedToSites = siteAssignedEmployees.length;
+    // Filter out managers and supervisors from the employee list for counting
+    const staffEmployees = siteAssignedEmployees.filter(emp => !emp.isManager && !emp.isSupervisor);
+    const managersAndSupervisors = siteAssignedEmployees.filter(emp => emp.isManager || emp.isSupervisor);
     
-    console.log(`Total employees assigned to sites: ${totalEmployeesAssignedToSites}`);
+    // Calculate total staff employees assigned to sites (excluding managers/supervisors)
+    const totalStaffAssignedToSites = staffEmployees.length;
+    
+    console.log(`Total employees assigned to sites: ${siteAssignedEmployees.length}`);
+    console.log(`Staff employees (excluding managers/supervisors): ${totalStaffAssignedToSites}`);
+    console.log(`Managers & Supervisors (excluded from counts): ${managersAndSupervisors.length}`);
+    
+    // Create a set of staff employee IDs for quick lookup
+    const staffEmployeeIds = new Set(staffEmployees.map(emp => emp._id || emp.id));
     
     // Try to fetch attendance records
     let allRecords: AttendanceRecord[] = [];
@@ -398,19 +421,26 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
     
     console.log(`✅ Fetched ${allRecords.length} attendance records total across all sites`);
     
+    // Filter records to ONLY include staff employees (exclude managers and supervisors)
+    const staffRecords = allRecords.filter(record => 
+      staffEmployeeIds.has(record.employeeId)
+    );
+    
+    console.log(`✅ Filtered to ${staffRecords.length} attendance records for staff employees only (excluding managers/supervisors)`);
+    
     // Log sample records to see actual status values
-    if (allRecords.length > 0) {
-      console.log('Sample attendance record:', allRecords[0]);
+    if (staffRecords.length > 0) {
+      console.log('Sample staff attendance record:', staffRecords[0]);
       // Count status types to debug
       const statusCounts: {[key: string]: number} = {};
-      allRecords.forEach(record => {
+      staffRecords.forEach(record => {
         const status = record.status || 'unknown';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
       });
-      console.log('Status distribution in fetched records:', statusCounts);
+      console.log('Status distribution in staff records:', statusCounts);
     }
     
-    // Process records into daily summaries (TOTALS ACROSS ALL SITES - ONLY SITE-ASSIGNED EMPLOYEES)
+    // Process records into daily summaries (TOTALS ACROSS ALL SITES - ONLY STAFF EMPLOYEES)
     const dailySummaries: { [key: string]: DailyAttendanceSummary } = {};
     
     // Initialize all dates in range
@@ -430,16 +460,23 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
         total: 0,
         rate: '0.0%',
         index: days - Math.floor((new Date(endDate).getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)),
-        totalEmployees: totalEmployeesAssignedToSites,
+        totalEmployees: totalStaffAssignedToSites, // Use staff count, not total employees
         sitesWithData: 0,
         siteBreakdown: {}
       };
       
-      // Initialize site breakdown for this date using site counts from employees assigned to sites
-      siteCounts.forEach(site => {
+      // Initialize site breakdown for this date using site counts from staff employees only
+      // We need to recalculate site counts for staff only
+      const staffSiteCounts: { [siteName: string]: number } = {};
+      staffEmployees.forEach(emp => {
+        const siteName = emp.site || emp.siteName || 'Unknown';
+        staffSiteCounts[siteName] = (staffSiteCounts[siteName] || 0) + 1;
+      });
+      
+      Object.entries(staffSiteCounts).forEach(([siteName, count]) => {
         if (dailySummaries[dateStr].siteBreakdown) {
-          dailySummaries[dateStr].siteBreakdown![site.siteName] = {
-            total: site.totalEmployees,
+          dailySummaries[dateStr].siteBreakdown![siteName] = {
+            total: count,
             present: 0,
             absent: 0,
             weeklyOff: 0,
@@ -454,13 +491,15 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
     // Track which sites have data for each date
     const sitesWithDataPerDate: { [date: string]: Set<string> } = {};
     
-    // Create a set of valid site names from our site counts
-    const validSiteNames = new Set(siteCounts.map(site => site.siteName));
+    // Create a set of valid site names from our staff site counts
+    const staffSiteNames = new Set(
+      staffEmployees.map(emp => emp.site || emp.siteName || 'Unknown').filter(Boolean)
+    );
     
-    // Count attendance by date across ALL SITES (only for valid sites)
-    allRecords.forEach(record => {
-      // Only count attendance if the site is valid (has employees assigned)
-      if (record.siteName && validSiteNames.has(record.siteName) && dailySummaries[record.date]) {
+    // Count attendance by date across ALL SITES (only for staff employees)
+    staffRecords.forEach(record => {
+      // Only count attendance if the site is valid (has staff assigned)
+      if (record.siteName && staffSiteNames.has(record.siteName) && dailySummaries[record.date]) {
         // Track unique sites for this date
         if (!sitesWithDataPerDate[record.date]) {
           sitesWithDataPerDate[record.date] = new Set();
@@ -515,27 +554,24 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
       }
     });
     
-    // IMPORTANT FIX: For dates with no attendance data or partial data, calculate using site employee counts
-    // But we need to be careful not to overwrite the weekly off counts we already have
+    // IMPORTANT FIX: For dates with no attendance data or partial data, calculate using staff site counts
     Object.values(dailySummaries).forEach(summary => {
       // Calculate total accounted employees from attendance records
       const totalAccounted = summary.present + summary.weeklyOff + summary.leave + summary.absent;
       
-      // If we have fewer accounted employees than total employees, add the missing ones as absent
-      // But only if we actually have some attendance data for this date
-      // If totalAccounted is 0, it means no attendance records for this date at all
+      // If we have fewer accounted employees than total staff, add the missing ones as absent
       if (totalAccounted < summary.totalEmployees) {
         if (totalAccounted > 0) {
           // We have some attendance data, so missing employees are absent
           summary.absent += (summary.totalEmployees - totalAccounted);
         } else {
           // No attendance data at all for this date
-          // For now, mark all as absent (or you could mark as unknown)
+          // Mark all as absent
           summary.absent = summary.totalEmployees;
         }
       }
       
-      // Also update site breakdown to account for missing employees
+      // Also update site breakdown to account for missing staff
       if (summary.siteBreakdown) {
         Object.keys(summary.siteBreakdown).forEach(siteName => {
           const siteData = summary.siteBreakdown![siteName];
@@ -551,7 +587,6 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
       }
       
       // Calculate attendance rate (present + weekly off considered as present for rate)
-      // Note: Weekly off is considered present for attendance rate calculation
       const totalPresentWithWO = summary.present + summary.weeklyOff;
       summary.rate = summary.totalEmployees > 0 
         ? ((totalPresentWithWO / summary.totalEmployees) * 100).toFixed(1) + '%'
@@ -563,13 +598,13 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     
-    console.log(`📊 Processed ${summaries.length} daily summaries across all sites`);
-    console.log(`📈 Total employees assigned to sites: ${totalEmployeesAssignedToSites}`);
-    console.log(`🏢 Site breakdown:`, siteCounts);
+    console.log(`📊 Processed ${summaries.length} daily summaries across all sites (staff only)`);
+    console.log(`📈 Total staff assigned to sites: ${totalStaffAssignedToSites}`);
     
     // Log the first day's data for debugging
     if (summaries.length > 0) {
-      console.log('📅 Sample day data:', summaries[0]);
+      console.log('📅 Sample day data (staff only):', summaries[0]);
+      console.log('📊 Sample day breakdown - Present:', summaries[0].present, 'Weekly Off:', summaries[0].weeklyOff, 'Leave:', summaries[0].leave, 'Absent:', summaries[0].absent);
     }
     
     return summaries;
@@ -580,7 +615,7 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
       description: error.message || 'Using demo data instead'
     });
     
-    // Generate demo data as fallback with realistic totals (only site-assigned employees)
+    // Generate demo data as fallback with realistic totals (only staff employees)
     return generateDemoAttendanceData(days);
   }
 };
@@ -951,6 +986,20 @@ const SuperAdminDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const navigate = useNavigate();
 
+  // ✅ CORRECT: Navigation handlers defined inside the component
+  const handleManagerAttendance = () => {
+    console.log('Navigating to managers tab');
+    navigate('/superadmin/users?tab=managers');
+  };
+
+  const handleSupervisorAttendance = () => {
+    console.log('Navigating to supervisors tab');
+    navigate('/superadmin/users?tab=supervisors');
+  };
+
+  // State for attendance data
+ 
+  // ... rest of your state declarations
   // State for attendance data
   const [attendanceData, setAttendanceData] = useState<DailyAttendanceSummary[]>([]);
   const [loadingAttendance, setLoadingAttendance] = useState(true);
@@ -1253,7 +1302,7 @@ const SuperAdminDashboard = () => {
       <DashboardHeader
         title={
           <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Super Admin Dashboard
+           Admin Dashboard
           </span>
         }
         subtitle="Comprehensive Overview of Attendance, Departments, and Payroll"
@@ -1313,6 +1362,7 @@ const SuperAdminDashboard = () => {
             </CardContent>
           </Card>
         </motion.div>
+{/* Quick Navigation Buttons */}
 
         {/* Site Employee Counts Summary - ONLY EMPLOYEES ASSIGNED TO SITES */}
         {siteEmployeeCounts.length > 0 && (

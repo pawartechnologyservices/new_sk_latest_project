@@ -470,6 +470,7 @@ const SupervisorDashboard = () => {
     breakEndTime: null,
     totalHours: 0,
     breakTime: 0,
+    lastCheckInDate: null,
     hasCheckedInToday: false,
     hasCheckedOutToday: false
   });
@@ -511,40 +512,39 @@ const SupervisorDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Check backend connection
- // Check backend connection - UPDATED VERSION
-const checkBackendConnection = async () => {
-  try {
-    setIsCheckingConnection(true);
-    console.log('🔄 Checking backend connection at:', `${API_URL}`);
-    
-    // Check if we can connect to the server by making a request to employees endpoint
-    // This endpoint definitely exists in your backend
-    const response = await axios.get(`${API_URL}/employees?limit=1`, {
-      timeout: 5000,
-      validateStatus: (status) => status < 500 // Accept any status less than 500
-    });
-    
-    // If we get any response (even 404, 401, 403, etc.), the server is running
-    console.log(`✅ Backend connected (status: ${response.status})`);
-    setIsBackendConnected(true);
-    
-  } catch (error: any) {
-    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-      // Network error means server is not reachable
-      console.error('❌ Backend connection error - server not reachable:', error);
-      setIsBackendConnected(false);
-    } else if (error.response) {
-      // We got a response from the server (even if it's an error), so server is running
-      console.log(`✅ Backend is running but returned status ${error.response.status}`);
+  const checkBackendConnection = async () => {
+    try {
+      setIsCheckingConnection(true);
+      console.log('🔄 Checking backend connection at:', `${API_URL}`);
+      
+      // Check if we can connect to the server by making a request to employees endpoint
+      // This endpoint definitely exists in your backend
+      const response = await axios.get(`${API_URL}/employees?limit=1`, {
+        timeout: 5000,
+        validateStatus: (status) => status < 500 // Accept any status less than 500
+      });
+      
+      // If we get any response (even 404, 401, 403, etc.), the server is running
+      console.log(`✅ Backend connected (status: ${response.status})`);
       setIsBackendConnected(true);
-    } else {
-      console.error('❌ Backend connection error:', error);
-      setIsBackendConnected(false);
+      
+    } catch (error: any) {
+      if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+        // Network error means server is not reachable
+        console.error('❌ Backend connection error - server not reachable:', error);
+        setIsBackendConnected(false);
+      } else if (error.response) {
+        // We got a response from the server (even if it's an error), so server is running
+        console.log(`✅ Backend is running but returned status ${error.response.status}`);
+        setIsBackendConnected(true);
+      } else {
+        console.error('❌ Backend connection error:', error);
+        setIsBackendConnected(false);
+      }
+    } finally {
+      setIsCheckingConnection(false);
     }
-  } finally {
-    setIsCheckingConnection(false);
-  }
-};
+  };
 
   // Fetch tasks where this specific supervisor is assigned
   const fetchSupervisorSitesFromTasks = useCallback(async () => {
@@ -1227,7 +1227,8 @@ const checkBackendConnection = async () => {
   // Handle check-in
   const handleCheckIn = async () => {
     try {
-      if (attendance.hasCheckedInToday && !attendance.isCheckedIn) {
+      // FIX: Check if user has already checked in today - disable check-in button completely
+      if (attendance.hasCheckedInToday) {
         toast.error("You have already checked in today. Only one check-in allowed per day.");
         return;
       }
@@ -1437,9 +1438,15 @@ const checkBackendConnection = async () => {
     }
   };
 
-  // Reset attendance
+  // FIXED: Reset attendance - Now only works when it's actually a new day
   const handleResetAttendance = async () => {
     try {
+      // Check if it's actually a new day before allowing reset
+      if (!isNewDay()) {
+        toast.error("Cannot reset attendance for the same day. Please wait until tomorrow.");
+        return;
+      }
+
       console.log('🔄 Resetting attendance for new day...');
       
       setIsAttendanceLoading(true);
@@ -1462,6 +1469,7 @@ const checkBackendConnection = async () => {
         console.log('Reset API failed, using local reset:', resetError);
       }
       
+      // Create new attendance state for the new day
       const newAttendance = {
         isCheckedIn: false,
         isOnBreak: false,
@@ -1471,14 +1479,14 @@ const checkBackendConnection = async () => {
         breakEndTime: null,
         totalHours: 0,
         breakTime: 0,
-        lastCheckInDate: attendance.lastCheckInDate,
+        lastCheckInDate: new Date().toDateString(), // Update to today's date but with no check-in
         hasCheckedInToday: false,
         hasCheckedOutToday: false
       };
       
       saveAttendanceStatus(newAttendance);
       
-      toast.success("✅ Attendance reset for new day!");
+      toast.success("✅ Attendance reset for new day! You can now check in.");
       
     } catch (error) {
       console.error('Reset error:', error);
@@ -1491,6 +1499,12 @@ const checkBackendConnection = async () => {
   // Handle break in
   const handleBreakIn = async () => {
     try {
+      // FIX: Don't allow break if checked out
+      if (attendance.hasCheckedOutToday) {
+        toast.error("You have already checked out today. Cannot start break after check-out.");
+        return;
+      }
+
       if (!attendance.isCheckedIn) {
         toast.error("You need to check in first!");
         return;
@@ -1554,6 +1568,12 @@ const checkBackendConnection = async () => {
   // Handle break out
   const handleBreakOut = async () => {
     try {
+      // FIX: Don't allow break out if checked out
+      if (attendance.hasCheckedOutToday) {
+        toast.error("You have already checked out today. Cannot end break after check-out.");
+        return;
+      }
+
       if (!attendance.isOnBreak) {
         toast.error("You are not on break!");
         return;
@@ -1814,7 +1834,9 @@ const checkBackendConnection = async () => {
       const resetAttendance = {
         ...attendance,
         hasCheckedInToday: false,
-        hasCheckedOutToday: false
+        hasCheckedOutToday: false,
+        isCheckedIn: false,
+        isOnBreak: false
       };
       saveAttendanceStatus(resetAttendance);
     }
@@ -2132,15 +2154,18 @@ const checkBackendConnection = async () => {
                   >
                     {isAttendanceLoading ? "Processing..." : "Force Check Out"}
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleResetAttendance}
-                    disabled={isAttendanceLoading}
-                    className="text-xs"
-                  >
-                    {isAttendanceLoading ? "Processing..." : "Reset for New Day"}
-                  </Button>
+                  {/* FIX: Only show reset button if it's actually a new day */}
+                  {isNewDay() && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleResetAttendance}
+                      disabled={isAttendanceLoading}
+                      className="text-xs"
+                    >
+                      {isAttendanceLoading ? "Processing..." : "Reset for New Day"}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -2154,15 +2179,18 @@ const checkBackendConnection = async () => {
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   You have completed your attendance for today. Check-out allowed only once per day.
                 </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleResetAttendance}
-                  disabled={isAttendanceLoading}
-                  className="mt-2 text-xs border-green-300 text-green-700 hover:bg-green-100"
-                >
-                  {isAttendanceLoading ? "Processing..." : "Reset for New Day"}
-                </Button>
+                {/* FIX: Only show reset button if it's actually a new day */}
+                {isNewDay() && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleResetAttendance}
+                    disabled={isAttendanceLoading}
+                    className="mt-2 text-xs border-green-300 text-green-700 hover:bg-green-100"
+                  >
+                    {isAttendanceLoading ? "Processing..." : "Reset for New Day"}
+                  </Button>
+                )}
               </div>
             )}
 
@@ -2176,15 +2204,16 @@ const checkBackendConnection = async () => {
                   </Badge>
                 </div>
                 <div className="flex gap-2">
+                  {/* FIX: Check-in button disabled when hasCheckedInToday is true */}
                   <Button
                     onClick={handleCheckIn}
-                    disabled={attendance.isCheckedIn || (attendance.hasCheckedInToday && !attendance.hasCheckedOutToday) || isAttendanceLoading || isCheckingStatus}
+                    disabled={attendance.isCheckedIn || attendance.hasCheckedInToday || isAttendanceLoading || isCheckingStatus}
                     className="flex-1 flex items-center gap-2"
-                    variant={(attendance.isCheckedIn || (attendance.hasCheckedInToday && !attendance.hasCheckedOutToday) || isAttendanceLoading || isCheckingStatus) ? "outline" : "default"}
+                    variant={(attendance.isCheckedIn || attendance.hasCheckedInToday || isAttendanceLoading || isCheckingStatus) ? "outline" : "default"}
                   >
                     <LogIn className="h-4 w-4" />
                     {isAttendanceLoading ? "Processing..." : 
-                     attendance.hasCheckedInToday && !attendance.hasCheckedOutToday ? 'Already Checked In' : 
+                     attendance.hasCheckedInToday ? 'Already Checked In' : 
                      'Check In'}
                   </Button>
                   <Button
@@ -2211,7 +2240,7 @@ const checkBackendConnection = async () => {
                 )}
               </div>
 
-              {/* Break In/Out */}
+              {/* Break In/Out - FIX: Disable both buttons after check-out */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Break Status</span>
@@ -2222,26 +2251,37 @@ const checkBackendConnection = async () => {
                 <div className="flex gap-2">
                   <Button
                     onClick={handleBreakIn}
-                    disabled={!attendance.isCheckedIn || attendance.isOnBreak || isAttendanceLoading || isCheckingStatus}
+                    disabled={!attendance.isCheckedIn || attendance.isOnBreak || isAttendanceLoading || isCheckingStatus || attendance.hasCheckedOutToday}
                     className="flex-1 flex items-center gap-2"
-                    variant={(!attendance.isCheckedIn || attendance.isOnBreak || isAttendanceLoading || isCheckingStatus) ? "outline" : "default"}
+                    variant={(!attendance.isCheckedIn || attendance.isOnBreak || isAttendanceLoading || isCheckingStatus || attendance.hasCheckedOutToday) ? "outline" : "default"}
+                    title={attendance.hasCheckedOutToday ? "Cannot start break after check-out" : ""}
                   >
                     <Coffee className="h-4 w-4" />
-                    {isAttendanceLoading ? "Processing..." : "Break In"}
+                    {isAttendanceLoading ? "Processing..." : 
+                     attendance.hasCheckedOutToday ? 'Checked Out' :
+                     'Break In'}
                   </Button>
                   <Button
                     onClick={handleBreakOut}
-                    disabled={!attendance.isOnBreak || isAttendanceLoading || isCheckingStatus}
+                    disabled={!attendance.isOnBreak || isAttendanceLoading || isCheckingStatus || attendance.hasCheckedOutToday}
                     className="flex-1 flex items-center gap-2"
-                    variant={!attendance.isOnBreak || isAttendanceLoading || isCheckingStatus ? "outline" : "default"}
+                    variant={(!attendance.isOnBreak || isAttendanceLoading || isCheckingStatus || attendance.hasCheckedOutToday) ? "outline" : "default"}
+                    title={attendance.hasCheckedOutToday ? "Cannot end break after check-out" : ""}
                   >
                     <Timer className="h-4 w-4" />
-                    {isAttendanceLoading ? "Processing..." : "Break Out"}
+                    {isAttendanceLoading ? "Processing..." : 
+                     attendance.hasCheckedOutToday ? 'Checked Out' :
+                     'Break Out'}
                   </Button>
                 </div>
                 {attendance.breakStartTime && attendance.isOnBreak && (
                   <p className="text-xs text-gray-500">
                     Break started: {formatTimeForDisplay(attendance.breakStartTime)}
+                  </p>
+                )}
+                {attendance.hasCheckedOutToday && (
+                  <p className="text-xs text-orange-500">
+                    Break actions disabled - already checked out
                   </p>
                 )}
               </div>
@@ -2280,28 +2320,30 @@ const checkBackendConnection = async () => {
                 )}
               </div>
               
-              {/* Reset Button */}
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetAttendance}
-                  disabled={isAttendanceLoading || (!attendance.hasCheckedInToday && !attendance.hasCheckedOutToday)}
-                  className="w-full text-sm"
-                >
-                  {isAttendanceLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                      Resetting...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-3 w-3" />
-                      Reset Attendance for New Day
-                    </>
-                  )}
-                </Button>
-              </div>
+              {/* Reset Button - FIXED: Only show when it's actually a new day and user has checked in/out */}
+              {isNewDay() && (attendance.hasCheckedInToday || attendance.hasCheckedOutToday) && (
+                <div className="mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetAttendance}
+                    disabled={isAttendanceLoading}
+                    className="w-full text-sm"
+                  >
+                    {isAttendanceLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        Resetting...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-3 w-3" />
+                        Reset Attendance for New Day
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

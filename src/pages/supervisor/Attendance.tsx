@@ -146,6 +146,8 @@ interface AttendanceStatus {
   totalHours: number;
   breakTime: number;
   lastCheckInDate?: string | null;
+  hasCheckedInToday?: boolean;
+  hasCheckedOutToday?: boolean;
 }
 
 interface Task {
@@ -249,9 +251,9 @@ const MobileEmployeeAttendanceCard = ({
               <DropdownMenuItem onClick={() => onManual(employee)}>
                 <FileText className="h-4 w-4 mr-2" /> Manual Entry
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onStatusUpdate(employee, attendanceRecord || null)}>
+              {/* <DropdownMenuItem onClick={() => onStatusUpdate(employee, attendanceRecord || null)}>
                 <Edit className="h-4 w-4 mr-2" /> Update Status
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -313,7 +315,7 @@ const MobileEmployeeAttendanceCard = ({
                   {getStatusIcon(attendanceRecord.status)}
                   {attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </Badge>
-                <Button
+                {/* <Button
                   size="sm"
                   variant="ghost"
                   className="h-6 w-6 p-0"
@@ -321,7 +323,7 @@ const MobileEmployeeAttendanceCard = ({
                   disabled={updatingStatus}
                 >
                   <Edit className="h-3 w-3" />
-                </Button>
+                </Button> */}
               </div>
             </div>
 
@@ -1054,8 +1056,31 @@ const Attendance = () => {
       try {
         const statusResponse = await axios.get(`${API_URL}/attendance/status/${currentSupervisor.id}`);
         if (statusResponse.data && statusResponse.data.success) {
-          setCurrentStatus(statusResponse.data.data);
-          console.log('✅ Current status loaded:', statusResponse.data.data);
+          const apiAttendance = statusResponse.data.data;
+          const today = new Date().toDateString();
+          const lastCheckInDate = apiAttendance.lastCheckInDate ? 
+            new Date(apiAttendance.lastCheckInDate).toDateString() : null;
+          
+          const hasCheckedInToday = lastCheckInDate === today;
+          const hasCheckedOutToday = apiAttendance.checkOutTime && 
+            new Date(apiAttendance.checkOutTime).toDateString() === today;
+          
+          const newStatus: AttendanceStatus = {
+            isCheckedIn: apiAttendance.isCheckedIn || false,
+            isOnBreak: apiAttendance.isOnBreak || false,
+            checkInTime: apiAttendance.checkInTime || null,
+            checkOutTime: apiAttendance.checkOutTime || null,
+            breakStartTime: apiAttendance.breakStartTime || null,
+            breakEndTime: apiAttendance.breakEndTime || null,
+            totalHours: Number(apiAttendance.totalHours) || 0,
+            breakTime: Number(apiAttendance.breakTime) || 0,
+            lastCheckInDate: apiAttendance.lastCheckInDate || null,
+            hasCheckedInToday: hasCheckedInToday,
+            hasCheckedOutToday: hasCheckedOutToday
+          };
+          
+          setCurrentStatus(newStatus);
+          console.log('✅ Current status loaded:', newStatus);
         }
       } catch (statusError) {
         console.log('Status API call failed:', statusError);
@@ -1204,6 +1229,17 @@ const Attendance = () => {
   // Handle check-in for current supervisor
   const handleCheckIn = async () => {
     try {
+      // FIX: Check if user has already checked in today - disable check-in button completely
+      if (currentStatus?.hasCheckedInToday) {
+        toast.error("You have already checked in today. Only one check-in allowed per day.");
+        return;
+      }
+
+      if (currentStatus?.isCheckedIn) {
+        toast.error("You are already checked in!");
+        return;
+      }
+
       console.log('🔄 Attempting check-in for supervisor:', currentSupervisor.id);
       
       const payload = {
@@ -1226,7 +1262,9 @@ const Attendance = () => {
           isCheckedIn: true,
           checkInTime: now,
           checkOutTime: null,
-          lastCheckInDate: new Date().toDateString()
+          lastCheckInDate: new Date().toDateString(),
+          hasCheckedInToday: true,
+          hasCheckedOutToday: false
         } as AttendanceStatus;
         setCurrentStatus(newStatus);
         
@@ -1237,7 +1275,6 @@ const Attendance = () => {
       }
     } catch (error) {
       console.error('Check-in error:', error);
-      toast.error("Error checking in");
       
       // Fallback: Update local state
       const now = new Date().toISOString();
@@ -1246,15 +1283,39 @@ const Attendance = () => {
         isCheckedIn: true,
         checkInTime: now,
         checkOutTime: null,
-        lastCheckInDate: new Date().toDateString()
+        lastCheckInDate: new Date().toDateString(),
+        hasCheckedInToday: true,
+        hasCheckedOutToday: false
       } as AttendanceStatus;
       setCurrentStatus(newStatus);
+      
+      toast.error("Error checking in. Local record saved.");
     }
   };
 
   // Handle check-out for current supervisor
   const handleCheckOut = async () => {
     try {
+      if (currentStatus?.hasCheckedOutToday) {
+        toast.error("You have already checked out today.");
+        return;
+      }
+
+      if (!currentStatus?.isCheckedIn && !currentStatus?.hasCheckedInToday) {
+        toast.error("You need to check in first!");
+        return;
+      }
+
+      if (!currentStatus?.isCheckedIn && currentStatus?.hasCheckedInToday) {
+        toast.warning("You are not currently checked in, but you checked in earlier today.", {
+          action: {
+            label: "Force Check Out",
+            onClick: () => forceCheckOut()
+          }
+        });
+        return;
+      }
+
       console.log('🔄 Attempting check-out for supervisor:', currentSupervisor.id);
       
       const payload = {
@@ -1276,7 +1337,8 @@ const Attendance = () => {
           isCheckedIn: false,
           isOnBreak: false,
           checkOutTime: now,
-          totalHours: totalHours
+          totalHours: totalHours,
+          hasCheckedOutToday: true
         } as AttendanceStatus;
         setCurrentStatus(newStatus);
         
@@ -1287,7 +1349,6 @@ const Attendance = () => {
       }
     } catch (error) {
       console.error('Check-out error:', error);
-      toast.error("Error checking out");
       
       // Fallback: Update local state
       const now = new Date().toISOString();
@@ -1297,15 +1358,102 @@ const Attendance = () => {
         isCheckedIn: false,
         isOnBreak: false,
         checkOutTime: now,
-        totalHours: totalHours
+        totalHours: totalHours,
+        hasCheckedOutToday: true
       } as AttendanceStatus;
       setCurrentStatus(newStatus);
+      
+      toast.error("Error checking out. Local record saved.");
+    }
+  };
+
+  // Force check out
+  const forceCheckOut = async () => {
+    try {
+      console.log('🔄 Force checking out for supervisor:', currentSupervisor.id);
+      
+      const now = new Date().toISOString();
+      const totalHours = calculateTotalHours(currentStatus?.checkInTime, now);
+      
+      const newStatus = {
+        ...currentStatus,
+        isCheckedIn: false,
+        isOnBreak: false,
+        checkOutTime: now,
+        totalHours: totalHours,
+        hasCheckedOutToday: true
+      } as AttendanceStatus;
+      setCurrentStatus(newStatus);
+      
+      toast.success("Force checked out successfully!");
+      
+    } catch (error) {
+      console.error('Force check-out error:', error);
+      toast.error("Error force checking out");
+    }
+  };
+
+  // Reset attendance for new day
+  const resetAttendance = async () => {
+    try {
+      // Check if it's actually a new day before allowing reset
+      if (!isNewDay()) {
+        toast.error("Cannot reset attendance for the same day. Please wait until tomorrow.");
+        return;
+      }
+
+      console.log('🔄 Resetting attendance for new day...');
+      
+      // Try to call API if available
+      try {
+        await axios.post(`${API_URL}/attendance/reset/${currentSupervisor.id}`);
+      } catch (resetError) {
+        console.log('Reset API failed, using local reset:', resetError);
+      }
+      
+      const newStatus = {
+        isCheckedIn: false,
+        isOnBreak: false,
+        checkInTime: null,
+        checkOutTime: null,
+        breakStartTime: null,
+        breakEndTime: null,
+        totalHours: 0,
+        breakTime: 0,
+        lastCheckInDate: new Date().toDateString(),
+        hasCheckedInToday: false,
+        hasCheckedOutToday: false
+      } as AttendanceStatus;
+      
+      setCurrentStatus(newStatus);
+      
+      toast.success("Attendance reset for new day! You can now check in.");
+      
+    } catch (error) {
+      console.error('Reset error:', error);
+      toast.error("Error resetting attendance");
     }
   };
 
   // Handle break in for current supervisor
   const handleBreakIn = async () => {
     try {
+      // FIX: Don't allow break if checked out
+      if (currentStatus?.hasCheckedOutToday) {
+        toast.error("You have already checked out today. Cannot start break after check-out.");
+        return;
+      }
+
+      if (!currentStatus?.isCheckedIn) {
+        toast.error("You need to check in first!");
+        return;
+      }
+
+      if (currentStatus?.isOnBreak) {
+        toast.error("You are already on break!");
+        return;
+      }
+
       console.log('🔄 Starting break for supervisor:', currentSupervisor.id);
       
       const payload = {
@@ -1335,7 +1483,6 @@ const Attendance = () => {
       }
     } catch (error) {
       console.error('Break-in error:', error);
-      toast.error("Error starting break");
       
       // Fallback: Update local state
       const now = new Date().toISOString();
@@ -1345,12 +1492,25 @@ const Attendance = () => {
         breakStartTime: now
       } as AttendanceStatus;
       setCurrentStatus(newStatus);
+      
+      toast.error("Error starting break. Local record saved.");
     }
   };
 
   // Handle break out for current supervisor
   const handleBreakOut = async () => {
     try {
+      // FIX: Don't allow break out if checked out
+      if (currentStatus?.hasCheckedOutToday) {
+        toast.error("You have already checked out today. Cannot end break after check-out.");
+        return;
+      }
+
+      if (!currentStatus?.isOnBreak) {
+        toast.error("You are not on break!");
+        return;
+      }
+
       console.log('🔄 Ending break for supervisor:', currentSupervisor.id);
       
       const payload = {
@@ -1383,7 +1543,6 @@ const Attendance = () => {
       }
     } catch (error) {
       console.error('Break-out error:', error);
-      toast.error("Error ending break");
       
       // Fallback: Update local state
       const now = new Date().toISOString();
@@ -1396,6 +1555,8 @@ const Attendance = () => {
         breakTime: totalBreakTime
       } as AttendanceStatus;
       setCurrentStatus(newStatus);
+      
+      toast.error("Error ending break. Local record saved.");
     }
   };
 
@@ -1607,6 +1768,31 @@ const Attendance = () => {
       setLoadingWeekly(false);
     }
   };
+
+  // Check if it's a new day
+  const isNewDay = useCallback(() => {
+    if (!currentStatus?.lastCheckInDate) return true;
+    
+    const today = new Date().toDateString();
+    const lastCheckInDay = new Date(currentStatus.lastCheckInDate).toDateString();
+    
+    return today !== lastCheckInDay;
+  }, [currentStatus?.lastCheckInDate]);
+
+  // Auto-reset attendance if it's a new day
+  useEffect(() => {
+    if (currentStatus?.lastCheckInDate && isNewDay()) {
+      console.log('📅 New day detected, resetting attendance flags');
+      const resetStatus = {
+        ...currentStatus,
+        hasCheckedInToday: false,
+        hasCheckedOutToday: false,
+        isCheckedIn: false,
+        isOnBreak: false
+      };
+      setCurrentStatus(resetStatus as AttendanceStatus);
+    }
+  }, [currentStatus?.lastCheckInDate, isNewDay]);
 
   // Format time for display
   const formatTimeForDisplay = (timestamp: string | null): string => {
@@ -2442,7 +2628,7 @@ const Attendance = () => {
                   Today's Actions - {currentSupervisor.name}
                 </CardTitle>
                 <CardDescription>
-                  Check in/out and manage breaks for today
+                  Check in/out and manage breaks for today - One check-in/check-out allowed per day
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2475,55 +2661,121 @@ const Attendance = () => {
                         </p>
                       </div>
                     </div>
+                    
+                    {/* Daily Check-in/out Status */}
+                    {currentStatus?.hasCheckedInToday && !currentStatus?.isCheckedIn && !currentStatus?.hasCheckedOutToday && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-yellow-800">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="text-sm font-medium">Already Checked In Today</span>
+                        </div>
+                        <p className="text-xs text-yellow-600 mt-1">
+                          You have already checked in today. Check-in is allowed only once per day.
+                        </p>
+                        <div className="flex gap-2 mt-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={forceCheckOut}
+                            className="text-xs"
+                          >
+                            Force Check Out
+                          </Button>
+                          {isNewDay() && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={resetAttendance}
+                              className="text-xs"
+                            >
+                              Reset for New Day
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {currentStatus?.hasCheckedOutToday && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <CheckCircle className="h-4 w-4" />
+                          <span className="text-sm font-medium">Already Checked Out Today</span>
+                        </div>
+                        <p className="text-xs text-green-600 mt-1">
+                          You have completed your attendance for today.
+                        </p>
+                        {isNewDay() && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={resetAttendance}
+                            className="mt-2 text-xs"
+                          >
+                            Reset for New Day
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-4">
                     <h3 className="font-medium">Quick Actions</h3>
                     <div className="grid grid-cols-2 gap-3">
+                      {/* FIX: Check-in button disabled when hasCheckedInToday is true */}
                       <Button 
                         onClick={handleCheckIn}
-                        disabled={currentStatus?.isCheckedIn}
+                        disabled={currentStatus?.isCheckedIn || currentStatus?.hasCheckedInToday}
                         className="h-12"
                         size={isMobileView ? "sm" : "default"}
+                        variant={(currentStatus?.isCheckedIn || currentStatus?.hasCheckedInToday) ? "outline" : "default"}
                       >
                         <LogIn className="mr-2 h-5 w-5" />
-                        {!isMobileView && "Check In"}
-                        {isMobileView && "In"}
+                        {currentStatus?.hasCheckedInToday ? 'Already In' : 'Check In'}
                       </Button>
+                      
                       <Button 
                         onClick={handleCheckOut}
-                        disabled={!currentStatus?.isCheckedIn}
-                        variant="outline"
+                        disabled={(!currentStatus?.isCheckedIn && !currentStatus?.hasCheckedInToday) || currentStatus?.hasCheckedOutToday}
                         className="h-12"
                         size={isMobileView ? "sm" : "default"}
+                        variant={(!currentStatus?.isCheckedIn && !currentStatus?.hasCheckedInToday) || currentStatus?.hasCheckedOutToday ? "outline" : "default"}
                       >
                         <LogOut className="mr-2 h-5 w-5" />
-                        {!isMobileView && "Check Out"}
-                        {isMobileView && "Out"}
+                        {currentStatus?.hasCheckedOutToday ? 'Already Out' : 'Check Out'}
                       </Button>
+                      
+                      {/* FIX: Break buttons disabled after check-out */}
                       <Button 
                         onClick={handleBreakIn}
-                        disabled={!currentStatus?.isCheckedIn || currentStatus?.isOnBreak}
-                        variant="secondary"
+                        disabled={!currentStatus?.isCheckedIn || currentStatus?.isOnBreak || currentStatus?.hasCheckedOutToday}
                         className="h-12"
                         size={isMobileView ? "sm" : "default"}
+                        variant={(!currentStatus?.isCheckedIn || currentStatus?.isOnBreak || currentStatus?.hasCheckedOutToday) ? "outline" : "secondary"}
+                        title={currentStatus?.hasCheckedOutToday ? "Cannot start break after check-out" : ""}
                       >
                         <Clock className="mr-2 h-5 w-5" />
-                        {!isMobileView && "Start Break"}
-                        {isMobileView && "Break"}
+                        {currentStatus?.hasCheckedOutToday ? 'Checked Out' : 'Break In'}
                       </Button>
+                      
                       <Button 
                         onClick={handleBreakOut}
-                        disabled={!currentStatus?.isOnBreak}
-                        variant="secondary"
+                        disabled={!currentStatus?.isOnBreak || currentStatus?.hasCheckedOutToday}
                         className="h-12"
                         size={isMobileView ? "sm" : "default"}
+                        variant={(!currentStatus?.isOnBreak || currentStatus?.hasCheckedOutToday) ? "outline" : "secondary"}
+                        title={currentStatus?.hasCheckedOutToday ? "Cannot end break after check-out" : ""}
                       >
                         <Clock className="mr-2 h-5 w-5" />
-                        {!isMobileView && "End Break"}
-                        {isMobileView && "End"}
+                        {currentStatus?.hasCheckedOutToday ? 'Checked Out' : 'Break Out'}
                       </Button>
                     </div>
+                    
+                    {currentStatus?.hasCheckedOutToday && (
+                      <p className="text-xs text-orange-500">
+                        Break actions disabled - already checked out
+                      </p>
+                    )}
+                    
                     <div className="pt-4">
                       <Button 
                         onClick={handleRefresh}
@@ -2534,6 +2786,32 @@ const Attendance = () => {
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Refresh Status
                       </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="mt-6 pt-4 border-t">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Total Hours:</span>
+                      <p className="font-medium">{currentStatus?.totalHours ? currentStatus.totalHours.toFixed(2) : '0.00'} hrs</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Break Time:</span>
+                      <p className="font-medium">{currentStatus?.breakTime ? currentStatus.breakTime.toFixed(2) : '0.00'} hrs</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Employee ID:</span>
+                      <p className="font-medium text-sm">{currentSupervisor.id}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Daily Status:</span>
+                      <p className="font-medium">
+                        {currentStatus?.hasCheckedInToday ? 
+                          (currentStatus.hasCheckedOutToday ? "Completed" : "In Progress") : 
+                          "Not Started"}
+                      </p>
                     </div>
                   </div>
                 </div>
